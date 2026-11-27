@@ -40,13 +40,18 @@ The same fixture, still matched on 116th Congress ids, was run against the poole
 In the House, pooling changes little: the crossers break about 2.8 times as often as the party
 rather than 2.4 times, and their co-defection signal is about as strong. In the Senate the pooled
 crossers break about 2.7 times as often as their party (2.1 times in the 116th alone) and now look
-aligned. **Do not read the pooled Senate result as validation.** The 117th Congress began on
-January 3, 2021, so the pool contains the votes being predicted (in the Voteview files, House
-roll call 16 of the 117th Congress, 232 to 197 with 10 Republicans in favour, and Senate roll call
-59, 57 to 43 with 7 Republicans for conviction) and four years of votes cast after them. The 116th-only
-calibration is the only one without that leakage, and the defaults (`alignment_chamber_weight`
-Senate 0, the β values above) still rest on it. The pooled file is offered as a longer history for
-scenarios about later congresses, not as a better-validated one.
+aligned. **Do not read the pooled Senate result as validation.** The 117th Congress held the
+votes being predicted, so the pool contains them: the House impeachment vote
+([Clerk roll call 17 of 2021](https://clerk.house.gov/Votes/202117), 232 to 197; roll call 16 in
+Voteview's 117th Congress file) and the Senate verdict
+([vote 59 of the 117th Congress](https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00059.htm),
+57 to 43), along with the votes cast after them in the 117th and 118th Congresses. The comparison
+population also changes: the pooled party sets include members who served only in the 118th and
+were not in office for the 2021 votes, and they enter the party break rate, the random
+same-party sets and the β fit as non-crossers. The 116th-only calibration is the only one without
+these problems, and the defaults (`alignment_chamber_weight` Senate 0, the β values above) still
+rest on it. The pooled file is offered as a longer history for scenarios about later congresses,
+not as a better-validated one.
 
 ## What has not been checked
 
