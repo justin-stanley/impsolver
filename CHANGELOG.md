@@ -31,6 +31,10 @@ All notable changes are listed here. The format follows
   over them, and `evaluate` widens its bounds to the range; number-valued results are unchanged.
 - Portfolio `roster_changes` (dated vacancies and new seats): P0 is computed per roster epoch and
   each trial uses the roster in force on its first day; without changes results do not change.
+- The `portfolio --html` page has a tornado chart per scenario case (P with each bloc prior ±0.05,
+  rho ±0.2 and fatigue ±0.2, common random numbers; also `tornado` in the JSON), and
+  `impsolver compare-plans A.yaml B.yaml [--html OUT]` shows two portfolios or two scenarios side
+  by side; default results do not change.
 
 ### Changed
 - `portfolio` with succession rules: after each trigger's verdict, every branch re-orders the cases

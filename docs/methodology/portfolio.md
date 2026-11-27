@@ -117,3 +117,34 @@ The top plans, why any case was left out (`LOW_P`, `NO_FIT`, `EXCLUDED`, `DEPEND
 distribution of the number of removals. The joint distribution shares party swings across cases
 (at the first gate in each chamber when a scenario sets `gate_correlation` below 1) and follows the same decision tree as the expected value. `--html` writes all of it as a
 planning page.
+
+## Tornado chart
+
+For each case built from a scenario, the planning page (and `tornado` in the JSON output) shows
+how its probability moves when one input moves one notch and the rest stay as supplied:
+
+- each bloc's party prior, 0.05 down and up on the probability scale at every stage key the bloc
+  lists, clipped to [0, 1] (a clipped notch is labelled); a range or Beta prior moves as its
+  point value (its mean), which becomes a number in the moved run, so the chart measures the
+  point P(removal), not the uncertainty interval;
+- `rho`, 0.2 down and up, clipped to [0, 1];
+- the portfolio's `fatigue_delta`, 0.2 down and up, with the recommended order held fixed.
+
+The measured value is the case's P in the recommended order: P(removal) alone, then fatigue for
+the trials before it in that order's schedule (succession branches are not followed). A case
+left out of the plan is measured alone, without a fatigue bar. Every run reuses the scenario's
+seed and the portfolio's `draws`, so the member and swing draws are common random numbers: the
+base matches the plan, a swing reflects the input rather than Monte Carlo noise, and raising a
+bloc's prior can only raise P as long as the bloc's average stays on the same side of 0.5 at
+every gate (always, without alignment; with alignment the factor sign follows that side). Bars
+are sorted by swing, largest first. Members with an override or their own `p_pro` do not move
+with their bloc; a `defection_prior` is re-applied to the moved prior. P(removal) can move either
+way with `rho`, so read both ends of its bar.
+
+## Comparing two plans
+
+`impsolver compare-plans A.yaml B.yaml --html out.html` computes two portfolios (or two
+scenarios) exactly as `portfolio` (or `simulate`) would, then lines them up: a summary table with
+the differences, and each side's plan, per-case odds and tornado charts in two columns that stack
+on a phone. Scenarios use `--draws` (default 20,000) and their own seeds; portfolios use their
+own `draws`. Mixing a portfolio and a scenario is an error.

@@ -35,6 +35,10 @@ EXAMPLES: dict[str, list[str]] = {
         "--draws", "4000",
     ],
     "portfolio": ["portfolio", "examples/portfolio-example.yaml"],
+    "compare-plans": [
+        "compare-plans", "examples/scenario-cabinet-a.yaml", "examples/scenario-cabinet-b.yaml",
+        "--draws", "4000",
+    ],
     "calibrate": ["calibrate", "--alignment", "alignment/us-116.json", "--permutations", "2000"],
     "score": ["score", "--alignment", "alignment/us-116.json", "--draws", "4000"],
 }  # fmt: skip
