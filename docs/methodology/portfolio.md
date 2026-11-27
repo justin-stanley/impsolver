@@ -83,12 +83,16 @@ Pruning has to allow for epochs. Without roster changes, a partial plan that fre
 Senate no later than another, with at least the same value, is at least as good for every
 continuation. With roster changes that is no longer true: freeing the Senate earlier can put the
 next trial before a vacancy that would have helped it. The search therefore prunes such a plan
-only when it leads by a margin: for each case not yet scheduled, the largest gap between its best
-and worst fatigued P over the epochs that a later trial can still reach, times its weight. Once
-the Senate frees up on or after the last change date, the margin is zero and pruning is as
-before. The optimistic bound uses each case's best P₀ over all epochs. With no `roster_changes`
-the search and its results are unchanged. The exact search can be slower when the epochs differ a
-lot.
+only when it leads by a margin. Run from the plan with earlier lanes, the same continuation
+starts every trial no later, so it can only lose where a case's P rises from one epoch to a later
+one. The margin is, for each case not yet scheduled, its largest such rise in fatigued P over the
+epochs a later trial can still reach, times its weight. It is zero once the Senate frees up on or
+after the last change date, and zero for cases whose P only falls (for example a vacancy among
+supporters), so pruning is then as before. The optimistic bound uses each case's best P₀ over all
+epochs. With no `roster_changes` the search and its results are unchanged. When P rises after a
+change the exact search prunes less: with 10 cases (the exact limit) one search took about 4 s
+in testing against 0.5 s without changes, and `portfolio` runs seven (the plan plus six
+sensitivity rows).
 
 ## Succession
 

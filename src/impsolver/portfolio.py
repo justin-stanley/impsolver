@@ -356,26 +356,33 @@ def _watched(ctx: Ctx, subset: frozenset[str]) -> frozenset[str]:
 
 
 def _slack(ctx: Ctx, subset: frozenset[str], from_epoch: int) -> float:
-    """Most a continuation of a plan over ``subset`` can gain from running in different epochs.
+    """Most a dominated plan's continuation can gain over the dominating plan's from epochs.
 
-    Every later trial starts on or after the Senate frees up, so in epoch ``from_epoch`` or later;
-    each unscheduled candidate can differ by at most its P range over those epochs, at whatever
-    attempt number it runs. Zero without roster changes, or once only the last epoch remains.
+    The dominating plan ``a`` frees every lane no later than ``b``, so the same continuation run
+    from ``a`` starts each trial no later than from ``b``: in epochs i <= j with
+    i >= ``from_epoch`` (the epoch in which ``a`` frees the Senate). A candidate can therefore gain
+    at most its largest rise in fatigued P from an epoch to a later one, at whatever attempt number
+    it runs. Zero without roster changes, once only the last epoch remains, or when P never rises.
     """
     if not ctx.dates or from_epoch >= len(ctx.dates):
         return 0.0
     first, last = len(subset), max(len(subset), len(ctx.eligible) - 1)
     total = 0.0
     for cid in ctx.eligible:
-        if cid in subset:
+        row = ctx.p0e.get(cid)
+        if cid in subset or row is None or any(excluded_pair(ctx, cid, o) for o in subset):
             continue
-        lo, hi = ctx.p0_range(cid, from_epoch)
-        if hi > lo:
-            gap = max(
-                _fatigued(hi, ctx.delta, m) - _fatigued(lo, ctx.delta, m)
-                for m in range(first, last + 1)
-            )
-            total += ctx.cands[cid].weight * gap
+        tail = row[from_epoch:]
+        pairs = [(lo, hi) for i, lo in enumerate(tail) for hi in tail[i + 1 :] if hi > lo]
+        if not pairs:
+            continue
+        # Fatigue keeps the order of P but not the size of a rise, so check every rising pair.
+        gap = max(
+            _fatigued(hi, ctx.delta, m) - _fatigued(lo, ctx.delta, m)
+            for m in range(first, last + 1)
+            for lo, hi in pairs
+        )
+        total += ctx.cands[cid].weight * gap
     return total
 
 

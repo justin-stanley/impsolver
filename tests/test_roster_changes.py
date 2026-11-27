@@ -208,7 +208,7 @@ def _pf(n: int, rng: random.Random, n_dates: int) -> Portfolio:
             "draws": 100,
             "top": 1,
             "house_concurrency": rng.choice([1, 2]),
-            "fatigue_delta": rng.choice([0.0, 0.3]),
+            "fatigue_delta": rng.choice([-0.2, 0.0, 0.3]),
             "roster_changes": [
                 {"date": d.isoformat(), "chamber": "senate", "vacate": "placeholder"} for d in dates
             ],
@@ -226,7 +226,7 @@ def _pf(n: int, rng: random.Random, n_dates: int) -> Portfolio:
     )
 
 
-@pytest.mark.parametrize("seed", range(60))
+@pytest.mark.parametrize("seed", range(120))
 def test_pruned_search_matches_exhaustive(seed: int) -> None:
     rng = random.Random(seed)
     p = _pf(rng.randint(3, 6), rng, rng.randint(1, 3))
@@ -255,6 +255,9 @@ def test_earlier_lanes_need_slack_to_dominate() -> None:
     assert _slack(ctx, frozenset(), 0) == pytest.approx(0.7)
     assert _slack(ctx, frozenset(), 1) == 0.0
     assert _slack(make_ctx(p, {"c": 0.2})[0], frozenset(), 0) == 0.0
+    # Starting earlier never loses anything when P only falls later.
+    falling, _ = make_ctx(p, {"c": 0.9}, p0e={"c": [0.9, 0.2]})
+    assert _slack(falling, frozenset(), 0) == 0.0
 
 
 def test_dominance_with_identical_states() -> None:
