@@ -148,3 +148,22 @@ def test_c_zero_aligned_gates_decorrelate(rules: RuleSet) -> None:
 
     assert abs(corr(one)) > 0.3
     assert abs(corr(zero)) < 0.03
+
+
+def test_c_zero_with_national_swing_links_only_first_gates(rules: RuleSet) -> None:
+    prep = make_prep(
+        rules,
+        make_comp({"D": 218, "R": 217}, {"D": 50, "R": 50}),
+        party_priors={"D": {"*": 0.9}, "R": {"*": 0.3}},
+        rho=0.8,
+        national_swing=True,
+        gate_correlation=0.0,
+    )
+    raw = run_raw(prep, "I", build_path(rules, "A"), 20_000, 3, 0.8)
+    ids = [s.id for s in raw.stages]
+
+    def corr(a: str, b: str) -> float:
+        return float(np.corrcoef(raw.pro[ids.index(a)], raw.pro[ids.index(b)])[0, 1])
+
+    assert corr("H1", "S1") > 0.5  # first gates share the national swing
+    assert abs(corr("H2", "S2")) < 0.03  # later gates draw their own swing

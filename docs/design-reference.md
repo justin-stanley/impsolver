@@ -1,7 +1,7 @@
 # Design reference
 
 Detailed formulas and defaults behind `docs/technical-design.md`. Where the two differ, the
-"Changes after the 2026-11-27 audit" section of the technical design wins.
+"Changes since the original design" section of the technical design wins.
 
 ## Alignment JSON
 Alignment{schema_version 1, encoding: Literal["unsigned_breaks"] (reject files without it), source,
