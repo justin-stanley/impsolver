@@ -1,0 +1,10 @@
+chamber,state,district,name,party,bioguide_id,caucus
+house,AA,1,Alice Alpha,R,A000001,
+house,AA,2,Bob van Bravo Jr.,Democratic,,
+house,AA,3,Chris Charlie,R,,
+house,AA,4,,,,
+house,AA,5,Erin Echo,I,,R
+house,BB,AL,Gus Golf,R,G000777,
+house,DC,0,Dee Delegate,D,,
+senate,AA,,Sam One,R,,
+senate,BB,,Hal Hotel,D,,

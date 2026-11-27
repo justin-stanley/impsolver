@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
+# Synthetic "previous Congress" for the roster --from-results tests. Placeholder states (AA, BB)
+# and names; not a real roster.
+schema_version: 1
+name: synthetic-previous
+as_of: '2026-01-03'
+bodies:
+  house:
+    seats: 435
+    vacancies: 431
+    members:
+    - {id: A000001, name: 'ALPHA, Alice', party: R, state: AA, district: 1}
+    - {id: B000002, name: 'VAN BRAVO, Bob J., Jr.', party: D, state: AA, district: 2}
+    - {id: C000003, name: 'CHARLIE, Carol', party: R, state: AA, district: 3}
+    - {id: D000004, name: 'CHARLIE, Dan', party: D, state: AA, district: 4}
+  senate:
+    seats: 100
+    vacancies: 96
+    members:
+    - {id: S000011, name: 'ONE, Sam', party: R, state: AA}
+    - {id: S000012, name: 'TWO, Tess', party: D, state: AA}
+    - {id: S000013, name: 'THREE, Ted', party: I, caucus: D, state: BB}
+    - {id: S000014, name: 'FOUR, Fay', party: R, state: BB}

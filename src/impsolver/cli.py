@@ -783,7 +783,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", default="schemas")
 
     sub.add_parser(
-        "roster", help="build a composition from Voteview (see roster --help)", add_help=False
+        "roster",
+        help="build a composition from Voteview or certified results (see roster --help)",
+        add_help=False,
     )
     sub.add_parser(
         "align", help="fit alignment loadings from Voteview (see align --help)", add_help=False

@@ -84,6 +84,74 @@ The resulting party counts were checked against the
 [House Press Gallery party breakdown](https://pressgallery.house.gov/member-data/party-breakdown)
 and the [Senate party division](https://www.senate.gov/history/partydiv.htm).
 
+## A roster for a new Congress from certified results
+
+Voteview lists a member only after they have been sworn in, so it cannot supply the roster of a
+new Congress before its first votes. `impsolver roster --from-results` builds one from certified
+election results instead. The repository does not ship a 120th-Congress roster: build it yourself
+once the results are certified, and check it against official sources before you use it.
+
+Write one CSV row per seat with the columns `chamber,state,district,name,party`, plus the
+optional `bioguide_id` and `caucus`:
+
+```text
+chamber,state,district,name,party,bioguide_id,caucus
+house,AA,1,Alice Alpha,R,A000001,
+house,AA,2,Bob van Bravo Jr.,D,,
+house,AA,4,,,,
+house,BB,AL,Gus Golf,R,G000777,
+senate,AA,,Sam One,R,,
+```
+
+- `chamber` is `house` or `senate`, and `state` is the 2-letter postal code. Rows for
+  non-voting delegates (DC and the territories) are skipped.
+- `district` is the House district number. `AL`, `0` and `1` all mean an at-large seat and are
+  stored as district 1, as in the Voteview roster. Leave it blank for the Senate.
+- A row with a blank `name` is a vacant seat (for example a race not yet decided or certified).
+- `party` is a letter (`R`, `D`, `I`, ...); `Republican`, `Democrat`, `Democratic` and
+  `Independent` are also accepted. `caucus` sets the member's bloc and beats `--member-caucus`,
+  which beats `--caucus PARTY=BLOC`. Write `none` to use the member's own party.
+- `bioguide_id` is the member's Biographical Directory ID
+  (<https://bioguide.congress.gov/>). A member without one gets a placeholder id, `new:CA-06` in
+  the House or `new:CA-S1` in the Senate, until an ID is assigned.
+
+With `--previous COMPOSITION` (for example `compositions/us-119.yaml`), a row with a Bioguide ID
+keeps that ID and is flagged when it is not in the previous roster. A row without one is matched
+to a previous member of the same chamber and state with the same surname. The match is flagged
+in the member's `notes` and in the file header. If two previous members share that surname, the
+member is not matched; it gets a placeholder and a flag. Previous senators whose seats were not
+up can be carried over with `--senate-holdovers`. A state keeps as many holdovers as it has seats
+not listed in the results. When a state has more candidates than open seats, the command stops:
+`--vacate ID` names a previous senator who does not hold over (retired, resigned or defeated
+elsewhere), or the CSV can list the seat itself.
+
+The command fails if a seat appears twice, a state has more than 2 senators, a chamber has more
+rows than seats, or a named row has no party. It also fails when the results do not cover every
+seat (435 and 100), unless `--allow-missing` counts the unlisted seats as vacant. The header
+names the results file, the `--source` you give (required), the access date and the previous
+roster, and lists every vacancy, placeholder and flagged match.
+
+```bash
+impsolver roster --from-results results-120.csv \
+  --source "Clerk of the House, election statistics for November 3, 2026" \
+  --previous compositions/us-119.yaml --senate-holdovers --caucus I=D \
+  --name us-120 --as-of 2027-01-03 --accessed 2027-01-02 --out compositions/us-120.yaml
+```
+
+Primary sources for the rows:
+
+- The Clerk of the House publishes the official vote counts for each federal election in its
+  election statistics (<https://history.house.gov/Institution/Election-Statistics/Election-Statistics/>),
+  usually some months after the election.
+- The Clerk's member data and official list of members
+  (<https://clerk.house.gov/Members>) and the Senate's list of senators
+  (<https://www.senate.gov/senators/>) show who was sworn in.
+- Bioguide IDs: <https://bioguide.congress.gov/>.
+
+Once the new Congress has voted, rebuild the roster from Voteview with the commands above and
+check the two against each other; `impsolver compare --composition A --composition B SCENARIO`
+evaluates one scenario against both.
+
 ## Historical roll calls
 
 The backtest fixtures in `src/impsolver/data/fixtures/` record public roll-call tallies. Each

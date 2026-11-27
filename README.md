@@ -89,7 +89,7 @@ after a committee report.
 | `portfolio` | Order and dates for several cases: House capacity, 1 Senate trial at a time, deadlines, fatigue, succession |
 | `backtest`, `calibrate` | Checks against historical roll calls and the 2021 crossover votes |
 | `score` | Brier and log scores of crossing predictions over a parameter grid (report only) |
-| `roster`, `align` | Builds rosters and co-defection loadings from Voteview |
+| `roster`, `align` | Builds rosters and co-defection loadings from Voteview; `roster --from-results` builds a new Congress's roster from certified results |
 | `compare-plans` | Two portfolios or two scenarios side by side, with a tornado chart per case (`--html` for a page) |
 | `validate`, `init`, `compare`, `schema` | Checks files (portfolios too), writes starter templates, compares rosters, writes JSON schemas |
 

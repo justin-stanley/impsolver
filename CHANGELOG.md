@@ -47,6 +47,10 @@ All notable changes are listed here. The format follows
   candidate's reason; the re-scheduled `slots` on each sensitivity row; and `gates`, with each
   gate's rule in words, tally by bloc and every member's supplied probability and classification.
   No result changes.
+- `impsolver roster --from-results RESULTS.csv --source TEXT` builds a composition for a new
+  Congress from certified results: returning members matched by Bioguide ID (or flagged
+  name+state matches against `--previous`), `new:ST-DD`/`new:ST-S1` placeholders, vacancies,
+  optional Senate holdovers; no real 120th roster is shipped.
 - Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
   Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
 - Optional random attendance in the Monte Carlo (`attendance: random`, `absence_rate`, member
