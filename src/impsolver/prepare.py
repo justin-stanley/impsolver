@@ -178,8 +178,15 @@ def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared
     Returns:
         A ``Prepared`` scenario whose ``warnings`` list unknown member ids or blocs.
     """
+    return prepare_objects(*load_parts(path, composition), str(path))
+
+
+def load_parts(
+    path: str | Path, composition: str | Path | None = None
+) -> tuple[RuleSet, Composition, Scenario, Alignment | None]:
+    """The rules, raw composition, scenario and alignment that ``prepare`` combines."""
     scen = load_scenario(path)
     rules = load_rules(resolve_rules(scen.rules, path))
     comp = load_composition(composition if composition else resolve(scen.composition, path))
     align = load_alignment(resolve(scen.alignment, path)) if scen.alignment else None
-    return prepare_objects(rules, comp, scen, align, str(path))
+    return rules, comp, scen, align

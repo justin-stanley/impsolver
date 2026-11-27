@@ -29,6 +29,8 @@ All notable changes are listed here. The format follows
 - `party_priors` and `overrides` values may be a range `{low, high}` or `{beta: [a, b]}`;
   `uncertainty_draws` (or `simulate --uncertainty-draws`) reports P(removal) with a 5-95% interval
   over them, and `evaluate` widens its bounds to the range; number-valued results are unchanged.
+- Portfolio `roster_changes` (dated vacancies and new seats): P0 is computed per roster epoch and
+  each trial uses the roster in force on its first day; without changes results do not change.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

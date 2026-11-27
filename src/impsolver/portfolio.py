@@ -23,9 +23,18 @@ from pydantic import BaseModel
 from .deterministic import default_path, evaluate_article
 from .loader import load_portfolio, resolve
 from .members import logit, sigmoid
-from .model import ChamberCalendar, Portfolio, PortfolioCandidate
+from .model import (
+    Body,
+    Chamber,
+    ChamberCalendar,
+    Composition,
+    Member,
+    Portfolio,
+    PortfolioCandidate,
+    RosterChange,
+)
 from .paths import path_for
-from .prepare import Prepared, prepare
+from .prepare import Prepared, load_parts, prepare, prepare_objects
 from .results import DeterministicArticle, SimArticle
 from .simulate import (
     any_complete,
@@ -100,6 +109,75 @@ def make_calendars(pf: Portfolio) -> Calendars:
     )
 
 
+# ----------------------------------------------------------------- roster epochs
+
+
+def change_dates(pf: Portfolio) -> tuple[dt.date, ...]:
+    """Distinct roster-change dates, sorted. Epoch e > 0 starts on ``change_dates[e - 1]``."""
+    return tuple(sorted({rc.date for rc in pf.roster_changes}))
+
+
+def epoch_of(dates: tuple[dt.date, ...], day: dt.date) -> int:
+    """Roster epoch in force on ``day``: the number of change dates on or before it."""
+    return bisect.bisect_right(dates, day)
+
+
+def apply_changes(comp: Composition, changes: list[RosterChange], who: str) -> Composition:
+    """``comp`` after ``changes``, applied in order (vacate before seat within one change)."""
+    seats: dict[Chamber, tuple[list[Member], int, int]] = {
+        ch: (list(b.roster), b.seats, b.vacancies) for ch, b in comp.bodies.items()
+    }
+    for rc in changes:
+        where = f"{who}: roster change on {rc.date}"
+        if rc.chamber not in seats:
+            raise PortfolioError(f"{where}: composition {comp.name} has no {rc.chamber}")
+        members, n, vac = seats[rc.chamber]
+        if rc.vacate is not None:
+            idx = [i for i, m in enumerate(members) if m.id == rc.vacate]
+            if not idx:
+                raise PortfolioError(
+                    f"{where}: {rc.vacate} does not hold a {rc.chamber} seat in {comp.name}"
+                )
+            members.pop(idx[0])
+            vac += 1
+        if rc.seat is not None:
+            if any(m.id == rc.seat.id for m in members):
+                raise PortfolioError(f"{where}: {rc.seat.id} already holds a {rc.chamber} seat")
+            if vac == 0:
+                raise PortfolioError(f"{where}: no vacant {rc.chamber} seat for {rc.seat.id}")
+            members.append(rc.seat)
+            vac -= 1
+        seats[rc.chamber] = (members, n, vac)
+    as_of = max((rc.date for rc in changes), default=comp.as_of)
+    return Composition(
+        schema_version=1,
+        name=f"{comp.name} (roster changes to {as_of})" if changes else comp.name,
+        as_of=as_of,
+        bodies={ch: Body(seats=n, vacancies=v, members=ms) for ch, (ms, n, v) in seats.items()},
+    )
+
+
+def epoch_preps(pf: Portfolio, scenario: str | Path, who: str) -> list[Prepared]:
+    """The scenario prepared against the roster of each epoch after the first, in order.
+
+    Changes are applied to the raw composition before preparation, so a defection prior (if any)
+    is applied to each epoch's roster the same way; a new member without an alignment record keeps
+    their party prior.
+    """
+    rules, comp, scen, align = load_parts(scenario)
+    ordered = sorted(pf.roster_changes, key=lambda rc: rc.date)
+    return [
+        prepare_objects(
+            rules,
+            apply_changes(comp, [rc for rc in ordered if rc.date <= d], who),
+            scen,
+            align,
+            str(scenario),
+        )
+        for d in change_dates(pf)
+    ]
+
+
 # ---------------------------------------------------------------------- schedule
 
 
@@ -126,6 +204,7 @@ class Slot(BaseModel):
     p: float
     weight: float
     attempt: int
+    epoch: int = 0  # roster epoch of the trial's first day (0 = the scenario's own roster)
 
 
 @dataclass
@@ -137,6 +216,21 @@ class Ctx:
     delta: float
     scale: float = 1.0
     eligible: list[str] = field(default_factory=list)
+    # P0 per roster epoch (index 0 = no change yet); candidates not listed use ``p0`` throughout.
+    p0e: dict[str, tuple[float, ...]] = field(default_factory=dict)
+    dates: tuple[dt.date, ...] = ()
+
+    def p0_at(self, cid: str, day: dt.date) -> tuple[int, float]:
+        """(epoch, P0) for a trial of ``cid`` that starts on ``day``."""
+        e = epoch_of(self.dates, day)
+        row = self.p0e.get(cid)
+        return e, (row[e] if row else self.p0[cid])
+
+    def p0_range(self, cid: str, from_epoch: int = 0) -> tuple[float, float]:
+        """Lowest and highest P0 of ``cid`` over epochs ``from_epoch`` and later."""
+        row = self.p0e.get(cid)
+        vals = row[from_epoch:] if row else (self.p0[cid],)
+        return min(vals), max(vals)
 
     def days(self, n: int) -> int:
         return max(1, math.ceil(n * self.scale)) if n > 0 else 0
@@ -194,17 +288,18 @@ def place(
         t_end = ctx.cals.trial.nth_from(t_start, ctx.days(c.senate_days))
     if t_end >= FAR or t_end > ctx.deadline(c):
         return None
-    p = _fatigued(ctx.p0[cid], ctx.delta, attempt)
+    epoch, p0 = ctx.p0_at(cid, t_start)
     slot = Slot(
         id=cid,
         house_start=h_start,
         house_end=h_end,
         trial_start=t_start,
         trial_end=t_end,
-        p0=ctx.p0[cid],
-        p=p,
+        p0=p0,
+        p=_fatigued(p0, ctx.delta, attempt),
         weight=c.weight,
         attempt=attempt,
+        epoch=epoch,
     )
     new = LaneState(lanes, t_end + dt.timedelta(days=1), st.trial_end + ((cid, t_end),))
     return slot, new
@@ -229,14 +324,19 @@ class Plan:
     state: LaneState
 
 
-def _dominates(a: Plan, b: Plan, watched: frozenset[str]) -> bool:
+def _dominates(a: Plan, b: Plan, watched: frozenset[str], slack: float = 0.0) -> bool:
     """True if ``a`` is at least as good as ``b`` for every possible continuation.
 
-    Both plans cover the same subset, so future value depends only on when the House lanes and the
-    Senate free up, and on the trial ends that a still-unscheduled candidate's ``after`` can read
-    (``watched``). Other trial ends cannot affect anything that follows.
+    Both plans cover the same subset, so future feasibility depends only on when the House lanes
+    and the Senate free up, and on the trial ends that a still-unscheduled candidate's ``after``
+    can read (``watched``). Other trial ends cannot affect anything that follows. With roster
+    changes a later trial's P also depends on its start date: ``a``'s earlier lanes can put a
+    continuation in a worse epoch than ``b``'s, so ``a`` must lead by ``slack``, the most that
+    epoch differences could give back (see ``_slack``).
     """
-    if a.value < b.value - 1e-12 or a.state.senate_free > b.state.senate_free:
+    if a.state == b.state:
+        return a.value >= b.value - 1e-12
+    if a.value < b.value + slack - 1e-12 or a.state.senate_free > b.state.senate_free:
         return False
     if any(x > y for x, y in zip(a.state.house_free, b.state.house_free, strict=True)):
         return False
@@ -255,10 +355,42 @@ def _watched(ctx: Ctx, subset: frozenset[str]) -> frozenset[str]:
     return frozenset(out)
 
 
+def _slack(ctx: Ctx, subset: frozenset[str], from_epoch: int) -> float:
+    """Most a dominated plan's continuation can gain over the dominating plan's from epochs.
+
+    The dominating plan ``a`` frees every lane no later than ``b``, so the same continuation run
+    from ``a`` starts each trial no later than from ``b``: in epochs i <= j with
+    i >= ``from_epoch`` (the epoch in which ``a`` frees the Senate). A candidate can therefore gain
+    at most its largest rise in fatigued P from an epoch to a later one, at whatever attempt number
+    it runs. Zero without roster changes, once only the last epoch remains, or when P never rises.
+    """
+    if not ctx.dates or from_epoch >= len(ctx.dates):
+        return 0.0
+    first, last = len(subset), max(len(subset), len(ctx.eligible) - 1)
+    total = 0.0
+    for cid in ctx.eligible:
+        row = ctx.p0e.get(cid)
+        if cid in subset or row is None or any(excluded_pair(ctx, cid, o) for o in subset):
+            continue
+        tail = row[from_epoch:]
+        pairs = [(lo, hi) for i, lo in enumerate(tail) for hi in tail[i + 1 :] if hi > lo]
+        if not pairs:
+            continue
+        # Fatigue keeps the order of P but not the size of a rise, so check every rising pair.
+        gap = max(
+            _fatigued(hi, ctx.delta, m) - _fatigued(lo, ctx.delta, m)
+            for m in range(first, last + 1)
+            for lo, hi in pairs
+        )
+        total += ctx.cands[cid].weight * gap
+    return total
+
+
 def _p_max(ctx: Ctx, cid: str, attempt: int) -> float:
     """Highest fatigued P this candidate can still reach from attempt number ``attempt`` on."""
     last = max(attempt, len(ctx.eligible) - 1)
-    return max(_fatigued(ctx.p0[cid], ctx.delta, attempt), _fatigued(ctx.p0[cid], ctx.delta, last))
+    hi = ctx.p0_range(cid)[1]
+    return max(_fatigued(hi, ctx.delta, attempt), _fatigued(hi, ctx.delta, last))
 
 
 def _kth_best(found: list[Plan], k: int) -> float:
@@ -278,6 +410,14 @@ def search(ctx: Ctx, exhaustive: bool = False) -> list[Plan]:
     found: list[Plan] = [root]
     use_beam = not exhaustive and len(ctx.eligible) > ctx.pf.exact_limit
     k = max(1, ctx.pf.top)
+    slacks: dict[tuple[frozenset[str], int], float] = {}
+
+    def slack(key: frozenset[str], o: Plan) -> float:
+        e = epoch_of(ctx.dates, o.state.senate_free)
+        if (key, e) not in slacks:
+            slacks[(key, e)] = _slack(ctx, key, e)
+        return slacks[(key, e)]
+
     while frontier:
         nxt: list[Plan] = []
         thresh = -math.inf if exhaustive else _kth_best(found, k)
@@ -309,7 +449,7 @@ def search(ctx: Ctx, exhaustive: bool = False) -> list[Plan]:
                 key = frozenset(pl.order)
                 g = groups.setdefault(key, [])
                 w = watch.setdefault(key, _watched(ctx, key))
-                if not any(_dominates(o, pl, w) for o in g):
+                if not any(_dominates(o, pl, w, slack(key, o)) for o in g):
                     g.append(pl)
             nxt = [p for g in groups.values() for p in g]
             if use_beam:
@@ -360,6 +500,7 @@ class TreeNode(BaseModel):
     schedule: list[str]
     tried: list[str] = []
     tried_p: list[float] = []
+    tried_epoch: list[int] = []
     verdict: dt.date | None = None
 
 
@@ -424,6 +565,7 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
         sched: list[str] = []
         tried: list[str] = []
         tried_p: list[float] = []
+        tried_epoch: list[int] = []
         while items:
             it, items = items[0], items[1:]
             if it.sunk:
@@ -442,6 +584,7 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
             done = done + [it.cid]
             tried.append(it.cid)
             tried_p.append(slot.p)
+            tried_epoch.append(slot.epoch)
             value += slot.weight * slot.p
             sched.append(
                 f"{it.cid} House {slot.house_start}..{slot.house_end}, "
@@ -480,11 +623,18 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
                 schedule=sched,
                 tried=tried,
                 tried_p=tried_p,
+                tried_epoch=tried_epoch,
                 verdict=verdict,
             )
             return value + node.value, node
         return value, TreeNode(
-            at="(end)", p_removed=0.0, value=value, schedule=sched, tried=tried, tried_p=tried_p
+            at="(end)",
+            p_removed=0.0,
+            value=value,
+            schedule=sched,
+            tried=tried,
+            tried_p=tried_p,
+            tried_epoch=tried_epoch,
         )
 
     return run([_Item(c) for c in order], initial_state(ctx), 0, 0, [])
@@ -569,6 +719,9 @@ class PortfolioResult(BaseModel):
     removals_dist: RemovalsDist | None = None
     exhaustive: bool
     p0: dict[str, float]
+    # With roster changes: the date each epoch after the first starts, and P0 per epoch.
+    epochs: list[dt.date] = []
+    p0_epochs: dict[str, list[float]] = {}
     gate_paths: dict[str, SimArticle] = {}
     pivots: dict[str, DeterministicArticle] = {}
     labels: dict[str, str] = {}
@@ -583,6 +736,14 @@ class Loaded:
     preps: dict[str, Prepared]
     p0: dict[str, float]
     gates: dict[str, SimArticle] = field(default_factory=dict)
+    # With roster changes: P0 for each epoch (index 0 = ``p0``) and the preps of epochs 1 and on.
+    p0_epochs: dict[str, list[float]] = field(default_factory=dict)
+    epoch_preps: dict[str, list[Prepared]] = field(default_factory=dict)
+
+    def prep_at(self, cid: str, epoch: int) -> Prepared | None:
+        if epoch > 0 and cid in self.epoch_preps:
+            return self.epoch_preps[cid][epoch - 1]
+        return self.preps.get(cid)
 
 
 def deterministic_articles(loaded: Loaded) -> dict[str, DeterministicArticle]:
@@ -599,50 +760,91 @@ def deterministic_articles(loaded: Loaded) -> dict[str, DeterministicArticle]:
     return out
 
 
+def _p_removal_of(
+    prep: Prepared, c: PortfolioCandidate, draws: int, gate: bool = True
+) -> tuple[float, SimArticle | None]:
+    """P0 of a scenario candidate, and (if ``gate``) the gate path of its likeliest article."""
+    path_ = path_for(prep.rules, prep.scenario, default_path(prep))
+    seed, rho = prep.scenario.seed, prep.scenario.rho
+    if c.article is not None or len(prep.scenario.articles) == 1:
+        art = c.article or prep.scenario.articles[0]
+        sim = simulate_article(prep, art, path_, draws, seed, rho)
+        return sim.p_complete, sim
+    # Removal happens if any article convicts: one joint simulation over articles.
+    arts = list(prep.scenario.articles)
+    raws = run_raw_articles(prep, arts, path_, draws, seed, rho)
+    p = float(any_complete(raws).mean())
+    if not gate:
+        return p, None
+    best = max(arts, key=lambda a: float(raws[a].complete.mean()))
+    return p, simulate_article(prep, best, path_, draws, seed, rho)
+
+
 def load(path: str | Path) -> Loaded:
     pf = load_portfolio(path)
     preps: dict[str, Prepared] = {}
     p0: dict[str, float] = {}
     gates: dict[str, SimArticle] = {}
+    p0_epochs: dict[str, list[float]] = {}
+    later: dict[str, list[Prepared]] = {}
     for c in pf.candidates:
         if c.scenario is not None:
-            prep = prepare(resolve(c.scenario, path))
+            spath = resolve(c.scenario, path)
+            prep = prepare(spath)
             preps[c.id] = prep
-            path_ = path_for(prep.rules, prep.scenario, default_path(prep))
-            seed, rho = prep.scenario.seed, prep.scenario.rho
-            if c.article is not None or len(prep.scenario.articles) == 1:
-                art = c.article or prep.scenario.articles[0]
-                sim = simulate_article(prep, art, path_, pf.draws, seed, rho)
-                gates[c.id] = sim
-                p0[c.id] = sim.p_complete
-            else:
-                # Removal happens if any article convicts: one joint simulation over articles.
-                arts = list(prep.scenario.articles)
-                raws = run_raw_articles(prep, arts, path_, pf.draws, seed, rho)
-                p0[c.id] = float(any_complete(raws).mean())
-                best = max(arts, key=lambda a: float(raws[a].complete.mean()))
-                gates[c.id] = simulate_article(prep, best, path_, pf.draws, seed, rho)
+            p, sim = _p_removal_of(prep, c, pf.draws)
+            assert sim is not None
+            p0[c.id], gates[c.id] = p, sim
+            if pf.roster_changes:
+                # One P0 per roster epoch, computed once here and looked up by trial start.
+                later[c.id] = epoch_preps(pf, spath, f"candidate {c.id}")
+                p0_epochs[c.id] = [p] + [
+                    _p_removal_of(ep, c, pf.draws, gate=False)[0] for ep in later[c.id]
+                ]
         else:
             assert c.p is not None
             p0[c.id] = c.p
-    return Loaded(pf, preps, p0, gates)
+    return Loaded(pf, preps, p0, gates, p0_epochs, later)
 
 
 def make_ctx(
-    pf: Portfolio, p0: dict[str, float], delta: float | None = None, scale: float = 1.0
+    pf: Portfolio,
+    p0: dict[str, float],
+    delta: float | None = None,
+    scale: float = 1.0,
+    p0e: dict[str, list[float]] | None = None,
 ) -> tuple[Ctx, list[Dropped]]:
+    """Search context and the candidates dropped before search.
+
+    ``p0e`` gives P0 per roster epoch for candidates whose P0 depends on the roster; a list must
+    have one entry per epoch (``len(change_dates(pf)) + 1``).
+    """
     cands = {c.id: c for c in pf.candidates}
+    dates = change_dates(pf)
+    rows = {k: tuple(v) for k, v in (p0e or {}).items()}
+    for k, row in rows.items():
+        if len(row) != len(dates) + 1:
+            raise PortfolioError(f"candidate {k}: {len(row)} epoch P0 values for {len(dates) + 1}")
     ctx = Ctx(
-        pf, cands, p0, make_calendars(pf), pf.fatigue_delta if delta is None else delta, scale
+        pf,
+        cands,
+        p0,
+        make_calendars(pf),
+        pf.fatigue_delta if delta is None else delta,
+        scale,
+        p0e=rows,
+        dates=dates,
     )
     dropped: list[Dropped] = []
     for c in pf.candidates:
         if c.variant_of is not None:
             continue
-        if p0[c.id] < pf.p_floor:
-            dropped.append(
-                Dropped(id=c.id, reason="LOW_P", detail=f"P={p0[c.id]:.3f} < p_floor {pf.p_floor}")
-            )
+        lo, hi = ctx.p0_range(c.id)
+        if hi < pf.p_floor:
+            detail = f"P={hi:.3f} < p_floor {pf.p_floor}"
+            if hi > lo:
+                detail = f"P at most {hi:.3f} under any roster < p_floor {pf.p_floor}"
+            dropped.append(Dropped(id=c.id, reason="LOW_P", detail=detail))
             continue
         alone = replace(ctx, eligible=[c.id])
         if place(alone, c.id, initial_state(alone), 0) is None and not c.after:
@@ -708,8 +910,8 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
     With succession rules, the recommended order is the one that is best once removals are
     allowed to change later cases; dropped reasons and sensitivity are reported for that order.
     """
-    pf, p0 = loaded.pf, loaded.p0
-    ctx, dropped = make_ctx(pf, p0)
+    pf, p0, p0e = loaded.pf, loaded.p0, loaded.p0_epochs
+    ctx, dropped = make_ctx(pf, p0, p0e=p0e)
     order, _, plans = _best_value(ctx, exhaustive)
     dropped += _left_out(ctx, order)
     tops: list[PlanOut] = []
@@ -721,7 +923,7 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
         tops.append(PlanOut(order=list(p.order), expected_removals=p.value, slots=list(p.slots)))
         if len(tops) >= pf.top:
             break
-    sens = sensitivity(pf, p0, order, exhaustive)
+    sens = sensitivity(pf, p0, order, exhaustive, p0e)
     res = PortfolioResult(
         plans=tops,
         dropped=dropped,
@@ -729,6 +931,8 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
         fragile=any(r.fragile for r in sens),
         exhaustive=exhaustive,
         p0=p0,
+        epochs=list(ctx.dates),
+        p0_epochs=p0e,
         gate_paths=loaded.gates,
         pivots=deterministic_articles(loaded),
         labels={cid: prep.scenario.target.name for cid, prep in loaded.preps.items()},
@@ -742,7 +946,11 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
 
 
 def sensitivity(
-    pf: Portfolio, p0: dict[str, float], base: tuple[str, ...], exhaustive: bool
+    pf: Portfolio,
+    p0: dict[str, float],
+    base: tuple[str, ...],
+    exhaustive: bool,
+    p0e: dict[str, list[float]] | None = None,
 ) -> list[SensRow]:
     """Regret of keeping ``base`` when fatigue or durations differ from the inputs."""
     rows: list[SensRow] = []
@@ -751,7 +959,7 @@ def sensitivity(
     ]
     cases += [(f"durations x{s}", pf.fatigue_delta, s) for s in SENS_SCALES]
     for label, d, s in cases:
-        ctx, _ = make_ctx(pf, p0, d, s)
+        ctx, _ = make_ctx(pf, p0, d, s, p0e)
         _, best, _ = _best_value(ctx, exhaustive)
         base_v = _order_value(ctx, base)
         regret = max(0.0, best - base_v)
@@ -826,11 +1034,11 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
     pf = loaded.pf
     _, tree = evaluate_branching(ctx, order)
     nodes = _tree_nodes(tree)
-    keys: list[tuple[str, float]] = []
+    keys: list[tuple[str, float, int]] = []
     for nd in nodes:
-        for cid, p in zip(nd.tried, nd.tried_p, strict=True):
-            if (cid, p) not in keys:
-                keys.append((cid, p))
+        for key in zip(nd.tried, nd.tried_p, nd.tried_epoch, strict=True):
+            if key not in keys:
+                keys.append(key)
     if not keys:
         return RemovalsDist(
             probabilities=[1.0],
@@ -843,8 +1051,8 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
             notes=[],
         )
     branches = len(nodes) > 1
-    fixed = sorted({cid for cid, _ in keys if cid not in loaded.preps})
-    if not branches and not any(cid in loaded.preps for cid, _ in keys):
+    fixed = sorted({cid for cid, _, _ in keys if cid not in loaded.preps})
+    if not branches and not any(cid in loaded.preps for cid, _, _ in keys):
         dist = poisson_binomial(tree.tried_p)
         mean = sum(k * v for k, v in enumerate(dist))
         sd = math.sqrt(sum((k - mean) ** 2 * v for k, v in enumerate(dist)))
@@ -861,18 +1069,18 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
     draws = pf.draws
     rng = np.random.Generator(np.random.PCG64(pf.seed))
     shared: dict[tuple[str, str], np.ndarray] = {}
-    for cid, _ in keys:
-        prep = loaded.preps.get(cid)
+    for cid, _, e in keys:
+        prep = loaded.prep_at(cid, e)
         if prep is None:
             continue
         for ch, body in prep.comp.bodies.items():
             for m in body.roster:
                 shared.setdefault((ch, m.bloc), rng.standard_normal(draws))
-    outcome: dict[tuple[str, float], np.ndarray] = {}
-    for i, (cid, p) in enumerate(keys):
-        prep = loaded.preps.get(cid)
+    outcome: dict[tuple[str, float, int], np.ndarray] = {}
+    for i, (cid, p, e) in enumerate(keys):
+        prep = loaded.prep_at(cid, e)
         if prep is None:
-            outcome[(cid, p)] = rng.random(draws) < p
+            outcome[(cid, p, e)] = rng.random(draws) < p
             continue
         art = ctx.cands[cid].article
         arts = [art] if art is not None else list(prep.scenario.articles)
@@ -881,14 +1089,15 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
         raws = run_raw_articles(
             prep, arts, path, draws, pf.seed + 1000 + i, prep.scenario.rho, shift, shared
         )
-        outcome[(cid, p)] = any_complete(raws)
+        outcome[(cid, p, e)] = any_complete(raws)
     counts = np.zeros(draws, dtype=int)
 
     def walk(nd: TreeNode, mask: np.ndarray) -> None:
-        for cid, p in zip(nd.tried, nd.tried_p, strict=True):
-            counts[mask] += outcome[(cid, p)][mask]
+        for key in zip(nd.tried, nd.tried_p, nd.tried_epoch, strict=True):
+            counts[mask] += outcome[key][mask]
         if nd.removed is not None and nd.not_removed is not None:
-            hit = outcome[(nd.at, nd.tried_p[nd.tried.index(nd.at)])]
+            j = nd.tried.index(nd.at)
+            hit = outcome[(nd.at, nd.tried_p[j], nd.tried_epoch[j])]
             walk(nd.removed, mask & hit)
             walk(nd.not_removed, mask & ~hit)
 
@@ -909,7 +1118,8 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
         notes.append("no independent benchmark with succession branches; spread_ratio is 1")
     else:
         qs = [
-            float(outcome[(cid, p)].mean()) for cid, p in zip(tree.tried, tree.tried_p, strict=True)
+            float(outcome[key].mean())
+            for key in zip(tree.tried, tree.tried_p, tree.tried_epoch, strict=True)
         ]
         ind_sd = math.sqrt(sum(q * (1 - q) for q in qs))
     return RemovalsDist(

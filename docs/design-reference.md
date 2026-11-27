@@ -87,7 +87,8 @@ https://voteview.com/static/data/out/members/{H|S}{116|117|118|119}_members.csv
 
 ## Portfolio
 Portfolio{schema_version, start, deadline, house_concurrency=2, fatigue_delta=0, trial_carryover=false,
-p_floor=.05, top=3, draws=5000, beam=256, exact_limit=16, calendar, candidates}
+p_floor=.05, top=3, draws=5000, beam=256, exact_limit=16, calendar, roster_changes=[], candidates}
+RosterChange{date, chamber, vacate: member id|null, seat: Member|null (at least one)}
 Candidate{id, scenario|p (exactly one), article, house_days>=1, senate_days>=1, release, deadline,
 weight=1 (>0), after, excludes, senate_committee, committee_floor_days=2,
 succession[{on_removal_of, becomes|null}], variant_of}
