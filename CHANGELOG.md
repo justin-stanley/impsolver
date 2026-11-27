@@ -21,6 +21,8 @@ All notable changes are listed here. The format follows
 - `impsolver score` scores per-member crossing predictions on the crossover fixtures (Brier and log
   loss) over a grid of β, ρ, alignment weight and κ, with leave-one-event-out scores when there is
   more than one event; it reports only, and no default changes.
+- Crossover fixtures take an optional `not_voting` list, and `impsolver score` leaves those members
+  out instead of scoring them as non-crossers (2021: 41 House and 8 Senate Republicans of the 116th).
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

@@ -45,7 +45,8 @@ Propensity(breaks, votes, bloc_rate, source, weight=1). fit_beta is a logistic f
 Calibrated: House 1.34±0.43, Senate 0.89±0.47. Fail loudly with no break counts or no member match.
 
 ## Calibrate
-Crossover fixture {schema_version, case, history_congress 116, party R, bodies.house/senate.crossed[{id,name,note}]}.
+Crossover fixture {schema_version, case, history_congress 116, party R, bodies.house/senate.crossed[{id,name,note}], optional not_voting[{id,name,note}]}.
+not_voting (2021): House 41 (116th R not Yea/Nay on roll call 17, incl. 4 Not Voting), Senate 8 (not seated 2021-02-13).
 House: C001109 K000378 U000031 H001056 N000189 K000386 G000588 R000597, plus Meijer and Valadao (id null).
 Senate: B001135 C001075 C001035 M001153 R000615 S001197 T000461.
 Report break rate vs party, mean pairwise alignment vs 5000 random same-party sets (permutation p),
@@ -54,7 +55,8 @@ beta. min_votes 100. Expected: House 0.33 vs 0.20, p=0.014; Senate p=0.75.
 ## Score (calibration sweep)
 `impsolver score [FIXTURES] --alignment A [--alignment A_kappa2 ...]`; default fixtures: every file in
 `data/fixtures/members/`. Event = fixture; chamber scored separately. Members: party, breaks known,
-n_votes >= min_votes (100). Base rate b = observed crossing share (or `--base-rate`).
+n_votes >= min_votes (100), bloc has a break rate (per-member bloc rate), not on not_voting. An event
+that cannot be scored (no crossers or no non-crossers, members missing) goes to skipped. Base rate b = observed crossing share (or `--base-rate`).
 Marginal: p_i = sigmoid(logit b + beta*excess_i) (= priors.adjust for b < .5).
 Conditional: P(y_i | y_-i) under the copula with theta = (z, w) ~ N(0, I),
 q_i = Phi((Phi^-1(p_i) + sqrt(rho) z + sqrt(1-rho) a F_i.w) / (sqrt(1-rho) sqrt(1 - a^2 ||F_i||^2))).
@@ -62,7 +64,8 @@ Importance sampling from N(mode, (1.5^2) Laplace cov) given all y, dividing out 
 likelihood; common random numbers across the grid; min effective draws reported.
 Grid defaults: beta 0..3 (11 values), rho {0, .3, .6, .9}, weight {0, .5, 1}; defaults
 (beta 1, rho .6, chamber weight, kappa 50 or nearest) always added. kappa = one alignment file each.
-Scores: Brier and log loss (nats), lower is better, pooled over members. LOEO: pick the argmin
+Scores: Brier and log loss (nats), lower is better, pooled over members. Best settings and LOEO
+choices skip grid points with min effective draws < 100 (unless all are). LOEO: pick the argmin
 log loss on the other events, score the held-out event, alongside the defaults' held-out score.
 
 ## Viability

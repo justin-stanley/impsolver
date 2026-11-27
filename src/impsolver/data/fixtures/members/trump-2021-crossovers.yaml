@@ -1,6 +1,17 @@
 # Republicans who voted to impeach (House, 2021-01-13) or convict (Senate, 2021-02-13) in the
 # second Trump impeachment. Ids are bioguide ids. Members with id null were not seated in the
 # 116th Congress, so they have no history in the calibration window.
+#
+# not_voting lists the Republicans of the 116th Congress who cast no vote on the event: members
+# who had left before the 117th Congress, non-voting delegates, and members recorded Not Voting.
+# Scoring leaves them out rather than counting them as non-crossers.
+# House: every 116th Congress Republican not recorded Yea or Nay on roll call 17, 117th Congress
+#   (H.Res. 24, 2021-01-13; Republicans 10 yea, 197 nay, 4 not voting):
+#   https://clerk.house.gov/Votes/202117 (XML: https://clerk.house.gov/evs/2021/roll017.xml),
+#   matched by bioguide id.
+# Senate: every 116th Congress Republican absent from the roll of Senate vote 59, 117th Congress,
+#   1st session (2021-02-13, guilty 57, not guilty 43; all 100 senators voted):
+#   https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00059.htm
 schema_version: 1
 case: trump-2021
 history_congress: 116
@@ -18,6 +29,50 @@ bodies:
       - {id: R000597, name: Tom Rice}
       - {id: null, name: Peter Meijer, note: first seated in the 117th Congress}
       - {id: null, name: David Valadao, note: not seated in the 116th Congress}
+    not_voting:
+      - {id: A000374, name: Ralph Abraham, note: not on the roll call}
+      - {id: B001250, name: Robert (Rob) Bishop, note: not on the roll call}
+      - {id: B001284, name: Susan Brooks, note: not on the roll call}
+      - {id: B001289, name: Bradley Byrne, note: not on the roll call}
+      - {id: C001062, name: K. Michael Conaway, note: not on the roll call}
+      - {id: C001092, name: Chris Collins, note: not on the roll call}
+      - {id: C001093, name: Doug Collins, note: not on the roll call}
+      - {id: C001094, name: Paul Cook, note: not on the roll call}
+      - {id: D000614, name: Sean Duffy, note: not on the roll call}
+      - {id: F000461, name: Bill Flores, note: not on the roll call}
+      - {id: G000377, name: Kay Granger, note: recorded Not Voting}
+      - {id: G000560, name: Tom Graves, note: not on the roll call}
+      - {id: G000582, name: Jenniffer González-Cólon, note: not on the roll call}
+      - {id: G000584, name: Greg Gianforte, note: not on the roll call}
+      - {id: H001048, name: Duncan Duane Hunter, note: not on the roll call}
+      - {id: H001052, name: Andy Harris, note: recorded Not Voting}
+      - {id: H001065, name: George E.B. Holding, note: not on the roll call}
+      - {id: H001073, name: William Ballard Hurd, note: not on the roll call}
+      - {id: K000210, name: Peter T. King, note: not on the roll call}
+      - {id: K000362, name: Steve King, note: not on the roll call}
+      - {id: M001158, name: Kenny Marchant, note: not on the roll call}
+      - {id: M001179, name: Thomas A. Marino, note: not on the roll call}
+      - {id: M001187, name: Mark Meadows, note: not on the roll call}
+      - {id: M001198, name: Roger Wayne Marshall, note: not on the roll call}
+      - {id: M001210, name: Gregory Francis Murphy, note: recorded Not Voting}
+      - {id: O000168, name: Pete Olson, note: not on the roll call}
+      - {id: R000582, name: David P. (Phil) Roe, note: not on the roll call}
+      - {id: R000591, name: Martha Roby, note: not on the roll call}
+      - {id: R000600, name: Aumua Amata Coleman Radewagen, note: not on the roll call}
+      - {id: R000601, name: John Ratcliffe, note: not on the roll call}
+      - {id: R000607, name: Francis Rooney, note: not on the roll call}
+      - {id: R000611, name: Denver Riggleman, note: not on the roll call}
+      - {id: S000244, name: Frank James Sensenbrenner Jr., note: not on the roll call}
+      - {id: S000364, name: John M. Shimkus, note: not on the roll call}
+      - {id: S001210, name: Ross Spano, note: not on the roll call}
+      - {id: T000238, name: William McClellan (Mac) Thornberry, note: not on the roll call}
+      - {id: T000470, name: Scott Tipton, note: not on the roll call}
+      - {id: W000791, name: Greg Walden, note: not on the roll call}
+      - {id: W000806, name: Daniel A. Webster, note: recorded Not Voting}
+      - {id: W000810, name: Rob Woodall, note: not on the roll call}
+      - {id: W000819, name: Bradley Mark Walker, note: not on the roll call}
+      - {id: W000824, name: Steve Watkins, note: not on the roll call}
+      - {id: Y000065, name: Ted Yoho, note: not on the roll call}
   senate:
     crossed:
       - {id: B001135, name: Richard Burr}
@@ -27,3 +82,12 @@ bodies:
       - {id: R000615, name: Mitt Romney}
       - {id: S001197, name: Ben Sasse}
       - {id: T000461, name: Pat Toomey}
+    not_voting:
+      - {id: A000360, name: Lamar Alexander, note: not a senator on 2021-02-13}
+      - {id: E000285, name: Michael B. Enzi, note: not a senator on 2021-02-13}
+      - {id: G000562, name: Cory Gardner, note: not a senator on 2021-02-13}
+      - {id: I000055, name: Johnny Isakson, note: not a senator on 2021-02-13}
+      - {id: L000594, name: Kelly Loeffler, note: not a senator on 2021-02-13}
+      - {id: M001197, name: Martha McSally, note: not a senator on 2021-02-13}
+      - {id: P000612, name: David Perdue, note: not a senator on 2021-02-13}
+      - {id: R000307, name: Pat Roberts, note: not a senator on 2021-02-13}

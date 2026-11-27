@@ -3,8 +3,10 @@
 """Score per-member crossing predictions on crossover fixtures over a grid of settings.
 
 For each event (a crossover fixture) and chamber, the members of the fixture's party with break
-counts and at least ``min_votes`` votes in the alignment file are scored; ``y_i`` is 1 for members
-listed as having crossed.
+counts, a bloc break rate and at least ``min_votes`` votes in the alignment file are scored, except
+those the fixture lists as ``not_voting`` (no longer seated, or absent from the vote); ``y_i`` is 1
+for members listed as having crossed. Without a ``not_voting`` list, members who did not vote count
+as non-crossers. An event that cannot be scored is skipped with a reason.
 
 Marginal prediction (depends on beta only). With base rate b (the event's observed crossing share
 unless ``base_rate`` is given), the defection prior gives
@@ -29,6 +31,8 @@ the alignment weight and kappa are scored.
 Scores are Brier (mean squared error) and log loss (mean -log probability of the outcome, in nats);
 lower is better for both. Pooled scores average over members of every scored event. With more
 than one event, each event is held out in turn: the best settings on the others are scored on it.
+Best settings skip grid points with fewer than MIN_EFFECTIVE_DRAWS effective draws, unless every
+point is below it.
 
 The sweep only reports. It never changes defaults.
 """
@@ -126,6 +130,10 @@ class EventInfo(BaseModel):
     n_crossed: int
     base_rate: float
     unmatched: list[str]
+    # Members of the party left out because they cast no vote on the event. None when the
+    # fixture has no not_voting list, so every party member is scored and anyone not listed as
+    # crossing counts as a non-crosser, including members who were absent or no longer seated.
+    n_not_voting: int | None = None
 
 
 class ChamberSweep(BaseModel):
@@ -169,6 +177,8 @@ class EventData:
     loadings: dict[float, FloatArr]  # kappa -> F [n, k]
     base_rate: float
     unmatched: list[str]
+    excluded: int = 0  # members left out because the fixture lists them as not voting
+    has_voters: bool = False  # whether the fixture lists who did not vote
 
 
 def event_data(
@@ -178,27 +188,36 @@ def event_data(
     min_votes: int,
     base_rate: float | None,
 ) -> EventData:
-    """Members, outcomes, break excess and loadings for one event and chamber."""
+    """Members, outcomes, break excess and loadings for one event and chamber.
+
+    Members on the fixture's ``not_voting`` list cast no vote on the event and are left out; so
+    are members whose bloc has no break rate, as in ``priors.propensities``.
+    """
     ref_kappa = min(alignments, key=lambda k: (abs(k - KAPPA), k))
     ab = alignments[ref_kappa].bodies[chamber]
-    party = [
+    body = fx.bodies[chamber]  # type: ignore[index]
+    absent = {c.id for c in body.not_voting or [] if c.id is not None}
+    eligible = [
         m
         for m in ab.members
-        if m.party == fx.party and m.breaks is not None and m.n_votes >= min_votes
+        if m.party == fx.party
+        and m.breaks is not None
+        and m.n_votes >= min_votes
+        and m.bloc in ab.bloc_break_rate
     ]
+    party = [m for m in eligible if m.id not in absent]
+    excluded = len(eligible) - len(party)
     ids = [m.id for m in party]
-    body = fx.bodies[chamber]  # type: ignore[index]
     crossed = {c.id for c in body.crossed if c.id is not None}
     unmatched = [c.name for c in body.crossed if c.id is None or c.id not in ids]
     y = np.array([1.0 if i in crossed else 0.0 for i in ids])
     if y.sum() == 0 or y.sum() == y.size:
         raise ScoreError(f"{fx.case} {chamber}: needs both crossers and non-crossers")
-    breaks = sum(m.breaks or 0 for m in party)
-    votes = sum(m.n_votes for m in party)
-    bloc_rate = ab.bloc_break_rate.get(party[0].bloc, breaks / votes)
     excess = np.array(
         [
-            Propensity(m.breaks or 0, m.n_votes, bloc_rate, "score").excess(PSEUDO_VOTES)
+            Propensity(m.breaks or 0, m.n_votes, ab.bloc_break_rate[m.bloc], "score").excess(
+                PSEUDO_VOTES
+            )
             for m in party
         ]
     )
@@ -207,10 +226,14 @@ def event_data(
         by_id = {m.id: m.loadings for m in al.bodies[chamber].members}
         missing = [i for i in ids if i not in by_id]
         if missing:
-            raise ScoreError(f"alignment with kappa {kappa} lacks members {missing[:3]}")
+            raise ScoreError(
+                f"{fx.case} {chamber}: alignment with kappa {kappa} lacks members {missing[:3]}"
+            )
         loadings[kappa] = np.array([by_id[i] for i in ids], dtype=float)
     b = float(y.mean()) if base_rate is None else base_rate
-    return EventData(fx.case, y, excess, loadings, b, unmatched)
+    return EventData(
+        fx.case, y, excess, loadings, b, unmatched, excluded, body.not_voting is not None
+    )
 
 
 def marginal_p(ev: EventData, beta: float) -> FloatArr:
@@ -292,8 +315,18 @@ def conditional_p(
     return p, ess
 
 
+# Grid points with fewer effective draws than this are flagged, and are not chosen as best
+# settings unless every grid point is below it.
+MIN_EFFECTIVE_DRAWS = 100.0
+
+
+def _reliable(ess: float | None) -> bool:
+    return ess is None or ess >= MIN_EFFECTIVE_DRAWS
+
+
 def _best(points: list[ScorePoint], key: str = "log_loss") -> ScorePoint:
-    return min(points, key=lambda q: (getattr(q, key), q.beta, q.rho or 0, q.weight or 0))
+    ok = [q for q in points if _reliable(q.min_effective_draws)] or points
+    return min(ok, key=lambda q: (getattr(q, key), q.beta, q.rho or 0, q.weight or 0))
 
 
 Key = tuple[float, ...]
@@ -332,7 +365,8 @@ def _sweep_table(
     if len(per_event) > 1:
         for i, name in enumerate(names):
             train = _pool(per_event, [j for j in range(len(per_event)) if j != i])
-            key = min(train, key=lambda k: (train[k][1], k))
+            ok = [k for k in train if _reliable(train[k][2])] or list(train)
+            key = min(ok, key=lambda k: (train[k][1], k))
             sq, ll, _ = per_event[i][key]
             dsq, dll, _ = per_event[i][default_key]
             held.append(
@@ -424,9 +458,17 @@ def sweep(
             if any(chamber not in a.bodies for a in als.values()):
                 skipped.append(f"{fx.case} {chamber}: alignment has no {chamber} body")
                 continue
-            evs.append(event_data(fx, chamber, als, min_votes, base_rate))
+            try:
+                evs.append(event_data(fx, chamber, als, min_votes, base_rate))
+            except ScoreError as e:
+                skipped.append(str(e))
         if not evs:
             continue
+        if len(evs) < 2 <= len(used):
+            notes.append(
+                f"{chamber}: one scored event only: no leave-one-event-out scores; "
+                "its scores are in-sample"
+            )
         names = [e.case for e in evs]
         default_w = ALIGNMENT_CHAMBER_DEFAULT[chamber]  # type: ignore[index]
         weight_grid = _grid(weights, default_w)
@@ -466,6 +508,7 @@ def sweep(
                         n_crossed=int(e.y.sum()),
                         base_rate=e.base_rate,
                         unmatched=e.unmatched,
+                        n_not_voting=e.excluded if e.has_voters else None,
                     )
                     for e in evs
                 ],
@@ -484,6 +527,8 @@ def sweep(
                 min_effective_draws=min_ess,
             )
         )
+    if not chambers:
+        raise ScoreError("no event could be scored: " + "; ".join(skipped))
     if len(used) < 2:
         notes.append("one event only: no leave-one-event-out scores; all scores are in-sample")
     return Sweep(

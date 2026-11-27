@@ -50,7 +50,15 @@ from .prepare import prepare as _prepare_raw
 from .priors import PriorError
 from .report import render as render_report
 from .results import Evaluation, FlipResult, Simulation
-from .score import DEFAULT_BETAS, DEFAULT_RHOS, DEFAULT_WEIGHTS, ScorePoint, Sweep, sweep
+from .score import (
+    DEFAULT_BETAS,
+    DEFAULT_RHOS,
+    DEFAULT_WEIGHTS,
+    MIN_EFFECTIVE_DRAWS,
+    ScorePoint,
+    Sweep,
+    sweep,
+)
 from .simulate import simulate
 from .templates import DEFAULT_NAMES, TEMPLATES
 from .viability import Case, assess
@@ -410,13 +418,14 @@ def _settings(q: ScorePoint) -> str:
     return ", ".join(parts)
 
 
+def _low(q: ScorePoint) -> str:
+    if q.min_effective_draws is not None and q.min_effective_draws < MIN_EFFECTIVE_DRAWS:
+        return "  (low effective draws: Monte Carlo error)"
+    return ""
+
+
 def _scored(q: ScorePoint) -> str:
-    low = (
-        "  (low effective draws: Monte Carlo error)"
-        if q.min_effective_draws is not None and q.min_effective_draws < 100
-        else ""
-    )
-    return f"Brier {q.brier:.4f}  log {q.log_loss:.4f}{low}"
+    return f"Brier {q.brier:.4f}  log {q.log_loss:.4f}{_low(q)}"
 
 
 def render_sweep(s: Sweep, top: int) -> str:
@@ -431,6 +440,13 @@ def render_sweep(s: Sweep, top: int) -> str:
             f"\n{c.body}: {len(c.events)} event(s), {c.n_members} members, {c.n_crossed} crossed"
         )
         for e in c.events:
+            if e.n_not_voting is None:
+                out.append(
+                    f"  {e.case}: fixture lists no non-voters, so members who did not vote "
+                    "(absent or no longer seated) are scored as non-crossers"
+                )
+            elif e.n_not_voting:
+                out.append(f"  {e.case}: {e.n_not_voting} members left out as not voting")
             if e.unmatched:
                 out.append(f"  {e.case} unmatched: {', '.join(e.unmatched)}")
         out.append("  marginal P(cross), by beta:")
@@ -448,9 +464,18 @@ def render_sweep(s: Sweep, top: int) -> str:
             out.append(
                 f"    default: {_settings(c.default_conditional)}: {_scored(c.default_conditional)}"
             )
-            out.append(f"  best by Brier: {_settings(c.best_conditional_brier)}")  # type: ignore[arg-type]
+            bcb = c.best_conditional_brier
+            assert bcb is not None
+            out.append(f"  best by Brier: {_settings(bcb)}{_low(bcb)}")
             if c.min_effective_draws is not None:
-                out.append(f"  smallest effective draws: {c.min_effective_draws:.0f} of {s.draws}")
+                skip = (
+                    f"; best settings skip points below {MIN_EFFECTIVE_DRAWS:g}"
+                    if c.min_effective_draws < MIN_EFFECTIVE_DRAWS
+                    else ""
+                )
+                out.append(
+                    f"  smallest effective draws: {c.min_effective_draws:.0f} of {s.draws}{skip}"
+                )
         for label, held in (("marginal", c.loeo_marginal), ("conditional", c.loeo_conditional)):
             for h in held:
                 out.append(

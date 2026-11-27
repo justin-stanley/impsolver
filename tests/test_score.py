@@ -13,7 +13,7 @@ from impsolver.alignment import fit_body, to_alignment_body, write_alignment
 from impsolver.cli import main
 from impsolver.loader import BUILTIN_FIXTURES, load_alignment, load_crossovers
 from impsolver.model import Alignment, CrossoverFixture
-from impsolver.priors import Propensity, adjust
+from impsolver.priors import Propensity, adjust, propensities
 from tests import synth
 
 REPO = Path(__file__).resolve().parents[1]
@@ -281,8 +281,98 @@ def test_real_2021_sweep() -> None:
     fx = load_crossovers(BUILTIN_FIXTURES / "members" / "trump-2021-crossovers.yaml")
     s = S.sweep([fx], [load_alignment(al)], conditional=False)
     house, senate = s.chambers
-    assert (house.n_members, house.n_crossed) == (201, 8)
-    assert (senate.n_members, senate.n_crossed) == (54, 7)
+    # 41 House and 8 Senate Republicans of the 116th cast no vote on the 2021 event.
+    assert (house.n_members, house.n_crossed) == (160, 8)
+    assert (senate.n_members, senate.n_crossed) == (46, 7)
+    assert house.events[0].n_not_voting == 41 and senate.events[0].n_not_voting == 8
     assert house.best_marginal.beta == 1.25 and senate.best_marginal.beta == 1.0
     zero = next(q for q in house.marginal if q.beta == 0.0)
     assert house.best_marginal.log_loss < zero.log_loss
+
+
+def _with_not_voting(fx: CrossoverFixture, ids: list[str]) -> CrossoverFixture:
+    d = fx.model_dump()
+    d["bodies"]["house"]["not_voting"] = [{"id": i, "name": i} for i in ids]
+    return CrossoverFixture.model_validate(d)
+
+
+def test_not_voting_members_are_left_out() -> None:
+    absent = GROUP_B[:5] + ["R100", "NOPE"]  # "NOPE" is not in the alignment
+    fx = _with_not_voting(_fixture("a", GROUP_A), absent)
+    ev = S.event_data(fx, "house", {50.0: AL}, 100, None)
+    assert ev.y.size == 120 - 6 and ev.excluded == 6 and ev.has_voters
+    assert ev.base_rate == pytest.approx(12 / 114)
+    s = S.sweep([fx], [AL], **SMALL)
+    assert s.chambers[0].events[0].n_not_voting == 6 and s.chambers[0].n_members == 114
+    plain = S.sweep([_fixture("a", GROUP_A)], [AL], **SMALL)
+    assert plain.chambers[0].events[0].n_not_voting is None
+    everyone = S.sweep([_with_not_voting(_fixture("a", GROUP_A), [])], [AL], **SMALL)
+    assert everyone.chambers[0].events[0].n_not_voting == 0
+
+
+def test_cli_reports_not_voting(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    al, a, _ = _files(tmp_path)
+    b = tmp_path / "b.json"
+    fx = _with_not_voting(_fixture("b", GROUP_A), GROUP_B[:3])
+    b.write_text(fx.model_dump_json(), encoding="utf-8")
+    assert main(["score", a, str(b), "--alignment", al, "--marginal-only"]) == 0
+    out = capsys.readouterr().out
+    assert "a: fixture lists no non-voters" in out
+    assert "b: 3 members left out as not voting" in out
+
+
+def test_bloc_rate_is_per_member() -> None:
+    al = AL.model_copy(deep=True)
+    ab = al.bodies["house"]
+    for m in ab.members:
+        if m.id in GROUP_B:
+            m.bloc = "X"
+    ab.bloc_break_rate["X"] = 0.2
+    ev = S.event_data(_fixture("a", GROUP_A), "house", {50.0: al}, 100, 0.08)
+    p = S.marginal_p(ev, 1.3)
+    props = propensities(al, "house")
+    ids = [m.id for m in ab.members if m.party == "R" and m.n_votes >= 100]
+    for i, mid in enumerate(ids):
+        assert p[i] == pytest.approx(adjust(0.08, props[mid], 1.3, 20.0))
+    # A bloc with no break rate is left out, as in priors.propensities.
+    del ab.bloc_break_rate["X"]
+    ev2 = S.event_data(_fixture("a", GROUP_A), "house", {50.0: al}, 100, 0.08)
+    assert ev2.y.size == 120 - len(GROUP_B)
+
+
+def test_unscorable_event_is_skipped() -> None:
+    s = S.sweep([_fixture("a", GROUP_A), _fixture("none", [])], [AL], **SMALL)
+    assert s.events == ["a", "none"] and [e.case for e in s.chambers[0].events] == ["a"]
+    assert s.skipped == ["none house: needs both crossers and non-crossers"]
+    assert any(n.startswith("house: one scored event only") for n in s.notes)
+    assert not any(n.startswith("one event only") for n in s.notes)
+    with pytest.raises(S.ScoreError, match="no event could be scored"):
+        S.sweep([_fixture("none", [])], [AL], **SMALL)
+
+
+def test_best_skips_low_effective_draws() -> None:
+    lo = S.ScorePoint(beta=2, rho=0.9, weight=1, brier=0.01, log_loss=0.05, min_effective_draws=3)
+    hi = S.ScorePoint(beta=1, rho=0, weight=0, brier=0.02, log_loss=0.1, min_effective_draws=900)
+    assert S._best([lo, hi]) == hi and S._best([lo, hi], "brier") == hi
+    assert S._best([lo]) == lo  # nothing reliable: fall back to the full grid
+    sq = np.array([0.0])
+    tables: list[S.Table] = [
+        {(2.0,): (sq, np.array([0.01]), 3.0), (1.0,): (sq, np.array([0.2]), 500.0)},
+        {(2.0,): (sq, np.array([0.01]), 3.0), (1.0,): (sq, np.array([0.3]), 500.0)},
+    ]
+    _, _, held = S._sweep_table(tables, (1.0,), ["a", "b"])
+    assert [h.chosen.beta for h in held] == [1.0, 1.0]
+
+
+def test_render_flags_low_draws_on_best_by_brier() -> None:
+    from impsolver.cli import render_sweep
+
+    s = S.sweep([_fixture("a", GROUP_A)], [AL], **SMALL)
+    c = s.chambers[0]
+    assert c.best_conditional_brier is not None
+    c.best_conditional_brier.min_effective_draws = 2.0
+    c.min_effective_draws = 2.0
+    out = render_sweep(s, 3)
+    line = next(x for x in out.splitlines() if "best by Brier" in x)
+    assert "low effective draws" in line
+    assert "best settings skip points below 100" in out
