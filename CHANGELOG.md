@@ -26,6 +26,9 @@ All notable changes are listed here. The format follows
 - `impsolver align` pools several congresses, optionally with a recency weight (`--half-life`, in
   congresses; recorded as `half_life`), and `alignment/us-116-118.json` pools the 116th to 118th
   Congresses (Voteview checksums added); `us-116.json`, `us-119.json` and default results are unchanged.
+- `party_priors` and `overrides` values may be a range `{low, high}` or `{beta: [a, b]}`;
+  `uncertainty_draws` (or `simulate --uncertainty-draws`) reports P(removal) with a 5-95% interval
+  over them, and `evaluate` widens its bounds to the range; number-valued results are unchanged.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

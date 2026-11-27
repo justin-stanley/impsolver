@@ -42,7 +42,8 @@ CLI: python -m impsolver.alignment --votes --members (repeatable) --caucus 328=D
 100k draws in 10k chunks, PCG64(seed). Reuse the same u across gates within a draw (scenario
 `gate_correlation` < 1 mixes in a fresh draw per later gate, component by component). Marginals are
 preserved. Blocs are ordered by seat order. Outputs: P(pass|reached) per gate, P(complete), yes-count
-mean/p5/p50/p95, MC standard error, seed.
+mean/p5/p50/p95, MC standard error, seed. With `uncertainty_draws` N > 0, an outer loop samples
+each range/Beta prior once per draw (PCG64([seed, 0x0DD5])) and adds p_complete_interval (p5, p95).
 
 ## Defection prior
 DefectionPrior{beta=1, pseudo_votes=20, stages=["*"]}

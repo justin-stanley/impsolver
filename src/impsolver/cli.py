@@ -131,12 +131,19 @@ def render_flips(r: FlipResult) -> str:
 
 
 def render_simulation(s: Simulation) -> str:
-    out = [f"{s.target}: {s.draws} draws, rho={s.rho}, seed={s.seed}, aligned={s.aligned}"]
+    head = f"{s.target}: {s.draws} draws, rho={s.rho}, seed={s.seed}, aligned={s.aligned}"
+    if s.uncertainty_draws:
+        head += f", {s.uncertainty_draws} outer draws over uncertain priors"
+    out = [head]
     for a in s.articles:
-        out.append(
+        line = (
             f"\nArticle {a.article}, path {a.path}: P(complete)={a.p_complete:.4f} "
             f"(MC s.e. {a.mc_se:.4f})"
         )
+        if a.p_complete_interval is not None:
+            lo, hi = a.p_complete_interval
+            line += f", 5-95% over priors [{lo:.4f}, {hi:.4f}]"
+        out.append(line)
         for g in a.gates:
             c = g.pro_count
             out.append(
@@ -144,6 +151,12 @@ def render_simulation(s: Simulation) -> str:
                 f"{g.p_pass_given_reached:.4f}  PRO mean {c.mean:.1f} "
                 f"[p5 {c.p5:.0f}, p50 {c.p50:.0f}, p95 {c.p95:.0f}]"
             )
+    if s.p_any_complete is not None and s.p_any_complete_interval is not None:
+        lo, hi = s.p_any_complete_interval
+        out.append(
+            f"\nAny article: P(removal)={s.p_any_complete:.4f}, "
+            f"5-95% over priors [{lo:.4f}, {hi:.4f}]"
+        )
     return "\n".join(out)
 
 
@@ -261,7 +274,14 @@ def cmd_flips(a: argparse.Namespace) -> int:
 
 
 def cmd_simulate(a: argparse.Namespace) -> int:
-    s = simulate(prepare(a.scenario), draws=a.draws, rho=a.rho, seed=a.seed, path_name=a.path)
+    s = simulate(
+        prepare(a.scenario),
+        draws=a.draws,
+        rho=a.rho,
+        seed=a.seed,
+        path_name=a.path,
+        uncertainty_draws=a.uncertainty_draws,
+    )
     _emit(a, s, lambda: render_simulation(s))
     return 0
 
@@ -592,7 +612,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("simulate", cmd_simulate, help="copula Monte Carlo")
     p.add_argument("scenario")
-    p.add_argument("--draws", type=int, default=100_000)
+    p.add_argument(
+        "--draws",
+        type=int,
+        help="draws (default 100000; per outer draw, default 2000, with uncertainty_draws)",
+    )
+    p.add_argument(
+        "--uncertainty-draws",
+        type=int,
+        metavar="N",
+        help="outer draws over range/beta priors (overrides the scenario's uncertainty_draws)",
+    )
     p.add_argument("--rho", type=float)
     p.add_argument("--seed", type=int)
     p.add_argument("--path")

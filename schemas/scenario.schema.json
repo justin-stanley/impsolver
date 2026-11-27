@@ -28,6 +28,57 @@
       "title": "DefectionPrior",
       "type": "object"
     },
+    "PriorBeta": {
+      "additionalProperties": false,
+      "description": "A probability with a Beta(a, b) distribution, given as ``{beta: [a, b]}``.",
+      "properties": {
+        "beta": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            }
+          ],
+          "title": "Beta",
+          "type": "array"
+        }
+      },
+      "required": [
+        "beta"
+      ],
+      "title": "PriorBeta",
+      "type": "object"
+    },
+    "PriorRange": {
+      "additionalProperties": false,
+      "description": "A probability known only to lie in [low, high]: uniform in the Monte Carlo outer loop.",
+      "properties": {
+        "low": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Low",
+          "type": "number"
+        },
+        "high": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "High",
+          "type": "number"
+        }
+      },
+      "required": [
+        "low",
+        "high"
+      ],
+      "title": "PriorRange",
+      "type": "object"
+    },
     "Shift": {
       "additionalProperties": false,
       "properties": {
@@ -127,9 +178,19 @@
     "party_priors": {
       "additionalProperties": {
         "additionalProperties": {
-          "maximum": 1.0,
-          "minimum": 0.0,
-          "type": "number"
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/PriorRange"
+            },
+            {
+              "$ref": "#/$defs/PriorBeta"
+            }
+          ]
         },
         "type": "object"
       },
@@ -140,9 +201,19 @@
     "overrides": {
       "additionalProperties": {
         "additionalProperties": {
-          "maximum": 1.0,
-          "minimum": 0.0,
-          "type": "number"
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/PriorRange"
+            },
+            {
+              "$ref": "#/$defs/PriorBeta"
+            }
+          ]
         },
         "type": "object"
       },
@@ -279,6 +350,12 @@
         }
       ],
       "default": null
+    },
+    "uncertainty_draws": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Uncertainty Draws",
+      "type": "integer"
     }
   },
   "required": [
