@@ -152,6 +152,9 @@ def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicA
 def evaluate(prep: Prepared, path_name: str | None = None) -> Evaluation:
     """Bound every gate of every article using the scenario cutoffs.
 
+    Each article also carries ``pivots``: the present non-PRO members at its binding gate,
+    highest supplied p first, enough to cover the shortfall at the minimum plus 5 (at most 25).
+
     Args:
         prep: A prepared scenario.
         path_name: ``"A"`` or ``"B"``; defaults to B when the scenario has committee reports.

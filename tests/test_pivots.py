@@ -158,3 +158,10 @@ def test_html_has_no_pivot_section_without_scenarios() -> None:
     res = solve(Loaded(p, {}, {x.id: x.p or 0 for x in p.candidates}), joint=False)
     assert res.pivots == {}
     assert '<section id="pivots">' not in render(res, p)
+
+
+def test_html_notes_empty_pivot_list() -> None:
+    loaded = load(REPO / "examples" / "portfolio-example.yaml")
+    res = solve(loaded, joint=False)
+    next(iter(res.pivots.values())).pivots = []
+    assert "No non-PRO members at this gate." in _pivot_section(render(res, loaded.pf))
