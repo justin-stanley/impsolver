@@ -1,7 +1,7 @@
 {
  "schema_version": 1,
  "encoding": "unsigned_breaks",
- "source": "voteview:H119_votes.csv,S119_votes.csv",
+ "source": "Lewis, Jeffrey B., Keith Poole, Howard Rosenthal, Adam Boche, Aaron Rudkin, and Luke Sonnet (2026). Voteview: Congressional Roll-Call Votes Database. https://voteview.com/ Accessed 2026-11-27. Files: H119_members.csv, H119_votes.csv, S119_members.csv, S119_votes.csv.",
  "congresses": [
   119
  ],

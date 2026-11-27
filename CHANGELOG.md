@@ -20,5 +20,7 @@ First public release.
   `--vacate` for resignations Voteview does not show yet.
 - Historical fixtures for Johnson (1868), Clinton (1998), Trump (2019 and 2021) and Mayorkas
   (2024), each checked against House Clerk and Senate records.
+- `DATA.md` and `CITATION.cff`; generated rosters and alignment files carry the Voteview
+  citation and access date (`--accessed`).
 - Scenario options `senate_tie_break`, `national_swing` and `alignment_chamber_weight` (the
   Senate defaults to 0).

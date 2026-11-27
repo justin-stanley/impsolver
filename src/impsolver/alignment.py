@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import json
 import sys
 from collections import defaultdict
@@ -30,6 +31,17 @@ MIN_SHARED = 10
 MIN_BLOC_VOTES = 5
 MAX_NORM2 = 0.999
 CHAMBERS = {"House": "house", "Senate": "senate"}
+VOTEVIEW_CITATION = (
+    "Lewis, Jeffrey B., Keith Poole, Howard Rosenthal, Adam Boche, Aaron Rudkin, and Luke Sonnet "
+    "(2026). Voteview: Congressional Roll-Call Votes Database. https://voteview.com/"
+)
+
+
+def voteview_source(paths: list[Path], accessed: dt.date) -> str:
+    """Citation line stored in generated files, as Voteview asks users to cite the dataset."""
+    files = ", ".join(sorted(p.name for p in paths))
+    return f"{VOTEVIEW_CITATION} Accessed {accessed.isoformat()}. Files: {files}."
+
 
 FloatArr = npt.NDArray[np.float64]
 
@@ -409,6 +421,7 @@ def build_alignment(
     kappa: float = KAPPA,
     min_shared: int = MIN_SHARED,
     member_caucus: dict[str, str] | None = None,
+    accessed: dt.date | None = None,
 ) -> Alignment:
     members = read_members(member_paths)
     rolls = read_votes(vote_paths)
@@ -425,7 +438,7 @@ def build_alignment(
     return Alignment(
         schema_version=1,
         encoding="unsigned_breaks",
-        source="voteview:" + ",".join(sorted(p.name for p in vote_paths)),
+        source=voteview_source([*vote_paths, *member_paths], accessed or dt.date.today()),
         congresses=sorted(congresses),
         kappa=kappa,
         min_shared=min_shared,
@@ -448,6 +461,12 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="ID=BLOC ('none' = own party); beats --caucus",
     )
+    ap.add_argument(
+        "--accessed",
+        type=dt.date.fromisoformat,
+        default=None,
+        help="date the Voteview files were downloaded (for the citation; default today)",
+    )
     ap.add_argument("--k", type=int, default=K)
     ap.add_argument("--kappa", type=float, default=KAPPA)
     ap.add_argument("--min-shared", type=int, default=MIN_SHARED)
@@ -456,7 +475,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         mc = parse_mapping(a.member_caucus)
         al = build_alignment(
-            a.votes, a.members, parse_caucus(a.caucus), a.k, a.kappa, a.min_shared, mc
+            a.votes,
+            a.members,
+            parse_caucus(a.caucus),
+            a.k,
+            a.kappa,
+            a.min_shared,
+            mc,
+            a.accessed,
         )
     except (OSError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)

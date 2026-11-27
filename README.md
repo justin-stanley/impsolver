@@ -92,28 +92,32 @@ and [`docs/design-reference.md`](docs/design-reference.md).
 
 ## Data
 
-Rosters and alignment are built from **Voteview**. Please cite it when you use these files or
+Rosters and alignment are built from **Voteview**. Cite it whenever you use these files or
 regenerate them:
 
 > Lewis, Jeffrey B., Keith Poole, Howard Rosenthal, Adam Boche, Aaron Rudkin, and Luke Sonnet
 > (2026). *Voteview: Congressional Roll-Call Votes Database.* https://voteview.com/
+> Accessed 2026-11-27.
 
-This repository includes files derived from Voteview (`compositions/us-119.yaml`,
-`alignment/us-116.json`, `alignment/us-119.json`). It does not include the raw CSVs. Download them
-with `scripts/fetch-voteview.sh`, then rebuild:
+[DATA.md](DATA.md) lists every file derived from Voteview, the source files and access date behind
+each one, and the corrections applied on top of it. The derived files
+(`compositions/us-119.yaml`, `alignment/us-116.json`, `alignment/us-119.json`) carry the same
+citation. The raw CSVs are not included. Download them with `scripts/fetch-voteview.sh`, then
+rebuild (pass `--accessed` with your download date):
 
 ```bash
 scripts/fetch-voteview.sh 116 119
 V=data/voteview
 impsolver roster --members $V/H119_members.csv --members $V/S119_members.csv \
   --votes $V/H119_votes.csv --votes $V/S119_votes.csv --caucus 328=D \
-  --member-caucus K000401=R --vacate H001082 --as-of 2026-11-27 --out compositions/us-119.yaml
+  --member-caucus K000401=R --vacate H001082 --as-of 2026-11-27 --accessed 2026-11-27 \
+  --out compositions/us-119.yaml
 impsolver align --votes $V/H116_votes.csv --votes $V/S116_votes.csv \
   --members $V/H116_members.csv --members $V/S116_members.csv --caucus 328=D \
-  --out alignment/us-116.json
+  --accessed 2026-11-27 --out alignment/us-116.json
 impsolver align --votes $V/H119_votes.csv --votes $V/S119_votes.csv \
   --members $V/H119_members.csv --members $V/S119_members.csv --caucus 328=D \
-  --member-caucus K000401=R --out alignment/us-119.json
+  --member-caucus K000401=R --accessed 2026-11-27 --out alignment/us-119.json
 ```
 
 The `us-119` roster reflects the 119th Congress as of 2026-11-27, checked against the
@@ -151,8 +155,10 @@ ruff check src tests && ruff format --check src tests
 mypy src
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md). To cite impsolver, see
+[CITATION.cff](CITATION.cff).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT for the code. See [LICENSE](LICENSE). Data derived from Voteview keeps Voteview's citation
+request; see [DATA.md](DATA.md).
