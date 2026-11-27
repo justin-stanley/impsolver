@@ -6,9 +6,11 @@ impsolver needs Python 3.12 or newer. The ILP solver (CBC) ships with PuLP, so n
 required, and everything runs offline.
 
 ```bash
-pip install impsolver
+pip install "git+https://github.com/justin-stanley/impsolver@v0.1.0"
 impsolver --help
 ```
+
+impsolver is not on PyPI yet.
 
 To work on the code instead:
 

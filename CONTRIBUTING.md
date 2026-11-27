@@ -43,8 +43,9 @@ Record behaviour changes in `CHANGELOG.md`. Where the design changes, also updat
 1. Update `version` in `pyproject.toml` and move the CHANGELOG entries under a new version
    heading.
 2. Commit, then push a signed tag: `git tag -s vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`.
-3. The release workflow tests, builds, attests and publishes to PyPI with trusted publishing, then
-   creates the GitHub release from the CHANGELOG. Zenodo archives the release and mints a DOI.
+3. The release workflow tests, builds and attests the release, then creates the GitHub release
+   from the CHANGELOG. It publishes to PyPI only when the repository variable `PUBLISH_TO_PYPI` is
+   `true`, and Zenodo mints a DOI only once its GitHub integration is on (both on the backlog).
 
 ## Pull requests
 

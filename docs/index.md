@@ -28,7 +28,9 @@ portfolio of placeholder officials.
 ## Install
 
 ```bash
-pip install impsolver
+pip install "git+https://github.com/justin-stanley/impsolver@v0.1.0"
 ```
+
+impsolver is not on PyPI yet.
 
 Then follow [Getting started](getting-started.md).

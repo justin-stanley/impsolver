@@ -1,7 +1,9 @@
 name: Release
 
-# Push a tag such as v0.1.0 to build, attest and publish. PyPI publishing uses trusted publishing:
-# add this repository and workflow as a trusted publisher on pypi.org (environment "pypi").
+# Push a tag such as v0.1.0 to build, attest and create a GitHub release.
+# PyPI publishing uses trusted publishing and is off until it is set up: add this repository and
+# workflow as a trusted publisher on pypi.org (environment "pypi"), then set the repository
+# variable PUBLISH_TO_PYPI to "true". See the backlog issue "Publish to PyPI via trusted publishing".
 
 on:
   push:
@@ -40,6 +42,7 @@ jobs:
 
   pypi:
     needs: build
+    if: vars.PUBLISH_TO_PYPI == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi

@@ -2,8 +2,7 @@
 
 [![CI](https://github.com/justin-stanley/impsolver/actions/workflows/ci.yml/badge.svg)](https://github.com/justin-stanley/impsolver/actions/workflows/ci.yml)
 [![Docs](https://github.com/justin-stanley/impsolver/actions/workflows/docs.yml/badge.svg)](https://justin-stanley.github.io/impsolver/)
-[![PyPI](https://img.shields.io/pypi/v/impsolver)](https://pypi.org/project/impsolver/)
-[![Python](https://img.shields.io/pypi/pyversions/impsolver)](https://pypi.org/project/impsolver/)
+[![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/justin-stanley/impsolver/badge)](https://scorecard.dev/viewer/?uri=github.com/justin-stanley/impsolver)
 [![REUSE](https://img.shields.io/badge/REUSE-compliant-green)](https://reuse.software/)
@@ -38,12 +37,14 @@ probabilities. Please keep any use of this tool honest about its assumptions (se
 
 Requires Python 3.12 or newer.
 
+impsolver is not on PyPI yet. Install from GitHub:
+
 ```bash
-pip install impsolver
+pip install "git+https://github.com/justin-stanley/impsolver@v0.1.0"
 impsolver --help
 ```
 
-From source:
+From a clone:
 
 ```bash
 git clone https://github.com/justin-stanley/impsolver
