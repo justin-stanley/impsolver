@@ -19,6 +19,7 @@ from .compare import Comparison, PortfolioSide, ScenarioSide
 from .model import Portfolio
 from .portfolio import PlanOut, PortfolioResult, Slot, TreeNode, excluded_reason_text
 from .tornado import TORNADO_NOTE, Tornado, tornado_note
+from .views_votes import VOTES_CSS, votes_tab
 
 OPTIONAL_GATES = {"S3"}
 GATE_LABELS = {
@@ -74,11 +75,61 @@ svg text{fill:var(--ink);font-size:12px}svg .muted{fill:var(--muted)}
 overflow-wrap:anywhere}
 """
 
+SHELL_CSS = """
+.maintabs{display:none;gap:4px;flex-wrap:wrap;margin:22px 0 0;border-bottom:1px solid var(--line)}
+.js .maintabs{display:flex}
+.maintabs button{font:inherit;font-weight:600;color:var(--muted);background:none;border:0;
+border-bottom:3px solid transparent;padding:10px 14px;cursor:pointer;min-height:44px}
+.maintabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--ink)}
+.js .tabpanel{display:none}.js .tabpanel.on{display:block}
+h4{font-size:14px;margin:16px 0 6px}
+@media print{.maintabs,.caserail,.tabs{display:none!important}
+.js .tabpanel,.js .case,.js .gatepanel,.plan{display:block!important}}
+"""
+
 JS = """
-document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
-document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected','false'));
-document.querySelectorAll('.plan').forEach(x=>x.classList.remove('on'));
-b.setAttribute('aria-selected','true');document.getElementById(b.dataset.plan).classList.add('on');}));
+(function(){var d=document;d.documentElement.classList.add('js');
+function all(s,r){return Array.prototype.slice.call((r||d).querySelectorAll(s));}
+all('.tabs button').forEach(function(b){b.addEventListener('click',function(){
+all('.tabs button').forEach(function(x){x.setAttribute('aria-selected','false');});
+all('.plan').forEach(function(x){x.classList.remove('on');});
+b.setAttribute('aria-selected','true');d.getElementById(b.dataset.plan).classList.add('on');});});
+var tabs=all('.maintabs [role=tab]'),state={tab:null,cid:null,gate:null};
+function showTab(id,focus){var hit=false;tabs.forEach(function(t){var on=t.dataset.tab===id;
+hit=hit||on;});if(!hit)return false;tabs.forEach(function(t){var on=t.dataset.tab===id;
+t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;
+d.getElementById(t.getAttribute('aria-controls')).classList.toggle('on',on);
+if(on&&focus)t.focus();});state.tab=id;return true;}
+function caseOf(cid){return all('.case').filter(function(s){return s.dataset.cid===cid;})[0];}
+function showGate(sec,gate){var hit=false;all('.gatebtn',sec).forEach(function(b){
+hit=hit||b.dataset.gate===gate;});if(!hit)return false;
+all('.gatebtn',sec).forEach(function(b){
+b.setAttribute('aria-pressed',b.dataset.gate===gate?'true':'false');});
+all('.gatepanel',sec).forEach(function(p){p.classList.toggle('on',p.dataset.gate===gate);});
+state.gate=gate;return true;}
+function showCase(cid){var sec=caseOf(cid);if(!sec)return false;
+all('.casebtn').forEach(function(b){
+b.setAttribute('aria-pressed',b.dataset.cid===cid?'true':'false');});
+all('.case').forEach(function(s){s.classList.toggle('on',s===sec);});state.cid=cid;
+var g=all('.gatebtn[aria-pressed=true]',sec)[0];state.gate=g?g.dataset.gate:null;return true;}
+function save(){var h='#'+state.tab;if(state.tab==='votes'&&state.cid){
+h+='/'+encodeURIComponent(state.cid);if(state.gate)h+='/'+encodeURIComponent(state.gate);}
+if(history.replaceState)history.replaceState(null,'',h);}
+function load(){var parts=location.hash.replace(/^#/,'').split('/').map(decodeURIComponent);
+if(parts[0])showTab(parts[0]);if(parts[1]&&showCase(parts[1])&&parts[2]){
+showGate(caseOf(parts[1]),parts[2]);}}
+tabs.forEach(function(t,i){t.addEventListener('click',function(){showTab(t.dataset.tab);save();});
+t.addEventListener('keydown',function(ev){var n=tabs.length,j=-1,k=ev.key;
+if(k==='ArrowRight')j=(i+1)%n;else if(k==='ArrowLeft')j=(i+n-1)%n;else if(k==='Home')j=0;
+else if(k==='End')j=n-1;if(j>=0){ev.preventDefault();
+showTab(tabs[j].dataset.tab,true);save();}});});
+all('.casebtn').forEach(function(b){b.addEventListener('click',function(){
+showCase(b.dataset.cid);save();});});
+all('.case').forEach(function(sec){all('.gatebtn',sec).forEach(function(b){
+b.addEventListener('click',function(){showGate(sec,b.dataset.gate);save();});});});
+var first=tabs.filter(function(t){return t.getAttribute('aria-selected')==='true';})[0];
+if(first)state.tab=first.dataset.tab;var c0=all('.casebtn[aria-pressed=true]')[0];
+if(c0)showCase(c0.dataset.cid);load();window.addEventListener('hashchange',load);})();
 """
 
 
@@ -541,10 +592,27 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
             + "</div>"
         )
     data = json.dumps(res.model_dump(mode="json"), default=str).replace("</", "<\\/")
+    start = "votes" if res.gates else "floor"
+    names = [("votes", "Votes"), ("floor", "Floor time"), ("outcomes", "Outcomes")]
+    names.append(("moves", "What moves it"))
+    tablist = (
+        '<div class="maintabs" role="tablist" aria-label="Page sections">'
+        + "".join(
+            f'<button type="button" role="tab" id="tab-{k}" data-tab="{k}" '
+            f'aria-controls="panel-{k}" aria-selected="{"true" if k == start else "false"}" '
+            f'tabindex="{0 if k == start else -1}">{name}</button>'
+            for k, name in names
+        )
+        + "</div>"
+    )
+
+    def on(k: str) -> str:
+        return " on" if k == start else ""
+
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(title)}</title><style>{CSS}</style></head><body><main>
+<title>{e(title)}</title><style>{CSS}{SHELL_CSS}{VOTES_CSS}</style></head><body><main>
 <h1>{e(title)}</h1>
 <p class="sub">Window {pf.start} to {pf.deadline}; {pf.house_concurrency} House
 lane(s), one Senate trial at a time.</p>
@@ -556,18 +624,23 @@ lane(s), one Senate trial at a time.</p>
         "Fragile" if res.fragile else "Robust"
     }</b><span>to fatigue and duration changes</span></div>
 </div>
+{tablist}
+<section class="tabpanel{on("votes")}" id="panel-votes" role="tabpanel" aria-labelledby="tab-votes">
+<h2>Votes</h2><div class="panel">{votes_tab(res)}</div></section>
+<section class="tabpanel{on("floor")}" id="panel-floor" role="tabpanel" aria-labelledby="tab-floor">
 <h2>Plans and timeline</h2><div class="panel"><div class="tabs">{tabs}</div>{sections}</div>
-<h2>Gate paths</h2><div class="panel">{gate_paths(res, pf)}</div>
-{pivots_html(res, pf)}
-{succession}
-<h2>Removals</h2><div class="panel">{removals_svg(res)}</div>
 <h2>Left out</h2><div class="panel"><table><tr><th>Candidate</th><th>Reason</th><th>Detail</th>
-</tr>{dropped}</table></div>
+</tr>{dropped}</table></div></section>
+<section class="tabpanel{on("outcomes")}" id="panel-outcomes" role="tabpanel"
+aria-labelledby="tab-outcomes">
+{succession}
+<h2>Removals</h2><div class="panel">{removals_svg(res)}</div></section>
+<section class="tabpanel{on("moves")}" id="panel-moves" role="tabpanel" aria-labelledby="tab-moves">
 {tornado_section(res.tornado.values())}
 <h2>Sensitivity</h2><div class="panel"><p class=note>Regret is the expected removals lost by keeping
 the recommended order when an input changes. It is flagged fragile above max(0.01, 5% of the
 best).</p><table><tr><th>Change</th><th class=num>Best</th><th class=num>Recommended order
-</th><th class=num>Regret</th><th></th></tr>{sens}</table></div>
+</th><th class=num>Regret</th><th></th></tr>{sens}</table></div></section>
 <script type="application/json" id="impsolver-data">{data}</script>
 <script>{JS}</script></main></body></html>
 """

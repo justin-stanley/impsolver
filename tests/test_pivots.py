@@ -132,8 +132,12 @@ def test_render_evaluation_without_pivots(rules: RuleSet) -> None:
     assert PIVOT_HEADING not in render_evaluation(e)
 
 
-def _pivot_section(html: str) -> str:
-    m = re.search(r'<section id="pivots">.*?</section>', html, re.S)
+def _votes_section(html: str) -> str:
+    m = re.search(
+        r'<section class="tabpanel[^"]*" id="panel-votes".*?</section>\s*<section class="tabpanel',
+        html,
+        re.S,
+    )
     assert m is not None
     return m.group(0)
 
@@ -143,7 +147,7 @@ def test_html_pivots_for_scenario_candidates_only() -> None:
     res = solve(loaded, joint=False)
     assert set(res.pivots) == set(loaded.preps)
     html = render(res, loaded.pf)
-    section = _pivot_section(html)
+    section = _votes_section(html)
     assert "Members nearest the threshold (by the supplied probabilities)" in section
     for cid, art in res.pivots.items():
         assert cid in section
@@ -153,15 +157,10 @@ def test_html_pivots_for_scenario_candidates_only() -> None:
         assert word not in text, word
 
 
-def test_html_has_no_pivot_section_without_scenarios() -> None:
+def test_html_has_no_member_lists_without_scenarios() -> None:
     p = pf([c("a", 0.6), c("b", 0.4)])
     res = solve(Loaded(p, {}, {x.id: x.p or 0 for x in p.candidates}), joint=False)
     assert res.pivots == {}
-    assert '<section id="pivots">' not in render(res, p)
-
-
-def test_html_notes_empty_pivot_list() -> None:
-    loaded = load(REPO / "examples" / "portfolio-example.yaml")
-    res = solve(loaded, joint=False)
-    next(iter(res.pivots.values())).pivots = []
-    assert "No non-PRO members at this gate." in _pivot_section(render(res, loaded.pf))
+    html = render(res, p)
+    assert "Members nearest the threshold" not in html
+    assert "supplied directly; no gate breakdown" in html
