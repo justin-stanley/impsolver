@@ -63,6 +63,11 @@ uncertainty allows. Gate rows pool every inner draw of every outer draw. The MC 
 √(var_t / N + p(1 − p) / draws), where var_t is the variance of P(complete) across outer draws;
 the second term remains because the inner draws are shared.
 
+With more than one article, every article in an outer draw uses the same sampled priors and the
+same inner draws, and the output adds a line "Any article: P(removal)" (`p_any_complete` and
+`p_any_complete_interval` in JSON): the chance that at least one article convicts, with its 5th
+and 95th percentiles across outer draws.
+
 Because P(complete) is not linear in the priors, the pooled mean usually differs from the result
 at the midpoints. The other commands use the midpoints, so a portfolio candidate or a viability
 row backed by this scenario does not include the prior uncertainty.

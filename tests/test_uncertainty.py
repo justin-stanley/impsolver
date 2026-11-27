@@ -312,8 +312,25 @@ def test_override_range_is_per_member(rules: RuleSet) -> None:
 def test_multi_article_shares_prior_draws(rules: RuleSet) -> None:
     s = simulate(_prep(rules, articles=["I", "II"], uncertainty_draws=10), draws=500)
     a, b = s.articles
-    # No article-specific shifts: both articles see the same priors and the same inner draws.
+    # No article-specific shifts: both articles see the same priors and the same inner draws, so
+    # removal on any article equals removal on either one.
     assert a.p_complete == b.p_complete and a.p_complete_interval == b.p_complete_interval
+    assert s.p_any_complete == pytest.approx(a.p_complete)
+    assert s.p_any_complete_interval == pytest.approx(a.p_complete_interval)
+
+
+def test_any_article_interval(rules: RuleSet) -> None:
+    shifts = [{"label": "art II", "bloc": "R", "delta": -1.0, "article": "II"}]
+    s = simulate(_prep(rules, articles=["I", "II"], shifts=shifts, uncertainty_draws=20), draws=800)
+    a, b = s.articles
+    assert b.p_complete < a.p_complete
+    assert s.p_any_complete is not None and s.p_any_complete_interval is not None
+    assert s.p_any_complete >= a.p_complete
+    lo, hi = s.p_any_complete_interval
+    assert lo <= s.p_any_complete <= hi
+    # One article, or the loop off: no any-article line.
+    assert simulate(_prep(rules, uncertainty_draws=5), draws=200).p_any_complete is None
+    assert simulate(_prep(rules, articles=["I", "II"]), draws=200).p_any_complete is None
 
 
 def test_defection_prior_reapplied_per_draw(rules: RuleSet) -> None:
@@ -370,4 +387,8 @@ def test_cli_simulate_with_uncertainty(tmp_path: Path, capsys: pytest.CaptureFix
     assert len(data["articles"][0]["p_complete_interval"]) == 2
     assert main(["simulate", str(scen), "--draws", "500", "--uncertainty-draws", "0"]) == 0
     assert "over priors" not in capsys.readouterr().out
+    two = tmp_path / "two.yaml"
+    two.write_text(SCEN_TEXT + "articles: [I, II]\n")
+    assert main(["simulate", str(two), "--draws", "300", "--uncertainty-draws", "4"]) == 0
+    assert "Any article: P(removal)=" in capsys.readouterr().out
     assert main(["validate", "us-federal", str(tmp_path / "comp.yaml"), str(scen)]) == 0

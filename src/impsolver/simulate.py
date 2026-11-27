@@ -322,15 +322,22 @@ def sampled_preps(prep: Prepared, n: int, seed: int) -> list[Prepared]:
     return [prep.with_scenario(sample_scenario(prep.scenario, rng)) for _ in range(n)]
 
 
-def simulate_article_uncertain(
-    preps: list[Prepared], article: str, path: Path, draws: int, seed: int, rho: float
-) -> SimArticle:
-    """Pool ``draws`` inner draws for each sampled prep; report the spread across preps.
+def _spread(per: FloatArr, draws: int) -> tuple[float, float, tuple[float, float]]:
+    """Mean, standard error and (p5, p95) of per-outer-draw probabilities.
 
-    ``mc_se`` combines the spread of the mean across outer draws with the inner Monte Carlo
-    error, which common random numbers do not average away: sqrt(var_t / N + p (1 - p) / draws).
+    The standard error combines the spread of the mean across outer draws with the inner Monte
+    Carlo error, which common random numbers do not average away: sqrt(var_t / N + p(1-p) / draws).
     """
-    raws = [run_raw(p, article, path, draws, seed, rho) for p in preps]
+    pc = float(per.mean())
+    between = float(per.var(ddof=1)) / len(per) if len(per) > 1 else 0.0
+    lo, hi = np.percentile(per, [5, 95])
+    return pc, float(np.sqrt(between + pc * (1 - pc) / draws)), (float(lo), float(hi))
+
+
+def simulate_article_uncertain(
+    raws: list[RawSim], article: str, path: Path, draws: int
+) -> SimArticle:
+    """Pool the inner draws of every outer draw; report the spread across outer draws."""
     pooled = RawSim(
         raws[0].stages,
         raws[0].n_required,
@@ -338,17 +345,14 @@ def simulate_article_uncertain(
         np.concatenate([r.passed for r in raws], axis=1),
         np.concatenate([r.present for r in raws], axis=1),
     )
-    per = np.array([float(r.complete.mean()) for r in raws])
-    pc = float(per.mean())
-    between = float(per.var(ddof=1)) / len(per) if len(per) > 1 else 0.0
-    lo, hi = np.percentile(per, [5, 95])
+    pc, se, interval = _spread(np.array([float(r.complete.mean()) for r in raws]), draws)
     return SimArticle(
         article=article,
         path=path.name,
         p_complete=pc,
-        mc_se=float(np.sqrt(between + pc * (1 - pc) / draws)),
+        mc_se=se,
         gates=_gates(pooled),
-        p_complete_interval=(float(lo), float(hi)),
+        p_complete_interval=interval,
     )
 
 
@@ -381,13 +385,21 @@ def simulate(
         n_outer = 0
     n = draws if draws is not None else (DEFAULT_INNER_DRAWS if n_outer else DEFAULT_DRAWS)
     path = path_for(prep.rules, prep.scenario, path_name or default_path(prep))
+    arts = list(prep.scenario.articles)
+    p_any: float | None = None
+    any_interval: tuple[float, float] | None = None
     if n_outer:
         preps = sampled_preps(prep, n_outer, s)
-        articles = [
-            simulate_article_uncertain(preps, a, path, n, s, r) for a in prep.scenario.articles
-        ]
+        raws = {a: [run_raw(p, a, path, n, s, r) for p in preps] for a in arts}
+        articles = [simulate_article_uncertain(raws[a], a, path, n) for a in arts]
+        if len(arts) > 1:
+            # Removal on any article, per outer draw: articles share each draw's priors and swings.
+            per_any = [
+                float(any_complete({a: raws[a][t] for a in arts}).mean()) for t in range(n_outer)
+            ]
+            p_any, _, any_interval = _spread(np.array(per_any), n)
     else:
-        articles = [simulate_article(prep, a, path, n, s, r) for a in prep.scenario.articles]
+        articles = [simulate_article(prep, a, path, n, s, r) for a in arts]
     return Simulation(
         target=prep.scenario.target.name,
         draws=n,
@@ -397,6 +409,8 @@ def simulate(
         and any(chamber_weight(prep, ch) > 0 for ch in ("house", "senate")),
         articles=articles,
         uncertainty_draws=n_outer,
+        p_any_complete=p_any,
+        p_any_complete_interval=any_interval,
     )
 
 

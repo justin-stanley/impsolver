@@ -143,6 +143,12 @@ def render_simulation(s: Simulation) -> str:
                 f"{g.p_pass_given_reached:.4f}  PRO mean {c.mean:.1f} "
                 f"[p5 {c.p5:.0f}, p50 {c.p50:.0f}, p95 {c.p95:.0f}]"
             )
+    if s.p_any_complete is not None and s.p_any_complete_interval is not None:
+        lo, hi = s.p_any_complete_interval
+        out.append(
+            f"\nAny article: P(removal)={s.p_any_complete:.4f}, "
+            f"5-95% over priors [{lo:.4f}, {hi:.4f}]"
+        )
     return "\n".join(out)
 
 
