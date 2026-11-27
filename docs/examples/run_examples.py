@@ -29,6 +29,7 @@ EXAMPLES: dict[str, list[str]] = {
     "simulate-national": [
         "simulate", "examples/scenario-cabinet-a-national.yaml", "--draws", "20000",
     ],
+    "simulate-uncertain": ["simulate", "examples/scenario-cabinet-a-uncertain.yaml"],
     "viability": [
         "viability", "examples/scenario-cabinet-a.yaml", "examples/scenario-cabinet-b.yaml",
         "--draws", "4000",

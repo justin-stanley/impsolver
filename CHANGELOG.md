@@ -18,6 +18,9 @@ All notable changes are listed here. The format follows
   supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 - `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
   `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
+- `party_priors` and `overrides` values may be a range `{low, high}` or `{beta: [a, b]}`;
+  `uncertainty_draws` (or `simulate --uncertainty-draws`) reports P(removal) with a 5-95% interval
+  over them, and `evaluate` widens its bounds to the range; number-valued results are unchanged.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

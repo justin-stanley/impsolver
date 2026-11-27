@@ -12,6 +12,67 @@ For each member and gate, impsolver resolves P(PRO) in this order and stops at t
 Shifts then move it on the log-odds scale: p′ = σ(logit p + Σ δ). Probabilities of exactly 0 or 1
 never move.
 
+## Uncertain priors
+
+A `party_priors` or `overrides` value can be a number, a range or a Beta distribution:
+
+```yaml
+party_priors:
+  D: {"*": 0.97}                                  # a number, as before
+  R: {"*": {low: 0.20, high: 0.40}, S2: {beta: [3, 7]}}
+overrides:
+  R-001: {"*": {low: 0.4, high: 0.8}}
+uncertainty_draws: 200                            # outer Monte Carlo draws; 0 (default) is off
+```
+
+A range says only that the probability lies between `low` and `high`; a Beta(a, b) gives it a
+distribution with mean a / (a + b). Member `p_pro` values in a composition stay numbers. Files
+written before this option existed load and give the same results.
+
+Each command uses one number per prior, except `simulate` with the outer loop on:
+
+| Where | Range `{low, high}` | Beta `{beta: [a, b]}` |
+| --- | --- | --- |
+| `evaluate`: pro_min (is the member certainly PRO?) | `low` | 5th percentile |
+| `evaluate`: pro_max (is the member certainly not CON?) | `high` | 95th percentile |
+| `evaluate` pivots, `flips`, `compare`, `viability`, `portfolio`, and `simulate` with `uncertainty_draws: 0` | midpoint (low + high) / 2 | mean a / (a + b) |
+| `simulate` with `uncertainty_draws` N > 0 | uniform on [low, high] | Beta(a, b) |
+
+In `evaluate` a member counts as PRO only if the low value is at or above the high cutoff, and
+as CON only if the high value is at or below the low cutoff; everyone else is uncertain. A range
+therefore can only widen the [pro_min, pro_max] bounds compared with its midpoint.
+
+### The outer loop
+
+With `uncertainty_draws` N > 0 (or `simulate --uncertainty-draws N`), `simulate` runs two loops:
+
+1. **Outer draws.** For each of N draws, every uncertain prior is sampled once. A prior is one
+   entry in the file, such as `R: {"*": …}` or `overrides: R-001: {S2: …}`. Every member and stage
+   that resolves to that entry gets the same sampled value in that draw: all members of the bloc
+   share it, and a `"*"` entry gives the same value at every stage that falls back to it. Shifts
+   are then applied as usual. The samples come from their own stream, PCG64([seed, 0x0DD5]).
+2. **Inner draws.** Each outer draw runs the usual copula simulation with `--draws` draws (2,000
+   by default when the outer loop is on, instead of 100,000). Every outer draw uses the same
+   inner seed (common random numbers), so the differences between outer draws come only from the
+   sampled priors.
+
+`P(complete)` is the mean over outer draws, which is the probability with the prior uncertainty
+averaged in. The output adds the 5th and 95th percentiles of P(complete) across outer draws
+(`p_complete_interval` in JSON): the range of removal probabilities that the stated prior
+uncertainty allows. Gate rows pool every inner draw of every outer draw. The MC standard error is
+√(var_t / N + p(1 − p) / draws), where var_t is the variance of P(complete) across outer draws;
+the second term remains because the inner draws are shared.
+
+Because P(complete) is not linear in the priors, the pooled mean usually differs from the result
+at the midpoints. The other commands use the midpoints, so a portfolio candidate or a viability
+row backed by this scenario does not include the prior uncertainty.
+
+With a `defection_prior`, `evaluate` and the other single-number commands adjust the midpoint;
+the outer loop adjusts each sampled value instead. Members whose probability the defection prior
+sets therefore have no separate low and high bounds in `evaluate`.
+
+See the [worked example](../examples/assumptions.md#a-range-instead-of-a-number).
+
 ## Deterministic bounds
 
 `evaluate` classifies members with the scenario `cutoffs` (default 0.1 and 0.9): PRO at or above

@@ -1,0 +1,16 @@
+# Official A (scenario-cabinet-a.yaml) with the R prior given as a range instead of one number.
+# The target and every probability are placeholders.
+schema_version: 1
+target: {name: Official A, office: cabinet_secretary}
+articles: [I]
+rules: us-federal
+composition: ../compositions/shorthand-119.yaml
+party_priors:
+  D: {"*": 0.97}
+  I: {"*": 0.95}
+  # Each R prior is somewhere in its range; the midpoints are the cabinet-a values.
+  R: {"*": {low: 0.20, high: 0.40}, H1: {low: 0.30, high: 0.50}, S1: {low: 0.35, high: 0.55}}
+rho: 0.6
+seed: 21
+# 200 outer draws over the R ranges, each running the inner copula draws.
+uncertainty_draws: 200

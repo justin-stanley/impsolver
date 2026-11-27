@@ -195,6 +195,32 @@ class Shift(Strict):
     article: str | None = None
 
 
+class PriorRange(Strict):
+    """A probability known only to lie in [low, high]: uniform in the Monte Carlo outer loop."""
+
+    low: Prob
+    high: Prob
+
+    @model_validator(mode="after")
+    def _check(self) -> PriorRange:
+        if self.low > self.high:
+            raise ValueError(f"range needs low <= high, got low={self.low} high={self.high}")
+        return self
+
+
+BetaShape = Annotated[float, Field(gt=0.0)]
+
+
+class PriorBeta(Strict):
+    """A probability with a Beta(a, b) distribution, given as ``{beta: [a, b]}``."""
+
+    beta: Annotated[tuple[BetaShape, BetaShape], Field(strict=False)]
+
+
+# A party prior or override value: a number, a range {low, high} or a distribution {beta: [a, b]}.
+PriorValue = Prob | PriorRange | PriorBeta
+
+
 class DefectionPrior(Strict):
     beta: float = 1.0
     pseudo_votes: float = Field(default=20.0, gt=0)
@@ -210,8 +236,8 @@ class Scenario(Strict):
     articles: list[str] = ["I"]
     rules: str
     composition: str
-    party_priors: dict[str, dict[str, Prob]] = {}
-    overrides: dict[str, dict[str, Prob]] = {}
+    party_priors: dict[str, dict[str, PriorValue]] = {}
+    overrides: dict[str, dict[str, PriorValue]] = {}
     cutoffs: Annotated[tuple[float, float], Field(strict=False)] = (0.1, 0.9)
     rho: float = Field(default=0.6, ge=0.0, le=1.0)
     seed: int = 0
@@ -240,6 +266,9 @@ class Scenario(Strict):
     attendance: AttendanceMode = "fixed"
     absence_rate: Prob = 0.0
     defection_prior: DefectionPrior | None = None
+    # Outer Monte Carlo draws over uncertain priors (ranges and Beta distributions). 0 turns the
+    # outer loop off; simulate then uses each uncertain prior's midpoint (range) or mean (Beta).
+    uncertainty_draws: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _check(self) -> Scenario:

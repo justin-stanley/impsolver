@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import math
 
-from .model import STAR, Member, Scenario
+from .model import STAR, Member, PriorValue, Scenario
+from .uncertainty import Bound, value
 
 
 class ResolutionError(Exception):
@@ -31,27 +32,33 @@ def shifted(p: float, delta: float) -> float:
     return sigmoid(logit(p) + delta)
 
 
-def _lookup(table: dict[str, float], stage: str) -> float | None:
+def _lookup(table: dict[str, PriorValue], stage: str) -> PriorValue | None:
     if stage in table:
         return table[stage]
     return table.get(STAR)
 
 
 class Resolver:
-    """Resolve p_pro: override, member stage, member '*', party stage, party '*'; then shifts."""
+    """Resolve p_pro: override, member stage, member '*', party stage, party '*'; then shifts.
+
+    An override or party prior may be a range or a Beta distribution. ``bound`` picks which
+    number stands for it: ``"point"`` (the mean; a range's midpoint), or ``"low"`` / ``"high"``
+    (a range's ends, a Beta's 5th / 95th percentile) for the deterministic bounds.
+    """
 
     def __init__(self, scenario: Scenario) -> None:
         self.scenario = scenario
 
-    def base(self, m: Member, stage: str) -> tuple[float, str]:
+    def spec(self, m: Member, stage: str) -> tuple[PriorValue, str]:
+        """The prior value as given (a number, range or Beta) and where it came from."""
         ov = self.scenario.overrides.get(m.id)
         if ov is not None:
             v = _lookup(ov, stage)
             if v is not None:
                 return v, "override"
-        v = _lookup(m.p_pro, stage)
-        if v is not None:
-            return v, m.p_source or "member"
+        mv = m.p_pro.get(stage, m.p_pro.get(STAR))
+        if mv is not None:
+            return mv, m.p_source or "member"
         party = self.scenario.party_priors.get(m.bloc)
         if party is not None:
             v = _lookup(party, stage)
@@ -60,6 +67,10 @@ class Resolver:
         raise ResolutionError(
             f"no probability for member {m.id} ({m.name}, bloc {m.bloc}) at stage {stage}"
         )
+
+    def base(self, m: Member, stage: str, bound: Bound = "point") -> tuple[float, str]:
+        v, source = self.spec(m, stage)
+        return value(v, bound), source
 
     def delta(self, m: Member, stage: str, article: str) -> float:
         total = 0.0
@@ -73,6 +84,8 @@ class Resolver:
             total += s.delta
         return total
 
-    def resolve(self, m: Member, stage: str, article: str, extra: float = 0.0) -> float:
-        p, _ = self.base(m, stage)
+    def resolve(
+        self, m: Member, stage: str, article: str, extra: float = 0.0, bound: Bound = "point"
+    ) -> float:
+        p, _ = self.base(m, stage, bound)
         return shifted(p, self.delta(m, stage, article) + extra)

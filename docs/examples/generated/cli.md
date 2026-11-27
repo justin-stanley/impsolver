@@ -108,8 +108,8 @@ options:
 ### `impsolver simulate`
 
 ```text
-usage: impsolver simulate [-h] [--format {text,json}] [--draws DRAWS] [--rho RHO] [--seed SEED]
-                          [--path PATH]
+usage: impsolver simulate [-h] [--format {text,json}] [--draws DRAWS] [--uncertainty-draws N]
+                          [--rho RHO] [--seed SEED] [--path PATH]
                           scenario
 
 positional arguments:
@@ -118,7 +118,11 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --format {text,json}
-  --draws DRAWS
+  --draws DRAWS         draws (default 100000; per outer draw, default 2000, with
+                        uncertainty_draws)
+  --uncertainty-draws N
+                        outer draws over range/beta priors (overrides the scenario's
+                        uncertainty_draws)
   --rho RHO
   --seed SEED
   --path PATH

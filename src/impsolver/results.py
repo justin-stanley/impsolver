@@ -117,6 +117,8 @@ class SimArticle(BaseModel):
     p_complete: float
     mc_se: float
     gates: list[SimGate]
+    # 5th and 95th percentiles of P(complete) across outer draws over uncertain priors.
+    p_complete_interval: tuple[float, float] | None = None
 
 
 class Simulation(BaseModel):
@@ -126,6 +128,7 @@ class Simulation(BaseModel):
     seed: int
     aligned: bool
     articles: list[SimArticle]
+    uncertainty_draws: int = 0
 
 
 class BacktestCheck(BaseModel):
