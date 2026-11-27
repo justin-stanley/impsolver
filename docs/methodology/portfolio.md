@@ -42,6 +42,15 @@ cancelled. For example, a deputy becomes acting head. The plan branches at T's v
 branches differ only in work that starts after that verdict. House work already begun on a
 cancelled case is lost; a replacement case needs fresh House time.
 
+Each branch then picks its own order for the cases whose House work has not started. With at most
+six such cases it tries every order and keeps the best, with ties going to the original order;
+with more it keeps the original order. A re-ordered branch must keep the House start of every
+case whose House work began before the verdict, so re-ordering never revises a decision made
+before the verdict. Because the
+original order is always one of the options, adapting never lowers expected removals. The
+decision tree (`decision_tree` in the JSON, "Succession branches" on the `--html` page) shows each
+branch's order and marks the ones re-ordered after the verdict.
+
 ## Outputs
 
 The top plans, why any case was left out (`LOW_P`, `NO_FIT`, `EXCLUDED`, `DEPENDENCY_DROPPED`,

@@ -37,6 +37,7 @@ from .simulate import (
 
 FAR = dt.date(9999, 12, 31)
 MAX_BRANCH_TRIGGERS = 3
+ADAPTIVE_REORDER = 6  # re-order a branch exhaustively when at most this many cases remain
 EXHAUSTIVE_SUCCESSION = 7
 RESCORE_TOP = 2000
 SENS_DELTAS = (-0.2, 0.0, 0.2, 0.5)
@@ -350,6 +351,9 @@ class TreeNode(BaseModel):
     """One segment of a plan. ``tried`` lists the candidates whose trials run in it.
 
     A node whose ``at`` names a trigger branches after that trigger's verdict; ``(end)`` is a leaf.
+    ``order`` is the order this segment works through its remaining candidates; on a branch it
+    is the order re-optimized after the verdict, and ``reordered`` says whether it differs from
+    the order the branch would otherwise have kept.
     """
 
     at: str
@@ -361,6 +365,8 @@ class TreeNode(BaseModel):
     tried: list[str] = []
     tried_p: list[float] = []
     verdict: dt.date | None = None
+    order: list[str] = []
+    reordered: bool = False
 
 
 def _dependents(ctx: Ctx, trigger: str, rest: list[str]) -> dict[str, str | None]:
@@ -379,6 +385,12 @@ class _Item:
     cid: str
     not_before: dt.date | None = None
     sunk: bool = False  # House work already begun for a case that no longer exists
+    committed: dt.date | None = None  # House start, when it began before the last verdict
+    pin: dt.date | None = None  # House start a re-ordered branch must keep
+
+
+class _Infeasible(Exception):
+    """A re-ordered branch would move House work that had already started."""
 
 
 def _later(a: dt.date | None, b: dt.date | None) -> dt.date | None:
@@ -407,7 +419,38 @@ def _preview_starts(
     return out
 
 
-def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNode]:
+def _free_slots(items: list[_Item]) -> list[int]:
+    """Positions of the cases whose House work has not started."""
+    return [i for i, x in enumerate(items) if not x.sunk and x.committed is None]
+
+
+def _reorderings(items: list[_Item]) -> list[list[_Item]]:
+    """Every order a branch may re-plan to, in a canonical sequence.
+
+    Committed and sunk items keep their positions and are pinned to their House start; the free
+    (not yet started) items fill the other positions in every order. Returns no orders when fewer
+    than two or more than ``ADAPTIVE_REORDER`` items are free.
+    """
+    free = _free_slots(items)
+    if len(free) < 2 or len(free) > ADAPTIVE_REORDER:
+        return []
+    fixed = [replace(x, pin=x.committed) if x.committed else x for x in items]
+    pool = sorted((items[i] for i in free), key=lambda x: (x.cid, x.not_before or dt.date.min))
+    out = []
+    for perm in itertools.permutations(pool):
+        cand = list(fixed)
+        for i, x in zip(free, perm, strict=True):
+            cand[i] = x
+        out.append(cand)
+    return out
+
+
+def evaluate_branching(
+    ctx: Ctx,
+    order: tuple[str, ...],
+    adaptive: bool = True,
+    cache: dict[object, object] | None = None,
+) -> tuple[float, TreeNode]:
     """Expected value of a fixed order when a removal at a trigger's trial changes later cases.
 
     The plan is causal: the branches after a trigger may differ only in work that starts after
@@ -415,12 +458,74 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
     dependent is cancelled, its House lane stays used through the end of its House phase. A
     variant (for example a successor now holding the office) needs fresh House time, starting the
     day after the verdict. Everything else that has not started is re-planned from that day.
+
+    With ``adaptive`` (the default), each branch also re-optimizes the order of the candidates
+    whose House work has not started, over every permutation when at most ``ADAPTIVE_REORDER``
+    remain; work already started keeps its dates. ``cache`` may be shared between calls on the
+    same ``ctx`` (``best_with_succession`` does this).
     """
+    memo: dict[object, object] = {} if cache is None else cache
+
+    def best(
+        items: list[_Item], st: LaneState, attempt: int, depth: int, done: list[str]
+    ) -> tuple[float, TreeNode]:
+        """The kept order, or the best re-ordering when it is strictly better."""
+        kept: tuple[float, TreeNode] | None = None
+        try:
+            kept = run(items, st, attempt, depth, done)
+        except _Infeasible:
+            pass
+        alt = best_reordering(items, st, attempt, depth, done) if adaptive else None
+        if alt is not None and (kept is None or alt[0] > kept[0] + 1e-12):
+            return alt[0], alt[1].model_copy(update={"reordered": True})
+        if kept is None:
+            raise _Infeasible
+        return kept
+
+    def best_reordering(
+        items: list[_Item], st: LaneState, attempt: int, depth: int, done: list[str]
+    ) -> tuple[float, TreeNode] | None:
+        """Best feasible re-ordering of the free items (first in canonical order on ties).
+
+        It depends only on which items are free, not on their order, so it is cached on that set.
+        """
+        free = set(_free_slots(items))
+        shape = tuple(None if i in free else x for i, x in enumerate(items))
+        key = ("reorder", shape, frozenset(items[i] for i in free), st, attempt, depth, tuple(done))
+        if key not in memo:
+            found: tuple[float, TreeNode] | None = None
+            for cand in _reorderings(items):
+                try:
+                    v, t = run(cand, st, attempt, depth, done)
+                except _Infeasible:
+                    continue
+                if found is None or v > found[0] + 1e-12:
+                    found = (v, t)
+            memo[key] = found
+        return memo[key]  # type: ignore[return-value]
 
     def run(
         items: list[_Item], st: LaneState, attempt: int, depth: int, done: list[str]
     ) -> tuple[float, TreeNode]:
+        key = ("run", tuple(items), st, attempt, depth, tuple(done))
+        if key in memo:
+            hit = memo[key]
+            if hit is None:
+                raise _Infeasible
+            return hit  # type: ignore[return-value]
+        try:
+            out = _run(items, st, attempt, depth, done)
+        except _Infeasible:
+            memo[key] = None
+            raise
+        memo[key] = out
+        return out
+
+    def _run(
+        items: list[_Item], st: LaneState, attempt: int, depth: int, done: list[str]
+    ) -> tuple[float, TreeNode]:
         value = 0.0
+        planned = [x.cid for x in items if not x.sunk]
         sched: list[str] = []
         tried: list[str] = []
         tried_p: list[float] = []
@@ -428,6 +533,8 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
             it, items = items[0], items[1:]
             if it.sunk:
                 house = place_house(ctx, it.cid, st, it.not_before)
+                if it.pin is not None and (house is None or house[0] != it.pin):
+                    raise _Infeasible
                 if house is not None:
                     h_start, h_end, lanes = house
                     st = LaneState(lanes, st.senate_free, st.trial_end)
@@ -436,6 +543,8 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
             if any(excluded_pair(ctx, it.cid, o) for o in done):
                 continue
             got = place(ctx, it.cid, st, attempt, it.not_before)
+            if it.pin is not None and (got is None or got[0].house_start != it.pin):
+                raise _Infeasible
             if got is None:
                 continue
             slot, st = got
@@ -455,22 +564,29 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
             after = verdict + dt.timedelta(days=1)
             starts = _preview_starts(ctx, items, st, attempt, done)
             removed: list[_Item] = []
+            kept: list[_Item] = []
             for x in items:
-                committed = x.cid in starts and starts[x.cid] <= verdict
                 if x.sunk:
                     removed.append(x)
-                elif x.cid in deps:
-                    if committed:
-                        removed.append(_Item(x.cid, x.not_before, sunk=True))
-                    repl = deps[x.cid]
-                    if repl is not None:
-                        removed.append(_Item(repl, _later(x.not_before, after)))
-                elif committed:
-                    removed.append(x)
+                    kept.append(x)
+                    continue
+                began = starts.get(x.cid)
+                if began is not None and began <= verdict:
+                    fixed = replace(x, committed=began)
+                    kept.append(fixed)
+                    if x.cid not in deps:
+                        removed.append(fixed)
+                    else:
+                        removed.append(replace(fixed, sunk=True))
                 else:
-                    removed.append(_Item(x.cid, _later(x.not_before, after)))
-            vr, tr = run(removed, st, attempt, depth + 1, done)
-            vk, tk = run(items, st, attempt, depth + 1, done)
+                    free = replace(x, not_before=_later(x.not_before, after), committed=None)
+                    kept.append(free)
+                    if x.cid not in deps:
+                        removed.append(free)
+                if x.cid in deps and deps[x.cid] is not None:
+                    removed.append(_Item(str(deps[x.cid]), _later(x.not_before, after)))
+            vr, tr = best(removed, st, attempt, depth + 1, done)
+            vk, tk = best(kept, st, attempt, depth + 1, done)
             node = TreeNode(
                 at=it.cid,
                 p_removed=slot.p,
@@ -481,10 +597,17 @@ def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNod
                 tried=tried,
                 tried_p=tried_p,
                 verdict=verdict,
+                order=planned,
             )
             return value + node.value, node
         return value, TreeNode(
-            at="(end)", p_removed=0.0, value=value, schedule=sched, tried=tried, tried_p=tried_p
+            at="(end)",
+            p_removed=0.0,
+            value=value,
+            schedule=sched,
+            tried=tried,
+            tried_p=tried_p,
+            order=planned,
         )
 
     return run([_Item(c) for c in order], initial_state(ctx), 0, 0, [])
@@ -504,8 +627,9 @@ def best_with_succession(
     else:
         orders = [p.order for p in plans[:RESCORE_TOP]]
     best: tuple[tuple[str, ...], float, TreeNode | None] = ((), 0.0, None)
+    cache: dict[object, object] = {}
     for o in orders:
-        v, t = evaluate_branching(ctx, o)
+        v, t = evaluate_branching(ctx, o, cache=cache)
         if v > best[1] + 1e-12:
             best = (o, v, t)
     return best

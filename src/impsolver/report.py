@@ -324,6 +324,14 @@ def pivots_html(res: PortfolioResult, pf: Portfolio) -> str:
 # ------------------------------------------------------------------ succession
 
 
+def _branch_order(node: TreeNode) -> str:
+    """The order a branch works through its remaining cases, and whether it was re-ordered."""
+    if not node.order:
+        return ""
+    tag = " (re-ordered after the verdict)" if node.reordered else ""
+    return f' <span class="note">order: {e(" → ".join(node.order))}{tag}</span>'
+
+
 def tree_html(node: TreeNode) -> str:
     seg = ", ".join(e(t) for t in node.tried) or "nothing new"
     if node.at == "(end)" or node.removed is None or node.not_removed is None:
@@ -332,8 +340,10 @@ def tree_html(node: TreeNode) -> str:
     return (
         f'<li><span class="node">Trials: {seg}. At <b>{e(node.at)}</b>{when}: removed with '
         f"P {_pct(node.p_removed)}</span><ul>"
-        f'<li><span class="yes">If removed</span><ul>{tree_html(node.removed)}</ul></li>'
-        f'<li><span class="no">If not removed</span><ul>{tree_html(node.not_removed)}</ul></li>'
+        f'<li><span class="yes">If removed</span>{_branch_order(node.removed)}'
+        f"<ul>{tree_html(node.removed)}</ul></li>"
+        f'<li><span class="no">If not removed</span>{_branch_order(node.not_removed)}'
+        f"<ul>{tree_html(node.not_removed)}</ul></li>"
         "</ul></li>"
     )
 
@@ -428,7 +438,8 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
             "<h2>Succession branches</h2><div class='panel tree'><p class=note>Recommended order "
             f"once removals can change later cases: {e(' → '.join(res.succession_order or []))}"
             f". Expected removals {res.succession_value or 0:.2f}. Branches differ only in work "
-            "that starts after each verdict.</p>"
+            "that starts after each verdict; each branch re-orders the cases not yet started "
+            "when that helps.</p>"
             + (
                 "<p>In this order every dependent case is tried before the case it depends on, "
                 "so no removal changes a later case and the plan has no branches.</p>"

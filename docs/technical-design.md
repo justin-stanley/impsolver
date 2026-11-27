@@ -112,6 +112,12 @@ These change behavior relative to the original design.
 - Succession is causal. Branches after a trigger differ only in work that starts after its verdict.
   A cancelled dependent whose House work had begun keeps its lane through its House phase, and a
   variant (for example a successor in the office) needs fresh House time from the day after the verdict.
+- Succession branches adapt. After a trigger's verdict, each branch re-orders the cases whose
+  House work has not started, over every permutation when at most 6 remain (`ADAPTIVE_REORDER`),
+  and keeps the original order on ties or above that limit. Work started before the verdict must
+  keep its House start in any re-ordered branch. Expected removals with succession can only rise;
+  `succession_order` can change when a branch's best order differs from the order the branch would
+  have kept. Results without succession rules, and the shipped examples, do not change.
 - A portfolio candidate without `article` is removed if any article convicts: P0 is P(at least one
   article completes) from one simulation in which all articles share the party swings and member
   draws, and the joint removals distribution uses the same rule. Before, P0 was the first article's
