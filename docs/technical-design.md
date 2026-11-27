@@ -108,9 +108,10 @@ These change behavior relative to the original design.
 - `national_swing` (default false) draws one party swing per bloc for both chambers instead of one
   per chamber.
 - `gate_correlation` c (default 1, the original design) sets how much each member's draw carries
-  from one gate to the next in a chamber: every component (bloc swing, factor weights, individual
-  noise) at a later gate is sqrt(c) times the previous gate's plus sqrt(1-c) times a fresh standard
-  normal, so marginals are preserved. Default results do not change.
+  from one gate to the next in a chamber: the factor weights and individual noise at a later gate
+  are sqrt(c) times the previous gate's plus sqrt(1-c) times a fresh standard normal, so marginals
+  are preserved. The bloc swing stays fixed across gates, so national and portfolio-shared swings
+  stay fully shared. Default results do not change.
 - `senate_tie_break` (`none` | `pro` | `con`, default `none`) says how an exact tie on a Senate
   majority vote (S1, S3) is resolved. With `none`, a tie defeats the motion, as in the original design. Whether
   and how a presiding officer may break such a tie in an impeachment trial is not settled here, so

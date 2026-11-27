@@ -42,6 +42,7 @@ from .simulate import (
     p_complete,
     run_raw_articles,
     simulate_article,
+    summarize_raw,
 )
 from .tornado import Tornado, tornado
 
@@ -891,7 +892,9 @@ def deterministic_articles(loaded: Loaded) -> dict[str, DeterministicArticle]:
         prep = loaded.preps.get(c.id)
         if prep is None:
             continue
-        art = c.article or prep.scenario.articles[0]
+        # Same article as the gate-path row: the one the simulation reported.
+        sim = loaded.gates.get(c.id)
+        art = c.article or (sim.article if sim else prep.scenario.articles[0])
         out[c.id] = evaluate_article(
             prep, art, path_for(prep.rules, prep.scenario, default_path(prep))
         )
@@ -915,7 +918,7 @@ def _p_removal_of(
     if not gate:
         return p, None
     best = max(arts, key=lambda a: float(raws[a].complete.mean()))
-    return p, simulate_article(prep, best, path_, draws, seed, rho)
+    return p, summarize_raw(raws[best], best, path_, draws)
 
 
 def load(path: str | Path) -> Loaded:

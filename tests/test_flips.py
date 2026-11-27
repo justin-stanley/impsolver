@@ -174,7 +174,7 @@ def test_cbc_solver_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     # PuLP < 4 bundles CBC as PULP_CBC_CMD; prefer it when present.
     monkeypatch.setattr(pulp, "PULP_CBC_CMD", Bundled, raising=False)
     s = flips._cbc()
-    assert isinstance(s, Bundled) and s.kw == {"msg": False}
+    assert isinstance(s, Bundled) and s.kw == {"msg": False, "gapRel": 0.0}
     Bundled.found = False
     with pytest.raises(FlipError, match="CBC solver"):
         flips._cbc()

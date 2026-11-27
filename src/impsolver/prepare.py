@@ -165,7 +165,14 @@ def prepare_objects(
         if alignment is None:
             raise ValueError("defection_prior needs an alignment")
         comp = apply_defection_prior(scenario.defection_prior, scenario, comp, rules, alignment)
-    return Prepared(rules, comp, scenario, alignment, source, warnings, input_comp)
+    prep = Prepared(rules, comp, scenario, alignment, source, warnings, input_comp)
+    if scenario.attendance == "random":
+        if not any(prep.absence_rates(ch).any() for ch in comp.bodies):
+            prep.warnings.append(
+                "attendance is random but every absence rate is 0: set absence_rate, give members "
+                "p_absent, or use an alignment file with missed-vote counts"
+            )
+    return prep
 
 
 def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared:

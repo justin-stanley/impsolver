@@ -251,14 +251,25 @@ def cmd_init(a: argparse.Namespace) -> int:
     return 0
 
 
+FIXED_ATTENDANCE_NOTE = (
+    "note: attendance is random in this scenario, but {cmd} counts every present member; "
+    "use simulate to see the effect of absences"
+)
+
+
 def cmd_evaluate(a: argparse.Namespace) -> int:
-    e = evaluate(prepare(a.scenario), a.path)
+    prep = prepare(a.scenario)
+    if prep.scenario.attendance == "random":
+        print(FIXED_ATTENDANCE_NOTE.format(cmd="evaluate"), file=sys.stderr)
+    e = evaluate(prep, a.path)
     _emit(a, e, lambda: render_evaluation(e))
     return 0
 
 
 def cmd_flips(a: argparse.Namespace) -> int:
     prep = prepare(a.scenario)
+    if prep.scenario.attendance == "random":
+        print(FIXED_ATTENDANCE_NOTE.format(cmd="flips"), file=sys.stderr)
     seen = len(prep.warnings)
     r = find_flips(
         prep,

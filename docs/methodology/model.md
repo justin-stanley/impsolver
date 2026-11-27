@@ -99,10 +99,13 @@ With `national_swing: true` the House and Senate share one swing per bloc.
 ### Gate correlation
 
 `gate_correlation` (c, between 0 and 1, default 1) loosens the link between gates in the same
-chamber. For each gate after the first, every part of the draw (the bloc swing z_b, the
-co-defection factor weights if an alignment file is used, and the individual noise e_i) becomes
+chamber. For each gate after the first, the member-level parts of the draw (the co-defection
+factor weights if an alignment file is used, and the individual noise e_i) become
 
 x_g = √c · x_(g−1) + √(1 − c) · x′, with x′ a fresh standard normal.
+
+The bloc swing z_b stays the same at every gate: it is one party mood for the whole chamber, and
+swings shared across chambers (`national_swing`) or across portfolio cases stay fully shared.
 
 Each part stays standard normal, so every member's probability at every gate is unchanged; only
 the joint behaviour across gates moves. At c = 1 the draw is reused exactly as before. At c = 0 the

@@ -107,17 +107,18 @@ def _pro_corr(rules: RuleSet, c: float, rho: float) -> float:
 
 
 def test_c_zero_gates_independent(rules: RuleSet) -> None:
+    # Without a bloc swing (rho = 0), c = 0 makes gates independent.
     assert abs(_pro_corr(rules, 0.0, 0.0)) < 0.03
-    assert abs(_pro_corr(rules, 0.0, 0.6)) < 0.03
     # With c = 1 the same draws drive both gates.
     assert _pro_corr(rules, 1.0, 0.0) > 0.5
-    mid = _pro_corr(rules, 0.5, 0.6)
-    assert 0.1 < mid < _pro_corr(rules, 1.0, 0.6)
+    # The bloc swing is one party mood for the chamber, so it keeps gates linked at c = 0.
+    zero, mid, one = (_pro_corr(rules, c, 0.6) for c in (0.0, 0.5, 1.0))
+    assert 0.1 < zero < mid < one
 
 
-def test_c_zero_senate_gates_independent(rules: RuleSet) -> None:
-    prep = _plain(rules, rho=0.6, gate_correlation=0.0)
-    raw = run_raw(prep, "I", build_path(rules, "A"), 20_000, 4, 0.6)
+def test_c_zero_senate_gates_independent_without_swing(rules: RuleSet) -> None:
+    prep = _plain(rules, rho=0.0, gate_correlation=0.0)
+    raw = run_raw(prep, "I", build_path(rules, "A"), 20_000, 4, 0.0)
     ids = [s.id for s in raw.stages]
     assert abs(np.corrcoef(raw.pro[ids.index("S1")], raw.pro[ids.index("S2")])[0, 1]) < 0.03
 
@@ -150,7 +151,8 @@ def test_c_zero_aligned_gates_decorrelate(rules: RuleSet) -> None:
     assert abs(corr(zero)) < 0.03
 
 
-def test_c_zero_with_national_swing_links_only_first_gates(rules: RuleSet) -> None:
+def test_shared_swing_stays_shared_at_every_gate(rules: RuleSet) -> None:
+    """A national (or portfolio-shared) swing must link later gates too, whatever c is."""
     prep = make_prep(
         rules,
         make_comp({"D": 218, "R": 217}, {"D": 50, "R": 50}),
@@ -165,5 +167,5 @@ def test_c_zero_with_national_swing_links_only_first_gates(rules: RuleSet) -> No
     def corr(a: str, b: str) -> float:
         return float(np.corrcoef(raw.pro[ids.index(a)], raw.pro[ids.index(b)])[0, 1])
 
-    assert corr("H1", "S1") > 0.5  # first gates share the national swing
-    assert abs(corr("H2", "S2")) < 0.03  # later gates draw their own swing
+    assert corr("H1", "S1") > 0.5
+    assert corr("H2", "S2") > 0.5
