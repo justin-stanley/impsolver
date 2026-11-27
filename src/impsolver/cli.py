@@ -365,7 +365,10 @@ def cmd_portfolio(a: argparse.Namespace) -> int:
     for cid, prep in loaded.preps.items():
         for w in prep.warnings:
             print(f"warning: candidate {cid}: {w}", file=sys.stderr)
-    r = solve_portfolio(loaded, exhaustive=a.exhaustive)
+    # The tornado runs are only shown on the page and in JSON; skip them for plain text.
+    r = solve_portfolio(
+        loaded, exhaustive=a.exhaustive, sensitivities=bool(a.html) or a.format == "json"
+    )
     if a.html:
         Path(a.html).write_text(render_report(r, loaded.pf), encoding="utf-8")
         print(f"wrote {a.html}", file=sys.stderr)

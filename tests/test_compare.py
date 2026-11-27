@@ -142,3 +142,15 @@ def test_warnings_are_printed(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     a.write_text(text)
     assert main(["compare-plans", str(a), str(a), "--draws", "200"]) == 0
     assert "warning:" in capsys.readouterr().err
+
+
+def test_scenario_page_omits_fatigue_and_portfolio_json_has_tornado(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    a = _scenario(tmp_path, "a.yaml", "Official A", 0.35)
+    c, _ = compare(a, a, draws=300)
+    assert "fatigue delta" not in render_comparison(c)
+    pf = _portfolio(tmp_path, "p.yaml", 0.1)
+    assert main(["--format", "json", "portfolio", str(pf)]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert set(data["tornado"]) == {"one"}

@@ -65,10 +65,11 @@ the trials before it in that order's schedule (succession branches are not follo
 left out of the plan is measured alone, without a fatigue bar. Every run reuses the scenario's
 seed and the portfolio's `draws`, so the member and swing draws are common random numbers: the
 base matches the plan, a swing reflects the input rather than Monte Carlo noise, and raising a
-bloc's prior can only raise P. Bars are sorted by swing, largest first. Members with an override
-or their own `p_pro` do not move with their bloc; a `defection_prior` is re-applied to the moved
-prior. P(removal) is not monotone in `rho`: more correlation spreads the outcomes, which helps a
-case below even odds and hurts one above.
+bloc's prior can only raise P as long as the bloc's average stays on the same side of 0.5 at
+every gate (always, without alignment; with alignment the factor sign follows that side). Bars
+are sorted by swing, largest first. Members with an override or their own `p_pro` do not move
+with their bloc; a `defection_prior` is re-applied to the moved prior. P(removal) can move either
+way with `rho`, so read both ends of its bar.
 
 ## Comparing two plans
 

@@ -28,14 +28,28 @@ from .simulate import p_any_complete, p_complete
 PRIOR_NOTCH = 0.05
 RHO_NOTCH = 0.2
 FATIGUE_NOTCH = 0.2
-TORNADO_NOTE = (
-    "Each bar moves one input one notch down (upper bar) and up (lower bar) and holds the rest "
-    "as supplied. Bloc priors move by 0.05 at every stage they list, rho by 0.2 (both clipped to "
-    "[0, 1]) and the portfolio fatigue delta by 0.2 with the order held fixed. Runs share the "
-    "scenario's seed and draws, so swings are not Monte Carlo noise. Members with overrides or "
-    "their own probabilities do not move with their bloc. It restates the inputs; it is not a "
-    "forecast."
-)
+
+
+def tornado_note(fatigue: bool = True) -> str:
+    """The explanation printed above tornado charts; ``fatigue`` for portfolio charts."""
+    moved = (
+        "Bloc priors move by 0.05 at every stage they list, rho by 0.2 (both clipped to [0, 1])"
+        + (
+            " and the portfolio fatigue delta by 0.2 with the order held fixed. "
+            if fatigue
+            else ". "
+        )
+    )
+    return (
+        "Each bar moves one input one notch down (upper bar) and up (lower bar) and holds the "
+        "rest as supplied. " + moved + "Runs share the scenario's seed and draws, so swings are "
+        "not Monte Carlo noise. P can move either way with rho. Members with overrides or their "
+        "own probabilities do not move with their bloc. It restates the inputs; it is not a "
+        "forecast."
+    )
+
+
+TORNADO_NOTE = tornado_note()
 
 
 class TornadoBar(BaseModel):

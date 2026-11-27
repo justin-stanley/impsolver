@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from .compare import Comparison, PortfolioSide, ScenarioSide
 from .model import Portfolio
 from .portfolio import PlanOut, PortfolioResult, Slot, TreeNode, excluded_reason_text
-from .tornado import TORNADO_NOTE, Tornado
+from .tornado import TORNADO_NOTE, Tornado, tornado_note
 
 OPTIONAL_GATES = {"S3"}
 NEUTRALITY = "Plans cover only the candidates you supplied. impsolver does not nominate targets."
@@ -68,8 +68,8 @@ border-radius:8px;padding:4px 8px;font-size:13px}
 .tree .yes{color:var(--ok)}.tree .no{color:var(--warn)}.note{color:var(--muted);font-size:13px}
 svg text{fill:var(--ink);font-size:12px}svg .muted{fill:var(--muted)}
 .tornado{max-width:560px}.tornado svg text{font-size:13px}
-.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:16px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:16px}
 .cols>.panel{min-width:0}h3{font-size:15px;margin:14px 0 6px}
 .file{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--muted);
 overflow-wrap:anywhere}
@@ -710,7 +710,8 @@ def render_comparison(cmp: Comparison, title: str = "Plan comparison") -> str:
 <p class="sub">{e(NEUTRALITY)} {e(COMPARE_NOTE)}</p>
 <p class="file">A: {e(cmp.a.file)}<br>B: {e(cmp.b.file)}</p>
 <h2>Summary</h2><div class="panel">{_summary(cmp)}</div>
-<h2>Side by side</h2><p class=note>{e(TORNADO_NOTE)}</p><div class="cols">{cols}</div>
+<h2>Side by side</h2><p class=note>{e(tornado_note(cmp.kind == "portfolio"))}</p>
+<div class="cols">{cols}</div>
 <script type="application/json" id="impsolver-data">{data}</script>
 </main></body></html>
 """
