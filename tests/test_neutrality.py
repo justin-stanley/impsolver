@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """The tool evaluates only targets it is given; it never nominates targets."""
 
 import json

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Per-member probability resolution."""
 
 from __future__ import annotations

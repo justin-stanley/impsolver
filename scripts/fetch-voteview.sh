@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 # Download the Voteview member and vote files used to build rosters and alignment.
 # Usage: scripts/fetch-voteview.sh [CONGRESS ...]   (default: 116 119)
 # Voteview asks that the data be cited; see the "Data" section of README.md.

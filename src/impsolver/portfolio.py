@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Schedule a user-supplied portfolio of candidates to maximize expected removals.
 
 The House works on up to ``house_concurrency`` cases at once. The Senate holds one trial at a

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Load a scenario with its rules, composition and alignment, ready for evaluation."""
 
 from __future__ import annotations
@@ -115,6 +117,15 @@ def prepare_objects(
 
 
 def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared:
+    """Load a scenario file with its rules, composition and alignment.
+
+    Args:
+        path: Scenario YAML. Relative paths inside it resolve against its folder.
+        composition: Optional composition that replaces the one the scenario names.
+
+    Returns:
+        A ``Prepared`` scenario whose ``warnings`` list unknown member ids or blocs.
+    """
     scen = load_scenario(path)
     rules = load_rules(resolve_rules(scen.rules, path))
     comp = load_composition(composition if composition else resolve(scen.composition, path))

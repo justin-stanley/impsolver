@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Learn co-defection loadings from Voteview roll calls.
 
 The encoding is "unsigned breaks". On each contested roll call, a member's entry is 1 if they voted

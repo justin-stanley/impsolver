@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Output models. These are plain (non-strict) pydantic models so they serialize cleanly."""
 
 from __future__ import annotations

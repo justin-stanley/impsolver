@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Defection prior: move party-prior probabilities by each member's historical break rate."""
 
 from __future__ import annotations

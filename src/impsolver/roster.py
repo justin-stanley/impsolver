@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Build a composition (who holds each seat now) from Voteview member and vote files."""
 
 from __future__ import annotations

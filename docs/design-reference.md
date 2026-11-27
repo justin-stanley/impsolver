@@ -79,14 +79,8 @@ Joint removals_dist: one shared party-swing stream across scenario candidates pl
 Fatigued P is matched by a uniform shift found by bisection with CRN. Resolve succession per draw.
 Fixed-p candidates are drawn independently (noted); Poisson-binomial if all are fixed.
 
-## CLI (argparse, --format text|json)
-validate RULES [COMP] [SCEN]; evaluate SCEN;
-flips SCEN [--gate --path --article --ilp --constraint BLOC<=N* --exclude ID* --allow-absence
-  --absence-cost 1.0 --per-gate-stance];
-simulate SCEN [--draws 100000 --rho --seed]; compare SCEN --composition X*;
-viability SCEN+ [--target-p .5 --max-gap 2 --draws 20000]; backtest [FIXTURE...] (non-zero exit on mismatch);
-portfolio FILE [--exhaustive]; calibrate FIXTURE --alignment F [--min-votes 100 --permutations 5000 --seed 0];
-schema [--out schemas]; roster ... and align ... pass through. Errors go to stderr, exit 2.
+## CLI
+See the generated [CLI reference](reference/cli.md) for every command and flag.
 
 ## Roster
 impsolver roster --members* --votes* --caucus PARTY=BLOC* --member-caucus ID=BLOC* ("none" = own party;

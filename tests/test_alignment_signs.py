@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Sign conventions of the unsigned-break encoding."""
 
 import numpy as np

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Evaluate a single gate from an explicit tally."""
 
 from __future__ import annotations

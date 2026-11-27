@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Rank user-supplied scenarios by how close each is to completing its path.
 
 The tool ranks the scenarios it is given and never proposes targets of its own.
@@ -58,6 +60,11 @@ def min_flips(prep: Prepared) -> int | None:
 def assess(
     cases: list[Case], target_p: float = 0.5, max_gap: float = 2.0, draws: int = 20_000
 ) -> list[ViabilityRow]:
+    """Rank the given scenarios by P(removal), then flips needed, then support gap.
+
+    Labels: ``viable`` when P(removal) reaches ``target_p``, ``reachable`` when a uniform
+    log-odds shift of at most ``max_gap`` would get there, otherwise ``out of reach``.
+    """
     rows: list[ViabilityRow] = []
     for c in cases:
         pc = _p_complete(c.prep, 0.0, draws)

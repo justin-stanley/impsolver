@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a capability, rule set, output or improvement.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that impsolver cannot do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+  - type: checkboxes
+    id: policy
+    attributes:
+      label: Responsible use
+      options:
+        - label: This request works the same way for any party and does not ask the tool to suggest targets.
+          required: true

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Threshold arithmetic. Everything is integer and works on scalars or numpy arrays.
 
 The motion's yea side is PRO when ``pass_direction == "pass"`` and CON when it is ``"fail"``.

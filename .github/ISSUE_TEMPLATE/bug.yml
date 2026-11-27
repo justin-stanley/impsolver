@@ -1,0 +1,33 @@
+name: Bug report
+description: Something computes the wrong answer, crashes or misbehaves.
+labels: ["bug", "needs-triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected and what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal input to reproduce
+      description: Use placeholder officials (see RESPONSIBLE_USE.md). Paste YAML or attach files.
+      render: yaml
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: impsolver version and Python version
+      placeholder: "impsolver 0.1.0, Python 3.12.7, macOS 15"
+    validations:
+      required: true
+  - type: checkboxes
+    id: policy
+    attributes:
+      label: Responsible use
+      options:
+        - label: My example does not evaluate a named, real current official.
+          required: true

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Pydantic input models. Every model is strict and forbids unknown keys."""
 
 from __future__ import annotations

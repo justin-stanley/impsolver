@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """YAML/JSON loading with ruamel's safe loader, resolving paths relative to the referring file."""
 
 from __future__ import annotations

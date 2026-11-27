@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Self-contained HTML planning report for a portfolio result.
 
 The page shows only what the user supplied and what the solver computed from it: the plans, the
@@ -338,6 +340,7 @@ def _plan_section(idx: str, title: str, plan: PlanOut, pf: Portfolio, res: Portf
 
 
 def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan") -> str:
+    """Return a self-contained HTML planning page for a portfolio result."""
     plans: list[tuple[str, str, PlanOut]] = []
     for i, p in enumerate(res.plans, 1):
         plans.append((f"plan{i}", f"Plan {i}", p))

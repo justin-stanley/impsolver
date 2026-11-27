@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Gaussian-copula Monte Carlo over the gates of a path.
 
 Without alignment: u_i = sqrt(rho) z_bloc + sqrt(1-rho) e_i, and member i is PRO at gate g iff
@@ -256,6 +258,15 @@ def simulate(
     seed: int | None = None,
     path_name: str | None = None,
 ) -> Simulation:
+    """Gaussian-copula Monte Carlo over the gates of the scenario's path.
+
+    Args:
+        prep: A prepared scenario.
+        draws: Number of simulated votes.
+        rho: Bloc correlation; defaults to the scenario's ``rho``.
+        seed: PCG64 seed; defaults to the scenario's ``seed``.
+        path_name: ``"A"`` or ``"B"``.
+    """
     r = prep.scenario.rho if rho is None else rho
     s = prep.scenario.seed if seed is None else seed
     path = path_for(prep.rules, prep.scenario, path_name or default_path(prep))

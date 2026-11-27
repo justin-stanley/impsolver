@@ -16,23 +16,35 @@ Thanks for helping. Bug reports, fixes, documentation and new tests are all welc
 ## Development setup
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev]'
+uv sync --extra dev --extra docs     # or: pip install -e '.[dev,docs]'
+uv run pre-commit install
 ```
 
 Before opening a pull request:
 
 ```bash
-pytest -q
-ruff check src tests
-ruff format --check src tests
-mypy src
-impsolver backtest
+make test    # pytest with coverage; the floor is 90%
+make lint    # ruff, ruff-format, mypy --strict, REUSE and file checks
+make docs    # only if you touched docs/ or anything shown in the worked examples
+uv run impsolver backtest
 ```
 
 If you change a model in `src/impsolver/model.py`, regenerate the schemas with
-`impsolver schema --out schemas`; a test fails when they drift. If you change behaviour, add a
-line to `CHANGELOG.md` and, where the design changes, to `docs/technical-design.md`.
+`uv run impsolver schema --out schemas`; a test fails when they drift. If you change anything that
+the worked examples print, regenerate them with `uv run python docs/examples/run_examples.py`; the
+docs build fails when they are stale. New files need an SPDX header, or an entry in `REUSE.toml`
+for data files.
+
+Record behaviour changes in `CHANGELOG.md`. Where the design changes, also update
+`docs/technical-design.md`, and label the pull request `numerical-change` if default results move.
+
+## Releasing (maintainers)
+
+1. Update `version` in `pyproject.toml` and move the CHANGELOG entries under a new version
+   heading.
+2. Commit, then push a signed tag: `git tag -s vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`.
+3. The release workflow tests, builds, attests and publishes to PyPI with trusted publishing, then
+   creates the GitHub release from the CHANGELOG. Zenodo archives the release and mints a DOI.
 
 ## Pull requests
 

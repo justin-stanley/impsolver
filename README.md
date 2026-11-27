@@ -1,5 +1,14 @@
 # impsolver
 
+[![CI](https://github.com/justin-stanley/impsolver/actions/workflows/ci.yml/badge.svg)](https://github.com/justin-stanley/impsolver/actions/workflows/ci.yml)
+[![Docs](https://github.com/justin-stanley/impsolver/actions/workflows/docs.yml/badge.svg)](https://justin-stanley.github.io/impsolver/)
+[![PyPI](https://img.shields.io/pypi/v/impsolver)](https://pypi.org/project/impsolver/)
+[![Python](https://img.shields.io/pypi/pyversions/impsolver)](https://pypi.org/project/impsolver/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/justin-stanley/impsolver/badge)](https://scorecard.dev/viewer/?uri=github.com/justin-stanley/impsolver)
+[![REUSE](https://img.shields.io/badge/REUSE-compliant-green)](https://reuse.software/)
+<!-- DOI badge: added after the Zenodo integration mints the first DOI -->
+
 Vote math for U.S. federal impeachment and removal. Given a target that **you** supply, a chamber
 roster and per-member probabilities, impsolver works out what the House and Senate rules require
 at each step, how close the case is, which votes decide it, and, for several cases at once, which
@@ -30,11 +39,16 @@ probabilities. Please keep any use of this tool honest about its assumptions (se
 Requires Python 3.12 or newer.
 
 ```bash
-git clone <this repository>
-cd impsolver
-python -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev]'      # or: uv pip install -e '.[dev]'
+pip install impsolver
 impsolver --help
+```
+
+From source:
+
+```bash
+git clone https://github.com/justin-stanley/impsolver
+cd impsolver
+uv sync --extra dev          # or: pip install -e '.[dev]'
 ```
 
 The ILP solver uses CBC, which ships with PuLP; nothing else needs to be installed. impsolver runs
@@ -149,14 +163,18 @@ pages they were checked against.
 ## Development
 
 ```bash
-pip install -e '.[dev]'
-pytest -q
-ruff check src tests && ruff format --check src tests
-mypy src
+uv sync --extra dev --extra docs
+uv run pre-commit install
+make test        # pytest with coverage (90% floor)
+make lint        # ruff, mypy, REUSE and file checks via pre-commit
+make docs        # worked examples, demo page and the docs site
+make reproduce   # re-download Voteview, verify checksums, rebuild derived files
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md). To cite impsolver, see
-[CITATION.cff](CITATION.cff).
+Full documentation: https://justin-stanley.github.io/impsolver/. See
+[CONTRIBUTING.md](CONTRIBUTING.md), [RESPONSIBLE_USE.md](RESPONSIBLE_USE.md),
+[GOVERNANCE.md](GOVERNANCE.md), [SECURITY.md](SECURITY.md) and [CHANGELOG.md](CHANGELOG.md). To
+cite impsolver, see [CITATION.cff](CITATION.cff).
 
 ## License
 

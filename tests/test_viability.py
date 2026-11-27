@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 from impsolver.model import RuleSet
 from impsolver.viability import Case, assess, support_gap
 from tests.conftest import make_comp, make_prep

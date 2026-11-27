@@ -22,5 +22,12 @@ First public release.
   (2024), each checked against House Clerk and Senate records.
 - `DATA.md` and `CITATION.cff`; generated rosters and alignment files carry the Voteview
   citation and access date (`--accessed`).
+- Docs site with methodology, worked examples (generated and checked in CI), CLI and API
+  reference, and a demo planning page.
+- Community and project files: RESPONSIBLE_USE, CODE_OF_CONDUCT, SECURITY, GOVERNANCE,
+  issue forms, PR template, CODEOWNERS; REUSE-compliant licensing.
+- CI on Linux, macOS and Windows; CodeQL; OpenSSF Scorecard; Dependabot; release workflow with
+  PyPI trusted publishing and build attestations; `uv.lock`; checksummed data and
+  `make reproduce`.
 - Scenario options `senate_tie_break`, `national_swing` and `alignment_chamber_weight` (the
   Senate defaults to 0).

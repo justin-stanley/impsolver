@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Scenario options added after the audit: tie-break, national swing, per-chamber alignment."""
 
 import numpy as np

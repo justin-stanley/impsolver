@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Minimal changes that would make every chosen gate pass (greedy and ILP)."""
 
 from __future__ import annotations
@@ -109,6 +111,21 @@ def find_flips(
     absence_cost: float = 1.0,
     per_gate_stance: bool = False,
 ) -> FlipResult:
+    """Fewest stance changes that make every target gate pass.
+
+    Args:
+        prep: A prepared scenario.
+        article: Article to solve; defaults to the first.
+        path_name: ``"A"`` or ``"B"``.
+        gate: Solve one gate only (for example ``"S2"``); defaults to every required gate.
+        method: ``"ilp"`` (exact, default) or ``"greedy"``.
+        constraints: Caps such as ``"R<=5"``; the tightest cap per bloc wins.
+        exclude: Member ids that may not change.
+        allow_absence: Also consider members being absent (ILP only). Reported as procedural
+            sensitivity, never as a recommendation.
+        absence_cost: Cost of an absence relative to a flip.
+        per_gate_stance: Let a member's stance differ between gates.
+    """
     art = article or prep.scenario.articles[0]
     if art not in prep.scenario.articles:
         raise FlipError(f"unknown article {art}")

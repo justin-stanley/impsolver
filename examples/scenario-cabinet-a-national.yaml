@@ -1,0 +1,13 @@
+# Same as scenario-cabinet-a.yaml, but one party swing is shared by the House and the Senate.
+schema_version: 1
+target: {name: Official A, office: cabinet_secretary}
+articles: [I]
+rules: us-federal
+composition: ../compositions/shorthand-119.yaml
+party_priors:
+  D: {"*": 0.97}
+  I: {"*": 0.95}
+  R: {"*": 0.30, H1: 0.40, S1: 0.45}
+rho: 0.6
+seed: 21
+national_swing: true

@@ -9,3 +9,9 @@ data/voteview/*.csv
 *.egg-info/
 build/
 dist/
+docs/demo/
+site/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/

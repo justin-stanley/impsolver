@@ -1,0 +1,26 @@
+name: Data correction
+description: A roster, vacancy, caucus or historical tally is wrong or out of date.
+labels: ["data", "needs-triage"]
+body:
+  - type: input
+    id: file
+    attributes:
+      label: File and entry
+      placeholder: "compositions/us-119.yaml, member K000401"
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: What is wrong and what it should be
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Primary source
+      description: >-
+        A link to the House Clerk, House Press Gallery, senate.gov or Voteview, with the date you
+        checked it. Corrections are judged only on the source.
+    validations:
+      required: true

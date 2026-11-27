@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Deterministic bounds: classify members by cutoffs and bound each gate."""
 
 from __future__ import annotations
@@ -103,6 +105,12 @@ def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicA
 
 
 def evaluate(prep: Prepared, path_name: str | None = None) -> Evaluation:
+    """Bound every gate of every article using the scenario cutoffs.
+
+    Args:
+        prep: A prepared scenario.
+        path_name: ``"A"`` or ``"B"``; defaults to B when the scenario has committee reports.
+    """
     path = path_for(prep.rules, prep.scenario, path_name or default_path(prep))
     return Evaluation(
         target=prep.scenario.target.name,

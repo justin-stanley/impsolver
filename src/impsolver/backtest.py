@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Replay historical roll calls through the rule set and check the recorded outcomes."""
 
 from __future__ import annotations

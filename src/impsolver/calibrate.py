@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Check alignment and break-rate signals against a known set of crossover votes."""
 
 from __future__ import annotations

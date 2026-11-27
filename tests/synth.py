@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Synthetic roll-call data for alignment tests."""
 
 from __future__ import annotations

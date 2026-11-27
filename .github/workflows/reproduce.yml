@@ -1,0 +1,38 @@
+name: Reproduce data
+
+# Monthly: download Voteview, check it against data/voteview.sha256, rebuild the derived files
+# and compare them with the committed copies. Opens an issue when Voteview has changed.
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --extra dev
+      - id: run
+        shell: bash
+        run: |
+          set +e
+          make reproduce > reproduce.log 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat reproduce.log
+      - if: steps.run.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Monthly reproduce: Voteview data or derived files changed" \
+            --label data --body-file reproduce.log

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 """Walk a rule set's stage graph into ordered paths."""
 
 from __future__ import annotations

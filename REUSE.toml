@@ -1,0 +1,20 @@
+version = 1
+
+# Everything is MIT unless a later annotation says otherwise (the last match wins).
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Justin Stanley"
+SPDX-License-Identifier = "MIT"
+
+# Files derived from Voteview data: see LICENSES/LicenseRef-Voteview.txt and DATA.md.
+[[annotations]]
+path = [
+  "compositions/us-119.yaml",
+  "alignment/us-116.json",
+  "alignment/us-119.json",
+  "data/voteview.sha256",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "Voteview (Lewis, Poole, Rosenthal, Boche, Rudkin and Sonnet); derived by Justin Stanley"
+SPDX-License-Identifier = "LicenseRef-Voteview"

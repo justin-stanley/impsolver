@@ -1,0 +1,10 @@
+Files marked LicenseRef-Voteview are derived from Voteview's member and roll-call vote data.
+
+Voteview did not state a separate license for its data files as of 2026-11-27. It asks users to
+cite the dataset as:
+
+  Lewis, Jeffrey B., Keith Poole, Howard Rosenthal, Adam Boche, Aaron Rudkin, and Luke Sonnet
+  (2026). Voteview: Congressional Roll-Call Votes Database. https://voteview.com/
+
+If you reuse these files, cite Voteview as above. See DATA.md for the source files, access dates
+and the corrections applied on top of the data.

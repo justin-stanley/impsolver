@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Justin Stanley
+# SPDX-License-Identifier: MIT
 from impsolver.gates import evaluate_gate
 from impsolver.model import RuleSet
 

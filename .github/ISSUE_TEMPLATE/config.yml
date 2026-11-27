@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security, conduct or responsible-use report
+    url: https://github.com/justin-stanley/impsolver/security/advisories/new
+    about: Report privately through GitHub. Do not open a public issue.
+  - name: Responsible-use policy
+    url: https://github.com/justin-stanley/impsolver/blob/main/RESPONSIBLE_USE.md
+    about: Requests to evaluate named real officials, and advocacy, are out of scope.
