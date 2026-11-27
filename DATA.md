@@ -182,7 +182,9 @@ If you use this hook:
 
 - Take the scores from a source whose license you have checked allows your use, and follow its
   citation request.
-- Put the citation (author, title, version, URL, access date) in the `source` column. `roster`
+- Put the citation (author, title, version, URL, access date) in the `source` column, in double
+  quotes because it contains commas (`A000001,0.42,"Doe, J. State scores, v2, https://..., accessed
+  2026-11-27"`); a row with more or fewer than three fields is rejected. `roster`
   copies each source into the composition's header comment and each scored member's
   `score_source`, so the citation travels with the file.
 - Do not commit the score file or a composition built from it to this repository unless the

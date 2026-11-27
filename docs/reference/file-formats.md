@@ -20,7 +20,9 @@ the scenarios it references). See [Getting started](../getting-started.md#start-
 
 A composition member may carry `score` (a standardized external score) and `score_source` (its
 citation). `impsolver roster --member-scores FILE.csv` writes both from a CSV with the columns
-`id,score,source` that you supply; scores are standardized within each source. impsolver ships no
+`id,score,source` that you supply; scores are standardized within each source. Quote a `source`
+that contains commas (a citation usually does): a row with more or fewer than three fields is
+rejected rather than cut. impsolver ships no
 such file; see [data sources](../data.md#member-scores-user-supplied). A scenario's `score_prior`
 (`{BLOC: {slope, intercept}}`, intercept default 0) uses them; see the
 [model](../methodology/model.md#score-prior).

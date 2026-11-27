@@ -54,7 +54,9 @@ All notable changes are listed here. The format follows
   vacancies, optional Senate holdovers; no real 120th roster is shipped.
 - `impsolver roster --member-scores FILE.csv` (user-supplied `id,score,source`, standardized per
   source) and scenario `score_prior: {BLOC: {slope, intercept}}`, a logit shift for scored members
-  without congressional history; no scores are shipped and default results are unchanged.
+  without congressional history in any chamber of the alignment file (chambers it does not cover
+  are skipped with a warning; a source with commas must be quoted); no scores are shipped and
+  default results are unchanged.
 - Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
   Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
 - Optional random attendance in the Monte Carlo (`attendance: random`, `absence_rate`, member

@@ -19,6 +19,7 @@ from impsolver.priors import apply_score_prior
 from impsolver.roster import build_roster, dump_composition
 from impsolver.roster import main as roster_main
 from impsolver.scores import ScoreError, read_member_scores
+from impsolver.simulate import sampled_preps, simulate
 from tests.conftest import make_comp, make_scenario
 from tests.test_roster import files  # noqa: F401  (fixture)
 
@@ -70,6 +71,27 @@ def test_rejects_bad_files(tmp_path: Path, rows: list[str], header: str, msg: st
         read_member_scores(_csv(tmp_path, rows, header))
 
 
+@pytest.mark.parametrize(
+    "rows",
+    [
+        ["A,1,Doe J., State scores v2, https://x.org", "B,2,s"],  # unquoted commas
+        ["A,1", "B,2,s"],  # too few fields
+    ],
+)
+def test_rejects_rows_with_wrong_field_count(tmp_path: Path, rows: list[str]) -> None:
+    with pytest.raises(ScoreError, match=r"scores.csv:2: expected 3 fields.*double quotes"):
+        read_member_scores(_csv(tmp_path, rows))
+
+
+def test_quoted_citation_keeps_commas_and_separate_sources(tmp_path: Path) -> None:
+    v1, v2 = "Doe J., State scores, v1, https://x.org", "Doe J., State scores, v2, https://x.org"
+    rows = [f'A,1,"{v1}"', f'B,3,"{v1}"', f'C,10,"{v2}"', f'D,30,"{v2}"']
+    scores, stats = read_member_scores(_csv(tmp_path, rows))
+    assert scores["A"].source == v1 and scores["C"].source == v2
+    assert [(st.source, st.n, st.mean) for st in stats] == [(v1, 2, 2.0), (v2, 2, 20.0)]
+    assert scores["C"].z == pytest.approx(-1.0)
+
+
 def test_roster_attaches_scores(tmp_path: Path, files: tuple[Path, Path]) -> None:  # noqa: F811
     m, v = files
     # The file covers a reference set wider than the current seat holders.
@@ -100,18 +122,23 @@ def test_roster_cli_flag_and_no_match(tmp_path: Path, files: tuple[Path, Path]) 
     assert roster_main([*args, "--member-scores", str(bad)]) == 2
 
 
-def _alignment(ids: dict[str, int]) -> Alignment:
-    ms = [
-        AlignedMember(id=i, name=i, party="R", bloc="R", n_votes=n, breaks=0, loadings=LOAD)
-        for i, n in ids.items()
-    ]
-    body = AlignmentBody(
-        k=2,
-        n_contested=200,
-        members=ms,
-        bloc_mean_loadings={"R": LOAD},
-        bloc_break_rate={"R": 0.05},
-    )
+def _alignment(ids: dict[str, int], senate: dict[str, int] | None = None) -> Alignment:
+    def body(ids: dict[str, int]) -> AlignmentBody:
+        ms = [
+            AlignedMember(id=i, name=i, party="R", bloc="R", n_votes=n, breaks=0, loadings=LOAD)
+            for i, n in ids.items()
+        ]
+        return AlignmentBody(
+            k=2,
+            n_contested=200,
+            members=ms,
+            bloc_mean_loadings={"R": LOAD},
+            bloc_break_rate={"R": 0.05},
+        )
+
+    bodies = {"house": body(ids)}
+    if senate is not None:
+        bodies["senate"] = body(senate)
     return Alignment(
         schema_version=1,
         encoding="unsigned_breaks",
@@ -119,7 +146,7 @@ def _alignment(ids: dict[str, int]) -> Alignment:
         congresses=[116],
         kappa=50,
         min_shared=10,
-        bodies={"house": body},
+        bodies=bodies,
     )
 
 
@@ -198,3 +225,77 @@ def test_certain_party_prior_is_kept(rules: RuleSet) -> None:
     assert n == 4  # NEW, VET, ZERO, OVR: no alignment history and no override here
     new = {m.id: m for m in comp.bodies["house"].roster}["NEW"]
     assert set(new.p_pro.values()) == {0.0}
+
+
+def _senate() -> list[dict[str, Any]]:
+    return [
+        {"id": "SNEW", "name": "SNEW", "party": "R", "score": 2.0, "score_source": SRC},
+        {"id": "SVET", "name": "SVET", "party": "R", "score": 2.0, "score_source": SRC},
+        # A former House member: no Senate votes, but House votes in the alignment file.
+        {"id": "MOVED", "name": "MOVED", "party": "R", "score": 2.0, "score_source": SRC},
+    ]
+
+
+def test_score_prior_senate_and_history_in_any_chamber(rules: RuleSet) -> None:
+    scen = make_scenario(alignment="a.json", score_prior={"R": {"slope": 0.5}})
+    align = _alignment({"VET": 200, "MOVED": 150}, senate={"SVET": 80, "MOVED": 0})
+    comp, n = apply_score_prior(scen, make_comp(_house(), _senate()), rules, align)
+    senate = {m.id: m for m in comp.bodies["senate"].roster}
+    senate_stages = {s.id for s in rules.stages if s.chamber == "senate"}
+    assert set(senate["SNEW"].p_pro) == senate_stages
+    assert senate["SNEW"].p_pro["S2"] == pytest.approx(sigmoid(logit(0.05) + 1.0))
+    assert senate["SVET"].p_pro == {} and senate["MOVED"].p_pro == {}
+    assert n == 4  # house NEW, ZERO and OVR (no override here); senate SNEW
+
+
+def test_chamber_missing_from_alignment_is_skipped_with_warning(rules: RuleSet) -> None:
+    scen = make_scenario(alignment="a.json", score_prior={"R": {"slope": 0.5}})
+    comp = make_comp(_house(), _senate())
+    prep = prepare_objects(rules, comp, scen, _alignment({"VET": 200}))  # house only
+    senate = {m.id: m for m in prep.comp.bodies["senate"].roster}
+    assert all(m.p_pro == {} for m in senate.values())
+    assert {m.id: m for m in prep.comp.bodies["house"].roster}["NEW"].p_pro
+    assert any("score_prior skipped the senate" in w for w in prep.warnings)
+    both = prepare_objects(rules, comp, scen, _alignment({"VET": 200}, senate={}))
+    assert not any("skipped" in w for w in both.warnings)
+
+
+def test_partial_override_excludes_member_at_every_stage(rules: RuleSet) -> None:
+    scen = make_scenario(
+        alignment="a.json",
+        overrides={"NEW": {"H1": 0.5}},
+        score_prior={"R": {"slope": 1.0}},
+    )
+    comp, _ = apply_score_prior(scen, make_comp(_house(), {"R": 1}), rules, _alignment({}))
+    assert {m.id: m for m in comp.bodies["house"].roster}["NEW"].p_pro == {}
+
+
+def test_outer_loop_reapplies_score_prior_through_simulate(rules: RuleSet) -> None:
+    house = [
+        {"id": f"N{i:03d}", "name": f"N{i:03d}", "party": "R", "score": 3.0, "score_source": SRC}
+        for i in range(435)
+    ]
+    kw: dict[str, Any] = {
+        "party_priors": {"R": {"*": {"low": 0.2, "high": 0.6}}, "D": {"*": 0.9}},
+        "alignment": "a.json",
+        "uncertainty_draws": 4,
+    }
+    comp = make_comp(house, {"R": 100})
+    align = _alignment({})
+    scored = prepare_objects(
+        rules, comp, make_scenario(score_prior={"R": {"slope": 1.0}}, **kw), align
+    )
+    for sp in sampled_preps(scored, 4, scored.scenario.seed):
+        drawn = sp.scenario.party_priors["R"]["*"]
+        assert isinstance(drawn, float)
+        new = sp.comp.bodies["house"].roster[0]
+        assert new.p_pro["H1"] == pytest.approx(sigmoid(logit(drawn) + 3.0))
+    plain = prepare_objects(rules, comp, make_scenario(**kw), align)
+    with_score = simulate(scored, draws=500)
+    without = simulate(plain, draws=500)
+    assert with_score.uncertainty_draws == 4
+    h1 = [
+        next(g for g in sim.articles[0].gates if g.stage == "H1").p_pass_given_reached
+        for sim in (with_score, without)
+    ]
+    assert h1[0] > h1[1] + 0.5

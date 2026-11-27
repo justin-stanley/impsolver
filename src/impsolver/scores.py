@@ -50,6 +50,13 @@ def read_member_scores(path: Path) -> tuple[dict[str, MemberScore], list[SourceS
         if tuple(reader.fieldnames or ()) != COLUMNS:
             raise ScoreError(f"{path}: header must be exactly {','.join(COLUMNS)}")
         for n, r in enumerate(reader, start=2):
+            if None in r or None in r.values():
+                # An unquoted comma in the citation would otherwise cut it silently and could
+                # merge two sources into one standardization group.
+                raise ScoreError(
+                    f"{path}:{n}: expected 3 fields (id,score,source); put the source in double "
+                    'quotes if it contains commas, e.g. A000001,0.5,"Author, Title, v2, URL"'
+                )
             mid, src = (r["id"] or "").strip(), (r["source"] or "").strip()
             if not mid:
                 raise ScoreError(f"{path}:{n}: empty id")

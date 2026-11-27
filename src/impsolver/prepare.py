@@ -201,6 +201,15 @@ def prepare_objects(
     if scenario.score_prior and alignment is None:
         raise ValueError("score_prior needs an alignment")
     comp, scored = apply_member_priors(scenario, comp, rules, alignment)
+    if scenario.score_prior and alignment is not None:
+        for chamber, body in comp.bodies.items():
+            if chamber not in alignment.bodies and any(
+                m.score is not None and m.bloc in scenario.score_prior for m in body.roster
+            ):
+                warnings.append(
+                    f"score_prior skipped the {chamber}: the alignment file has no {chamber} "
+                    "body, so its members' history is unknown"
+                )
     if scenario.score_prior and scored == 0:
         warnings.append(
             "score_prior moved no member: none has a score, a score_prior bloc and no "

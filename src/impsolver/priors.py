@@ -106,10 +106,13 @@ def apply_defection_prior(
     return new
 
 
-def has_history(alignment: Alignment, chamber: str) -> set[str]:
-    """Ids with at least one recorded vote in ``chamber`` of the alignment file."""
-    body = alignment.bodies.get(chamber)
-    return set() if body is None else {m.id for m in body.members if m.n_votes > 0}
+def has_history(alignment: Alignment) -> set[str]:
+    """Ids with at least one counted vote (``n_votes > 0``) in any chamber of the alignment file.
+
+    ``n_votes`` counts contested roll calls only, after any recency weighting, so a member with
+    a few down-weighted contested votes can still have ``n_votes`` 0.
+    """
+    return {m.id for b in alignment.bodies.values() for m in b.members if m.n_votes > 0}
 
 
 def apply_score_prior(
@@ -121,15 +124,18 @@ def apply_score_prior(
     """Move the party prior of scored members without congressional history.
 
     A member qualifies when they carry a ``score``, their bloc has a ``score_prior`` entry, they
-    have no recorded vote in the alignment file for their chamber, and neither the composition
+    have no counted vote in any chamber of the alignment file, and neither the composition
     (``p_pro``, which includes a defection prior's result) nor an override already sets their
     probability. Their party prior becomes ``sigmoid(logit(p) + intercept + slope * score)``.
-    Returns the new composition and the number of members moved.
+    A chamber the alignment file does not cover is skipped, as in the defection prior, since its
+    members' history is unknown. Returns the new composition and the number of members moved.
     """
     new = comp.model_copy(deep=True)
     matched = 0
+    seen = has_history(alignment)
     for chamber, body in new.bodies.items():
-        seen = has_history(alignment, chamber)
+        if chamber not in alignment.bodies:
+            continue
         stage_ids = [s.id for s in rules.stages if s.chamber == chamber]
         members: list[Member] = []
         for m in body.roster:
