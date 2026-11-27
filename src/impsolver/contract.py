@@ -106,6 +106,7 @@ class GateDetail(BaseModel):
     seats: int
     vacancies: int
     present: int
+    base: int  # membership base, for rules that are a fraction of the membership
     required: int
     rule: RuleOut
     blocs: list[BlocTally]
@@ -403,6 +404,7 @@ def gate_detail(prep: Prepared, st: Stage, article: str) -> GateDetail:
         seats=body.seats,
         vacancies=body.vacancies,
         present=voting,
+        base=base,
         required=need,
         rule=RuleOut(
             kind=st.rule.kind,

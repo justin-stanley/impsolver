@@ -501,6 +501,10 @@
           "title": "Present",
           "type": "integer"
         },
+        "base": {
+          "title": "Base",
+          "type": "integer"
+        },
         "required": {
           "title": "Required",
           "type": "integer"
@@ -562,6 +566,7 @@
         "seats",
         "vacancies",
         "present",
+        "base",
         "required",
         "rule",
         "blocs",
