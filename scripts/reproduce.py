@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Check Voteview downloads against data/voteview.sha256 and rebuild the derived files.
 
-Usage: python scripts/reproduce.py   (after scripts/fetch-voteview.sh 116 119)
+Usage: python scripts/reproduce.py   (after scripts/fetch-voteview.sh 116 117 118 119)
 
 Exit status 0 means the downloads match the pinned checksums, the rebuilt roster is
 byte-identical and the rebuilt alignment files match the committed copies to 1e-6. Voteview
@@ -42,7 +42,7 @@ def check_manifest() -> list[str]:
         digest, name = line.split()
         path = DATA / name
         if not path.exists():
-            problems.append(f"missing {name}; run scripts/fetch-voteview.sh 116 119")
+            problems.append(f"missing {name}; run scripts/fetch-voteview.sh 116 117 118 119")
         elif sha256(path) != digest:
             problems.append(f"{name} differs from the pinned checksum (Voteview has newer data)")
     return problems
@@ -65,6 +65,18 @@ def rebuild(out: Path) -> None:
             "--caucus", "328=D", *extra, "--accessed", ACCESSED,
             "--out", str(out / f"us-{congress}.json"),
         ])  # fmt: skip
+    pooled = [
+        arg
+        for c in ("116", "117", "118")
+        for arg in (
+            "--votes", str(v / f"H{c}_votes.csv"), "--votes", str(v / f"S{c}_votes.csv"),
+            "--members", str(v / f"H{c}_members.csv"), "--members", str(v / f"S{c}_members.csv"),
+        )
+    ]  # fmt: skip
+    align_main([
+        *pooled, "--caucus", "328=D", "--accessed", ACCESSED,
+        "--out", str(out / "us-116-118.json"),
+    ])  # fmt: skip
 
 
 def close(a: object, b: object, tol: float = 1e-6) -> bool:
@@ -99,6 +111,7 @@ def main() -> int:
             (out / "us-119.yaml", ROOT / "compositions" / "us-119.yaml"),
             (out / "us-116.json", ROOT / "alignment" / "us-116.json"),
             (out / "us-119.json", ROOT / "alignment" / "us-119.json"),
+            (out / "us-116-118.json", ROOT / "alignment" / "us-116-118.json"),
         ]
         for built, committed in pairs:
             if not same(built, committed):

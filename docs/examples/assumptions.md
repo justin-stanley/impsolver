@@ -19,3 +19,18 @@ choices among the assumptions that move results.
 Other inputs to try: `rho`, `gate_correlation`, `senate_tie_break`, `alignment` with
 `alignment_chamber_weight`, `defection_prior`, and `attendance: random` with `absence_rate` (see
 [attendance](../methodology/model.md#attendance)).
+
+## A range instead of a number
+
+`examples/scenario-cabinet-a-uncertain.yaml` gives each R prior as a range whose midpoint is the
+number used above (for example `R: {"*": {low: 0.20, high: 0.40}}` in place of 0.30), and sets
+`uncertainty_draws: 200`:
+
+--8<-- "examples/generated/simulate-uncertain.md"
+
+P(complete) is the average over the 200 sets of R priors. The bracket after it is the 5th to
+95th percentile of P(complete) across those sets: the spread that the stated ranges alone allow,
+far wider than the Monte Carlo error. With `--uncertainty-draws 0 --draws 20000` the same file
+runs at the midpoints and prints exactly the first result on this page. `evaluate` on this file
+prints the same bounds as the original, because every R range lies between the 0.1 and 0.9
+cutoffs. See [uncertain priors](../methodology/model.md#uncertain-priors).

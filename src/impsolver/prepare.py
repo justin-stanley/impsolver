@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from .loader import (
 from .members import Resolver
 from .model import STAR, Alignment, Chamber, Composition, Member, RuleSet, Scenario
 from .priors import apply_defection_prior
+from .uncertainty import Bound, bound_scenario, has_uncertainty
 
 
 class ScenarioError(ValueError):
@@ -36,7 +38,7 @@ def check_references(rules: RuleSet, comp: Composition, scenario: Scenario) -> l
     stages = {s.id for s in rules.stages} | {STAR}
     errors: list[str] = []
 
-    def stage_keys(where: str, table: dict[str, float]) -> None:
+    def stage_keys(where: str, table: Mapping[str, object]) -> None:
         bad = sorted(set(table) - stages)
         if bad:
             errors.append(f"{where}: unknown stage key(s) {', '.join(bad)}")
@@ -72,6 +74,8 @@ def check_references(rules: RuleSet, comp: Composition, scenario: Scenario) -> l
     ]
     if scenario.attendance == "fixed" and scenario.absence_rate > 0:
         warnings.append("absence_rate has no effect unless attendance is random")
+    if scenario.uncertainty_draws > 0 and not has_uncertainty(scenario):
+        warnings.append("uncertainty_draws has no effect: no prior is a range or a beta")
     return warnings
 
 
@@ -83,6 +87,8 @@ class Prepared:
     alignment: Alignment | None
     source: str = "<memory>"
     warnings: list[str] = field(default_factory=list)
+    # The composition before any defection prior, kept so priors can be resampled.
+    input_comp: Composition | None = None
     resolver: Resolver = field(init=False)
 
     def __post_init__(self) -> None:
@@ -92,11 +98,53 @@ class Prepared:
         return self.comp.bodies[chamber].roster
 
     def probs(
-        self, chamber: Chamber, stage: str, article: str, extra: float = 0.0
+        self,
+        chamber: Chamber,
+        stage: str,
+        article: str,
+        extra: float = 0.0,
+        bound: Bound = "point",
     ) -> npt.NDArray[np.float64]:
+        """P(PRO) per member. ``bound`` picks the point value or the low / high bound of
+        uncertain priors (see :mod:`impsolver.uncertainty`).
+
+        With a defection prior, members whose party prior was adjusted carry one number in
+        ``p_pro``; their bounds come from re-applying the prior to the low and high party values.
+        The adjustment pushes away from the party's lean, so it is not monotone across 0.5: the
+        lower of the two results is the low bound and the higher is the high bound.
+        """
+        if bound != "point" and self.scenario.defection_prior is not None:
+            if self.input_comp is not None and self.alignment is not None:
+                ends = [
+                    self._bound_prep(b).probs(chamber, stage, article, extra)
+                    for b in ("low", "high")
+                ]
+                return np.minimum(*ends) if bound == "low" else np.maximum(*ends)
         return np.array(
-            [self.resolver.resolve(m, stage, article, extra) for m in self.members(chamber)],
+            [self.resolver.resolve(m, stage, article, extra, bound) for m in self.members(chamber)],
             dtype=float,
+        )
+
+    def _bound_prep(self, bound: Bound) -> Prepared:
+        cache = self.__dict__.setdefault("_bound_cache", {})
+        if bound not in cache:
+            cache[bound] = self.with_scenario(bound_scenario(self.scenario, bound))
+        prep: Prepared = cache[bound]
+        return prep
+
+    def with_scenario(self, scenario: Scenario) -> Prepared:
+        """The same inputs under another scenario (for example one with sampled priors).
+
+        The defection prior, if any, is applied again from the original composition.
+        """
+        base = self.input_comp if self.input_comp is not None else self.comp
+        comp = base
+        if scenario.defection_prior is not None and self.alignment is not None:
+            comp = apply_defection_prior(
+                scenario.defection_prior, scenario, base, self.rules, self.alignment
+            )
+        return Prepared(
+            self.rules, comp, scenario, self.alignment, self.source, list(self.warnings), base
         )
 
     def present_mask(self, chamber: Chamber) -> npt.NDArray[np.bool_]:
@@ -132,11 +180,12 @@ def prepare_objects(
     source: str = "<memory>",
 ) -> Prepared:
     warnings = check_references(rules, comp, scenario)
+    input_comp = comp
     if scenario.defection_prior is not None:
         if alignment is None:
             raise ValueError("defection_prior needs an alignment")
         comp = apply_defection_prior(scenario.defection_prior, scenario, comp, rules, alignment)
-    prep = Prepared(rules, comp, scenario, alignment, source, warnings)
+    prep = Prepared(rules, comp, scenario, alignment, source, warnings, input_comp)
     if scenario.attendance == "random":
         if not any(prep.absence_rates(ch).any() for ch in comp.bodies):
             prep.warnings.append(
@@ -156,8 +205,15 @@ def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared
     Returns:
         A ``Prepared`` scenario whose ``warnings`` list unknown member ids or blocs.
     """
+    return prepare_objects(*load_parts(path, composition), str(path))
+
+
+def load_parts(
+    path: str | Path, composition: str | Path | None = None
+) -> tuple[RuleSet, Composition, Scenario, Alignment | None]:
+    """The rules, raw composition, scenario and alignment that ``prepare`` combines."""
     scen = load_scenario(path)
     rules = load_rules(resolve_rules(scen.rules, path))
     comp = load_composition(composition if composition else resolve(scen.composition, path))
     align = load_alignment(resolve(scen.alignment, path)) if scen.alignment else None
-    return prepare_objects(rules, comp, scen, align, str(path))
+    return rules, comp, scen, align

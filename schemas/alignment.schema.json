@@ -162,6 +162,19 @@
       },
       "title": "Bodies",
       "type": "object"
+    },
+    "half_life": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Half Life"
     }
   },
   "required": [

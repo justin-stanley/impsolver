@@ -23,6 +23,17 @@ data files. If you reuse the derived files below, cite Voteview as above.
 | `compositions/us-119.yaml` | `H119_members.csv`, `S119_members.csv`, `H119_votes.csv`, `S119_votes.csv` | `impsolver roster` |
 | `alignment/us-116.json` | `H116_votes.csv`, `S116_votes.csv`, `H116_members.csv`, `S116_members.csv` | `impsolver align` |
 | `alignment/us-119.json` | `H119_votes.csv`, `S119_votes.csv`, `H119_members.csv`, `S119_members.csv` | `impsolver align` |
+| `alignment/us-116-118.json` | `H{116,117,118}_votes.csv`, `S{116,117,118}_votes.csv`, `H{116,117,118}_members.csv`, `S{116,117,118}_members.csv` | `impsolver align` (pooled, equal weight) |
+
+`us-116-118.json` pools the 116th, 117th and 118th Congresses with every roll call weighted
+equally. Members are matched across congresses by Bioguide ID, and each member's party and bloc
+are those of the latest congress they served in (votes cast under an earlier party are scored
+against that party's bloc). Like the other files it maps independents (party code 328) to the
+Democratic bloc: the senate.gov
+[party division page](https://www.senate.gov/about/parties-leadership/party-division.htm)
+(checked 2026-11-27) says both independents in the 117th Congress, and the independents of the
+118th, Manchin included after his switch, caucused with the Democrats. The House had no
+independents in either congress.
 
 The alignment files also record each member's missed votes (`n_missed`, roll calls coded 9, "not
 voting") out of the roll calls Voteview lists them on (`n_possible`); `attendance: random` uses
@@ -36,7 +47,7 @@ records when you downloaded the data. `make reproduce` runs all of this and chec
 against the committed files.
 
 ```bash
-scripts/fetch-voteview.sh 116 119
+scripts/fetch-voteview.sh 116 117 118 119
 V=data/voteview
 impsolver roster --members $V/H119_members.csv --members $V/S119_members.csv \
   --votes $V/H119_votes.csv --votes $V/S119_votes.csv --caucus 328=D \
@@ -48,6 +59,14 @@ impsolver align --votes $V/H116_votes.csv --votes $V/S116_votes.csv \
 impsolver align --votes $V/H119_votes.csv --votes $V/S119_votes.csv \
   --members $V/H119_members.csv --members $V/S119_members.csv --caucus 328=D \
   --member-caucus K000401=R --accessed 2026-11-27 --out alignment/us-119.json
+# 116th-118th pooled; add --half-life N to weight recent congresses more (default: equal weight)
+impsolver align --votes $V/H116_votes.csv --votes $V/S116_votes.csv \
+  --votes $V/H117_votes.csv --votes $V/S117_votes.csv \
+  --votes $V/H118_votes.csv --votes $V/S118_votes.csv \
+  --members $V/H116_members.csv --members $V/S116_members.csv \
+  --members $V/H117_members.csv --members $V/S117_members.csv \
+  --members $V/H118_members.csv --members $V/S118_members.csv \
+  --caucus 328=D --accessed 2026-11-27 --out alignment/us-116-118.json
 ```
 
 ### Corrections applied on top of Voteview

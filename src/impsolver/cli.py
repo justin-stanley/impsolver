@@ -17,6 +17,8 @@ from . import alignment as alignment_mod
 from . import roster as roster_mod
 from .backtest import run_backtest
 from .calibrate import calibrate
+from .compare import CompareError, Comparison, PortfolioSide
+from .compare import compare as compare_plans
 from .deterministic import default_path, evaluate
 from .flips import ABSENCE_NOTE, FlipError, find_flips
 from .loader import (
@@ -42,14 +44,24 @@ from .model import (
     Scenario,
 )
 from .paths import PathError, path_for
-from .portfolio import PortfolioError
+from .portfolio import PortfolioError, change_dates, epoch_preps
 from .portfolio import load as load_portfolio_inputs
 from .portfolio import solve as solve_portfolio
 from .prepare import Prepared
 from .prepare import prepare as _prepare_raw
 from .priors import PriorError
 from .report import render as render_report
+from .report import render_comparison
 from .results import Evaluation, FlipResult, Simulation
+from .score import (
+    DEFAULT_BETAS,
+    DEFAULT_RHOS,
+    DEFAULT_WEIGHTS,
+    MIN_EFFECTIVE_DRAWS,
+    ScorePoint,
+    Sweep,
+    sweep,
+)
 from .simulate import simulate
 from .templates import DEFAULT_NAMES, TEMPLATES
 from .viability import Case, assess
@@ -122,12 +134,19 @@ def render_flips(r: FlipResult) -> str:
 
 
 def render_simulation(s: Simulation) -> str:
-    out = [f"{s.target}: {s.draws} draws, rho={s.rho}, seed={s.seed}, aligned={s.aligned}"]
+    head = f"{s.target}: {s.draws} draws, rho={s.rho}, seed={s.seed}, aligned={s.aligned}"
+    if s.uncertainty_draws:
+        head += f", {s.uncertainty_draws} outer draws over uncertain priors"
+    out = [head]
     for a in s.articles:
-        out.append(
+        line = (
             f"\nArticle {a.article}, path {a.path}: P(complete)={a.p_complete:.4f} "
             f"(MC s.e. {a.mc_se:.4f})"
         )
+        if a.p_complete_interval is not None:
+            lo, hi = a.p_complete_interval
+            line += f", 5-95% over priors [{lo:.4f}, {hi:.4f}]"
+        out.append(line)
         for g in a.gates:
             c = g.pro_count
             out.append(
@@ -135,6 +154,12 @@ def render_simulation(s: Simulation) -> str:
                 f"{g.p_pass_given_reached:.4f}  PRO mean {c.mean:.1f} "
                 f"[p5 {c.p5:.0f}, p50 {c.p50:.0f}, p95 {c.p95:.0f}]"
             )
+    if s.p_any_complete is not None and s.p_any_complete_interval is not None:
+        lo, hi = s.p_any_complete_interval
+        out.append(
+            f"\nAny article: P(removal)={s.p_any_complete:.4f}, "
+            f"5-95% over priors [{lo:.4f}, {hi:.4f}]"
+        )
     return "\n".join(out)
 
 
@@ -170,6 +195,12 @@ def _validate_portfolio(path: str) -> tuple[str, list[str]]:
                 )
             path_for(prep.rules, prep.scenario, default_path(prep))
             evaluate(prep)  # resolves every probability
+            eps = epoch_preps(pf, resolve(c.scenario, path), f"candidate {c.id}")
+            for d, ep in zip(change_dates(pf), eps, strict=True):
+                evaluate(ep)  # each roster epoch, so a new seat without a prior fails here
+                prep.warnings += [
+                    f"roster from {d}: {w}" for w in ep.warnings if w not in prep.warnings
+                ]
         except ERRORS as e:
             msg = str(e) if not isinstance(e, KeyError) else f"unknown key {e}"
             raise CliError(f"{path}: candidate {c.id}: {msg}") from e
@@ -263,7 +294,14 @@ def cmd_flips(a: argparse.Namespace) -> int:
 
 
 def cmd_simulate(a: argparse.Namespace) -> int:
-    s = simulate(prepare(a.scenario), draws=a.draws, rho=a.rho, seed=a.seed, path_name=a.path)
+    s = simulate(
+        prepare(a.scenario),
+        draws=a.draws,
+        rho=a.rho,
+        seed=a.seed,
+        path_name=a.path,
+        uncertainty_draws=a.uncertainty_draws,
+    )
     _emit(a, s, lambda: render_simulation(s))
     return 0
 
@@ -293,6 +331,42 @@ def cmd_compare(a: argparse.Namespace) -> int:
         )
 
     _emit(a, rows, text)
+    return 0
+
+
+def render_comparison_text(c: Comparison) -> str:
+    out: list[str] = []
+    for tag, side in (("A", c.a), ("B", c.b)):
+        if isinstance(side, PortfolioSide):
+            out.append(
+                f"\n{tag}: {side.file}\n  E[removals]={side.expected_removals:.3f}  order "
+                f"{' > '.join(side.recommended_order) or 'none'}"
+            )
+            tornadoes = list(side.result.tornado.values())
+        else:
+            out.append(
+                f"\n{tag}: {side.file}\n  {side.target} ({side.office}) on {side.composition}: "
+                f"P(removal)={side.p_removal:.4f}"
+            )
+            tornadoes = [side.tornado]
+        for t in tornadoes:
+            out.append(f"  {t.id or t.label}: {t.basis} {t.base:.4f}")
+            out += [
+                f"    {b.input:16} {b.low_setting:>18} {b.p_low:.4f}  "
+                f"{b.high_setting:>18} {b.p_high:.4f}  swing {b.swing:.4f}"
+                for b in t.bars
+            ]
+    return "\n".join(out)
+
+
+def cmd_compare_plans(a: argparse.Namespace) -> int:
+    c, warnings = compare_plans(a.a, a.b, draws=a.draws, exhaustive=a.exhaustive)
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    if a.html:
+        Path(a.html).write_text(render_comparison(c), encoding="utf-8")
+        print(f"wrote {a.html}", file=sys.stderr)
+    _emit(a, c, lambda: render_comparison_text(c))
     return 0
 
 
@@ -336,7 +410,10 @@ def cmd_portfolio(a: argparse.Namespace) -> int:
     for cid, prep in loaded.preps.items():
         for w in prep.warnings:
             print(f"warning: candidate {cid}: {w}", file=sys.stderr)
-    r = solve_portfolio(loaded, exhaustive=a.exhaustive)
+    # The tornado runs are only shown on the page and in JSON; skip them for plain text.
+    r = solve_portfolio(
+        loaded, exhaustive=a.exhaustive, sensitivities=bool(a.html) or a.format == "json"
+    )
     if a.html:
         Path(a.html).write_text(render_report(r, loaded.pf), encoding="utf-8")
         print(f"wrote {a.html}", file=sys.stderr)
@@ -351,6 +428,7 @@ def cmd_portfolio(a: argparse.Namespace) -> int:
                 out.append(
                     f"  {s.id:16} House {s.house_start}..{s.house_end}  "
                     f"trial {s.trial_start}..{s.trial_end}  p0={s.p0:.3f} p={s.p:.3f}"
+                    + (f"  roster from {r.epochs[s.epoch - 1]}" if s.epoch else "")
                 )
         for d in r.dropped:
             out.append(f"dropped {d.id}: {d.reason} ({d.detail})")
@@ -398,6 +476,112 @@ def cmd_calibrate(a: argparse.Namespace) -> int:
         return "\n".join(out)
 
     _emit(a, c, text)
+    return 0
+
+
+def _floats(text: str) -> list[float]:
+    try:
+        return [float(v) for v in text.split(",") if v.strip()]
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"expected comma-separated numbers, got {text!r}") from e
+
+
+def _settings(q: ScorePoint) -> str:
+    parts = [f"beta {q.beta:g}"]
+    if q.rho is not None:
+        parts.append(f"rho {q.rho:g}")
+    if q.weight is not None:
+        parts.append(f"weight {q.weight:g}")
+        if q.weight > 0 and q.kappa is not None:
+            parts.append(f"kappa {q.kappa:g}")
+    return ", ".join(parts)
+
+
+def _low(q: ScorePoint) -> str:
+    if q.min_effective_draws is not None and q.min_effective_draws < MIN_EFFECTIVE_DRAWS:
+        return "  (low effective draws: Monte Carlo error)"
+    return ""
+
+
+def _scored(q: ScorePoint) -> str:
+    return f"Brier {q.brier:.4f}  log {q.log_loss:.4f}{_low(q)}"
+
+
+def render_sweep(s: Sweep, top: int) -> str:
+    base = "observed share per event" if s.base_rate is None else f"{s.base_rate:g}"
+    out = [
+        f"score: events {', '.join(s.events)}; base rate {base}; min votes {s.min_votes}",
+        "lower is better (Brier = mean squared error, log = mean log loss in nats)",
+    ]
+    out += [f"skipped: {x}" for x in s.skipped]
+    for c in s.chambers:
+        out.append(
+            f"\n{c.body}: {len(c.events)} event(s), {c.n_members} members, {c.n_crossed} crossed"
+        )
+        for e in c.events:
+            if e.n_not_voting is None:
+                out.append(
+                    f"  {e.case}: fixture lists no non-voters, so members who did not vote "
+                    "(absent or no longer seated) are scored as non-crossers"
+                )
+            elif e.n_not_voting:
+                out.append(f"  {e.case}: {e.n_not_voting} members left out as not voting")
+            if e.unmatched:
+                out.append(f"  {e.case} unmatched: {', '.join(e.unmatched)}")
+        out.append("  marginal P(cross), by beta:")
+        for q in c.marginal:
+            mark = "  <- default" if q.beta == c.default_marginal.beta else ""
+            out.append(f"    beta {q.beta:5.2f}  {_scored(q)}{mark}")
+        bm, bb = c.best_marginal, c.best_marginal_brier
+        out.append(f"  best by log: {_settings(bm)}; by Brier: {_settings(bb)}")
+        if c.best_conditional is not None and c.default_conditional is not None:
+            out.append(
+                f"  conditional P(cross | other members), top {top} of {len(c.conditional)}:"
+            )
+            for q in sorted(c.conditional, key=lambda q: (q.log_loss, q.beta))[:top]:
+                out.append(f"    {_settings(q):40s} {_scored(q)}")
+            out.append(
+                f"    default: {_settings(c.default_conditional)}: {_scored(c.default_conditional)}"
+            )
+            bcb = c.best_conditional_brier
+            assert bcb is not None
+            out.append(f"  best by Brier: {_settings(bcb)}{_low(bcb)}")
+            if c.min_effective_draws is not None:
+                skip = (
+                    f"; best settings skip points below {MIN_EFFECTIVE_DRAWS:g}"
+                    if c.min_effective_draws < MIN_EFFECTIVE_DRAWS
+                    else ""
+                )
+                out.append(
+                    f"  smallest effective draws: {c.min_effective_draws:.0f} of {s.draws}{skip}"
+                )
+        for label, held in (("marginal", c.loeo_marginal), ("conditional", c.loeo_conditional)):
+            for h in held:
+                out.append(
+                    f"  held out {h.event} ({label}): chose {_settings(h.chosen)}; "
+                    f"log {h.log_loss:.4f} vs default {h.default_log_loss:.4f}, "
+                    f"Brier {h.brier:.4f} vs default {h.default_brier:.4f}"
+                )
+    out += [f"note: {n}" for n in s.notes]
+    out.append("note: the sweep reports only; it does not change any default")
+    return "\n".join(out)
+
+
+def cmd_score(a: argparse.Namespace) -> int:
+    paths = a.fixtures or sorted((BUILTIN_FIXTURES / "members").glob("*.yaml"))
+    s = sweep(
+        [load_crossovers(p) for p in paths],
+        [load_alignment(p) for p in a.alignment],
+        betas=a.beta,
+        rhos=a.rho,
+        weights=a.weight,
+        base_rate=a.base_rate,
+        min_votes=a.min_votes,
+        draws=a.draws,
+        seed=a.seed,
+        conditional=not a.marginal_only,
+    )
+    _emit(a, s, lambda: render_sweep(s, a.top))
     return 0
 
 
@@ -488,7 +672,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("simulate", cmd_simulate, help="copula Monte Carlo")
     p.add_argument("scenario")
-    p.add_argument("--draws", type=int, default=100_000)
+    p.add_argument(
+        "--draws",
+        type=int,
+        help="draws (default 100000; per outer draw, default 2000, with uncertainty_draws)",
+    )
+    p.add_argument(
+        "--uncertainty-draws",
+        type=int,
+        metavar="N",
+        help="outer draws over range/beta priors (overrides the scenario's uncertainty_draws)",
+    )
     p.add_argument("--rho", type=float)
     p.add_argument("--seed", type=int)
     p.add_argument("--path")
@@ -496,6 +690,24 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("compare", cmd_compare, help="evaluate one scenario against several compositions")
     p.add_argument("scenario")
     p.add_argument("--composition", action="append", required=True)
+
+    p = add(
+        "compare-plans",
+        cmd_compare_plans,
+        help="two portfolios or two scenarios side by side, with tornado sensitivity",
+        description="Compute two portfolios (or two scenarios) as their own commands would, "
+        "and show them side by side with one-notch sensitivity of each case's P(removal).",
+    )
+    p.add_argument("a", metavar="A.yaml")
+    p.add_argument("b", metavar="B.yaml")
+    p.add_argument("--html", metavar="OUT", help="also write a self-contained comparison page")
+    p.add_argument(
+        "--draws",
+        type=int,
+        default=20_000,
+        help="draws per run for scenarios (portfolios use their own draws)",
+    )
+    p.add_argument("--exhaustive", action="store_true", help="exhaustive portfolio search")
 
     p = add("viability", cmd_viability, help="rank the scenarios you supply")
     p.add_argument("scenarios", nargs="+")
@@ -523,6 +735,49 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--permutations", type=int, default=5000)
     p.add_argument("--seed", type=int, default=0)
 
+    p = add(
+        "score",
+        cmd_score,
+        help="score crossing predictions on crossover fixtures over a grid of settings",
+        description="Brier and log scores of per-member crossing predictions on crossover "
+        "fixtures, over a grid of beta (defection prior), rho and alignment weight, and one "
+        "kappa per alignment file. Reports the best settings and, with several events, "
+        "leave-one-event-out scores. It never changes defaults.",
+    )
+    p.add_argument(
+        "fixtures", nargs="*", help="crossover fixtures (default: every built-in fixture)"
+    )
+    p.add_argument(
+        "--alignment",
+        action="append",
+        required=True,
+        help="alignment file; repeat with files fitted at other kappa values "
+        "(impsolver align --kappa K)",
+    )
+    p.add_argument("--beta", type=_floats, default=list(DEFAULT_BETAS), metavar="B,B,...")
+    p.add_argument("--rho", type=_floats, default=list(DEFAULT_RHOS), metavar="R,R,...")
+    p.add_argument(
+        "--weight",
+        type=_floats,
+        default=list(DEFAULT_WEIGHTS),
+        metavar="W,W,...",
+        help="alignment weights to try",
+    )
+    p.add_argument(
+        "--base-rate",
+        type=float,
+        help="crossing base rate for every event (default: each event's observed share)",
+    )
+    p.add_argument("--min-votes", type=int, default=100)
+    p.add_argument("--draws", type=int, default=10_000, help="importance draws per event")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--top", type=int, default=5, help="conditional settings to list")
+    p.add_argument(
+        "--marginal-only",
+        action="store_true",
+        help="skip the conditional (rho, weight, kappa) grid",
+    )
+
     p = add("schema", cmd_schema, help="write JSON schemas")
     p.add_argument("--out", default="schemas")
 
@@ -543,6 +798,7 @@ ERRORS = (
     FlipError,
     PriorError,
     PortfolioError,
+    CompareError,
     CliError,
     ValueError,
     KeyError,

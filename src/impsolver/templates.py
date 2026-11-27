@@ -48,6 +48,8 @@ party_priors:
   D: {"*": 0.90}
   I: {"*": 0.85}
   R: {"*": 0.30, H1: 0.40}
+# A value may also be a range {low: 0.2, high: 0.4} or a distribution {beta: [3, 7]}; set
+# uncertainty_draws: 200 to have `simulate` report a 5-95% interval over them.
 # Per-member overrides use the member ids from the composition, for example:
 # overrides:
 #   R-001: {"*": 0.5}
