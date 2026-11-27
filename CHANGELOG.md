@@ -33,6 +33,10 @@ All notable changes are listed here. The format follows
   each trial uses the roster in force on its first day; without changes results do not change.
 
 ### Changed
+- `portfolio` with succession rules: after each trigger's verdict, every branch re-orders the cases
+  not yet started (all orders when at most 6 remain); a case already started stays in the plan
+  with its House start. The decision tree shows each branch's order. Expected removals with succession can rise and the recommended
+  order can change; portfolios without succession rules are unchanged.
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per
   article, adds a case-level line to `path_checks`, and fails a fixture with no required-stage vote.
 - The ILP runs on PuLP 4 (`pulp[cbc]>=2.9,<5`; CBC now comes from the `cbcbox` wheel). Flip and

@@ -107,7 +107,10 @@ Sensitivity: delta in (-.2,0,.2,.5), durations x0.75/x1.25. Regret = best value 
 rescheduled. FRAGILE if regret > max(.01, .05*E).
 Succession: branch at the trigger's trial (removed or not); the dependent becomes its variant or is
 cancelled. At most 3 triggers branch. Exhaustive up to 7 eligible candidates, otherwise re-score the
-top 2000 non-branching orders. Output a decision tree.
+top 2000 non-branching orders. After each verdict, each branch re-orders the cases whose House work
+has not started (every permutation when at most 6 remain); a case whose House work has started
+keeps its House start and stays in the plan (its Senate trial may move).
+Output a decision tree with each branch's order.
 Joint removals_dist: one shared party-swing stream across scenario candidates plus member noise.
 Fatigued P is matched by a uniform shift found by bisection with CRN. Resolve succession per draw.
 Fixed-p candidates are drawn independently (noted); Poisson-binomial if all are fixed.
