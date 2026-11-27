@@ -3,7 +3,12 @@ case: clinton-1998
 target: {name: William J. Clinton, office: president}
 date: 1999-02-12
 path: B
-source: Clerk roll calls 543 and 545 (1998); Senate roll calls 17 and 18 (1999)
+sources:
+  - https://clerk.house.gov/Votes/1998543
+  - https://clerk.house.gov/Votes/1998545
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1061/vote_106_1_00017.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1061/vote_106_1_00018.htm
+verified: 2026-11-27
 bodies:
   house: {seats: 435}
   senate: {seats: 100}

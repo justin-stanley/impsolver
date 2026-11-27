@@ -14,7 +14,6 @@ import itertools
 import math
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 from pydantic import BaseModel
@@ -883,7 +882,3 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
 
 def run_portfolio(path: str | Path, exhaustive: bool = False) -> PortfolioResult:
     return solve(load(path), exhaustive)
-
-
-def as_dict(res: PortfolioResult) -> dict[str, Any]:
-    return res.model_dump(mode="json")

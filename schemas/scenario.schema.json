@@ -212,6 +212,40 @@
       "title": "Alignment Weight",
       "type": "number"
     },
+    "alignment_chamber_weight": {
+      "additionalProperties": {
+        "maximum": 1.0,
+        "minimum": 0.0,
+        "type": "number"
+      },
+      "default": {
+        "house": 1.0,
+        "senate": 0.0
+      },
+      "propertyNames": {
+        "enum": [
+          "house",
+          "senate"
+        ]
+      },
+      "title": "Alignment Chamber Weight",
+      "type": "object"
+    },
+    "national_swing": {
+      "default": false,
+      "title": "National Swing",
+      "type": "boolean"
+    },
+    "senate_tie_break": {
+      "default": "none",
+      "enum": [
+        "none",
+        "pro",
+        "con"
+      ],
+      "title": "Senate Tie Break",
+      "type": "string"
+    },
     "defection_prior": {
       "anyOf": [
         {

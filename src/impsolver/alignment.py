@@ -71,6 +71,17 @@ def parse_caucus(specs: list[str]) -> dict[str, str]:
     return out
 
 
+def parse_mapping(specs: list[str], what: str = "ID=BLOC") -> dict[str, str]:
+    """'KEY=VALUE' strings to a dict; used for --member-caucus."""
+    out: dict[str, str] = {}
+    for s in specs:
+        key, sep, value = s.partition("=")
+        if not sep or not key.strip() or not value.strip():
+            raise ValueError(f"bad mapping {s!r}; expected {what}")
+        out[key.strip()] = value.strip()
+    return out
+
+
 def read_members(paths: list[Path]) -> list[VVMember]:
     """Read Voteview member CSVs. Rows for the same person in one chamber are merged.
 
@@ -443,7 +454,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args(argv)
     try:
-        mc = dict(x.split("=", 1) for x in a.member_caucus)
+        mc = parse_mapping(a.member_caucus)
         al = build_alignment(
             a.votes, a.members, parse_caucus(a.caucus), a.k, a.kappa, a.min_shared, mc
         )

@@ -3,7 +3,10 @@ case: trump-2021
 target: {name: Donald J. Trump, office: president}
 date: 2021-02-13
 path: A
-source: Clerk roll call 17 (2021); Senate roll call 59 (2021)
+sources:
+  - https://clerk.house.gov/Votes/202117
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00059.htm
+verified: 2026-11-27
 bodies:
   house: {seats: 435, vacancies: 2}
   senate: {seats: 100}

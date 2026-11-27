@@ -316,7 +316,8 @@ class Fixture(Strict):
     votes: list[FixtureVote]
     expected_complete: bool = False
     expected_ends_at: str | None = None
-    source: str | None = None
+    sources: list[str] = []
+    verified: LooseDate | None = None
 
 
 class CrossedMember(Strict):

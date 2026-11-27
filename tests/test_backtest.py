@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from impsolver.backtest import default_fixtures, run_backtest
+from impsolver.backtest import DEFAULT_RULES, default_fixtures, run_backtest
 
 
 def test_all_fixtures_match() -> None:
@@ -35,3 +35,17 @@ votes:
         text=True,
     )
     assert r.returncode != 0
+
+
+def test_fixture_tallies_account_for_every_sworn_member() -> None:
+    from impsolver.loader import load_fixture, load_rules
+
+    rules = load_rules(DEFAULT_RULES)
+    for f in default_fixtures():
+        fx = load_fixture(f)
+        assert fx.sources, f"{f.name} has no sources"
+        for v in fx.votes:
+            body = fx.bodies[rules.stage(v.stage).chamber]
+            assert v.yea + v.nay + v.present + v.not_voting == body.seats - body.vacancies, (
+                f"{f.name} {v.stage} {v.yea}-{v.nay}"
+            )

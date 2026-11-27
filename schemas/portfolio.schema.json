@@ -304,13 +304,13 @@
       "type": "integer"
     },
     "beam": {
-      "default": 256,
+      "default": 4096,
       "minimum": 1,
       "title": "Beam",
       "type": "integer"
     },
     "exact_limit": {
-      "default": 16,
+      "default": 10,
       "minimum": 1,
       "title": "Exact Limit",
       "type": "integer"

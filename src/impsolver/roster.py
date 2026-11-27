@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from .alignment import VVMember, parse_caucus, read_members, read_votes
+from .alignment import VVMember, parse_caucus, parse_mapping, read_members, read_votes
 from .model import Body, Composition, Member
 
 SEATS = {"house": 435, "senate": 100}
@@ -153,16 +153,6 @@ def dump_composition(report: RosterReport) -> str:
     return header + buf.getvalue()
 
 
-def _pairs(specs: list[str]) -> dict[str, str]:
-    out = {}
-    for s in specs:
-        if "=" not in s:
-            raise ValueError(f"bad mapping {s!r}; expected ID=BLOC")
-        k, v = s.split("=", 1)
-        out[k.strip()] = v.strip()
-    return out
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="impsolver roster", description=__doc__)
     ap.add_argument("--members", action="append", required=True, type=Path)
@@ -188,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             a.members,
             a.votes,
             parse_caucus(a.caucus),
-            _pairs(a.member_caucus),
+            parse_mapping(a.member_caucus),
             a.keep,
             a.vacancy_gap,
             a.as_of,

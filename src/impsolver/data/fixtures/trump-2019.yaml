@@ -3,7 +3,12 @@ case: trump-2019
 target: {name: Donald J. Trump, office: president}
 date: 2020-02-05
 path: B
-source: Clerk roll calls 695 and 696 (2019); Senate roll calls 33 and 34 (2020)
+sources:
+  - https://clerk.house.gov/Votes/2019695
+  - https://clerk.house.gov/Votes/2019696
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1162/vote_116_2_00033.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1162/vote_116_2_00034.htm
+verified: 2026-11-27
 bodies:
   house: {seats: 435, vacancies: 4}
   senate: {seats: 100}

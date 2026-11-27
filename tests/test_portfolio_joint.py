@@ -19,7 +19,7 @@ party_priors: {D: {"*": 0.97}, R: {"*": 0.45}}
 rho: %s
 seed: 1
 """
-RULES = Path(__file__).resolve().parents[1] / "rules" / "us-federal.yaml"
+RULES = "us-federal"
 
 
 def _write(tmp: Path, cands: str, rho: float = 0.95) -> Path:

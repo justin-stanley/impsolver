@@ -3,13 +3,15 @@ case: johnson-1868
 target: {name: Andrew Johnson, office: president}
 date: 1868-05-16
 path: B
-source: House Journal, 40th Congress; Senate Journal, trial of Andrew Johnson
+sources:
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-johnson.htm
+verified: 2026-11-27
 bodies:
-  house: {seats: 193, vacancies: 3}   # approximate seated membership, 40th Congress
+  house: {seats: 193, vacancies: 3}   # approximate seated membership; affects only the quorum check
   senate: {seats: 54}
 votes:
   - {stage: H2, article: XI, yea: 126, nay: 47, not_voting: 17, expected: PASS,
-     note: "resolution of impeachment, 1868-02-24"}
+     note: "resolution of impeachment, 1868-02-24 (the articles were adopted later)"}
   - {stage: S2, article: XI, yea: 35, nay: 19, expected: FAIL, expected_short: 1,
      note: "36 of 54 needed"}
 expected_complete: false

@@ -1,7 +1,6 @@
-# impsolver — technical design (recovered)
+# impsolver: technical design
 
-This spec was rebuilt on 2026-11-27 from the transcript of the earlier session. The tool is neutral:
-the user supplies the candidates, and the tool never nominates targets.
+The tool is neutral: the user supplies the candidates, and the tool never nominates targets.
 
 ## Stack
 Python 3.12, pydantic v2 (strict, extra=forbid), ruamel.yaml (safe), numpy, PuLP<3 (CBC),
@@ -20,7 +19,7 @@ and runs fully offline.
 - Integer ceil is `-(-p*n//q)`. `required_pro` is the minimal pro that passes: required passes and
   required - 1 fails. Examples: 2/3 of 100 is 67, of 54 is 36, of 99 is 66.
 
-## Rules (rules/us-federal.yaml)
+## Rules (built-in `us-federal`, src/impsolver/data/rules/us-federal.yaml)
 | id | chamber | motion | rule | direction | next |
 |----|---------|--------|------|-----------|------|
 | H1 | house | table/refer privileged resolution | majority | fail | H2 |
@@ -65,17 +64,17 @@ psi_i = 1-||F_i||^2. s_ig is the sign of (bloc lean - 0.5), and the lean is the 
 bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed).
 
 ## Alignment, defection prior, calibration, viability, portfolio
-These follow the spec relayed in parts 2 and 3; see the module docstrings in `src/impsolver/`.
+See `docs/design-reference.md` and the module docstrings in `src/impsolver/`.
 
 ## Changes after the 2026-11-27 audit
-These change behavior relative to the recovered spec.
+These change behavior relative to the original design.
 - `alignment_chamber_weight` (default `{house: 1, senate: 0}`) multiplies `alignment_weight` for each
   chamber. The Senate defaults to 0 because the 2021 calibration found no Senate co-defection
-  signal (permutation p = 0.75). Set it to 1 to restore the spec's behavior.
+  signal (permutation p = 0.75). Set it to 1 to restore the original behavior.
 - `national_swing` (default false) draws one party swing per bloc for both chambers instead of one
   per chamber.
 - `senate_tie_break` (`none` | `pro` | `con`, default `none`) says how an exact tie on a Senate
-  majority vote (S1, S3) is resolved. With `none`, a tie defeats the motion, as in the spec. Whether
+  majority vote (S1, S3) is resolved. With `none`, a tie defeats the motion, as in the original design. Whether
   and how a presiding officer may break such a tie in an impeachment trial is not settled here, so
   the tool takes it as the user's stated assumption. The setting is applied in the deterministic
   bounds, the Monte Carlo and the ILP.

@@ -7,7 +7,7 @@ from impsolver.cli import main
 
 REPO = Path(__file__).resolve().parents[1]
 SCEN = str(REPO / "examples" / "scenario-example.yaml")
-RULES = str(REPO / "rules" / "us-federal.yaml")
+RULES = "us-federal"
 COMP = str(REPO / "compositions" / "shorthand-119.yaml")
 
 
@@ -66,7 +66,6 @@ def test_calibrate(capsys: pytest.CaptureFixture[str]) -> None:
     rc, out, _ = run(
         capsys,
         "calibrate",
-        str(REPO / "fixtures/members/trump-2021-crossovers.yaml"),
         "--alignment",
         str(al),
         "--permutations",
@@ -108,10 +107,7 @@ def test_errors_exit_2(capsys: pytest.CaptureFixture[str]) -> None:
 def test_validate_fails_on_warnings(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
     scen = tmp_path / "s.yaml"
     scen.write_text(
-        Path(SCEN)
-        .read_text()
-        .replace("../rules", str(REPO / "rules"))
-        .replace("../compositions", str(REPO / "compositions"))
+        Path(SCEN).read_text().replace("../compositions", str(REPO / "compositions"))
         + "overrides: {NOPE: {'*': 1.0}}\n"
     )
     rc, _, err = run(capsys, "validate", RULES, COMP, str(scen))
@@ -123,10 +119,7 @@ def test_portfolio_and_viability_print_scenario_warnings(
 ) -> None:
     scen = tmp_path / "s.yaml"
     scen.write_text(
-        Path(SCEN)
-        .read_text()
-        .replace("../rules", str(REPO / "rules"))
-        .replace("../compositions", str(REPO / "compositions"))
+        Path(SCEN).read_text().replace("../compositions", str(REPO / "compositions"))
         + "overrides: {NOPE: {'*': 1.0}}\n"
     )
     pf = tmp_path / "pf.yaml"

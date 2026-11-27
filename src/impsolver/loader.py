@@ -43,9 +43,29 @@ def load_model[M: BaseModel](cls: type[M], path: str | Path) -> M:
         raise LoadError(f"{path}: {e}") from e
 
 
+DATA = Path(__file__).resolve().parent / "data"
+BUILTIN_RULES = DATA / "rules"
+BUILTIN_FIXTURES = DATA / "fixtures"
+
+
 def resolve(ref: str, relative_to: str | Path) -> Path:
     p = Path(ref)
     return p if p.is_absolute() else (Path(relative_to).parent / p)
+
+
+def builtin_rules(name: str) -> Path:
+    path = BUILTIN_RULES / f"{name}.yaml"
+    if not path.exists():
+        known = sorted(q.stem for q in BUILTIN_RULES.glob("*.yaml"))
+        raise LoadError(f"unknown built-in rule set {name!r}; known: {', '.join(known)}")
+    return path
+
+
+def resolve_rules(ref: str, relative_to: str | Path) -> Path:
+    """A rule-set reference is a built-in name (``us-federal``) or a path to a YAML file."""
+    if "/" not in ref and "\\" not in ref and Path(ref).suffix == "":
+        return builtin_rules(ref)
+    return resolve(ref, relative_to)
 
 
 def load_rules(path: str | Path) -> RuleSet:

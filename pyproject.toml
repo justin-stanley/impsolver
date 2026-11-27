@@ -1,22 +1,42 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "impsolver"
 version = "0.1.0"
-description = "Neutral vote-math solver for impeachment (House) and conviction (Senate)"
+description = "Neutral vote math for U.S. impeachment (House) and conviction (Senate)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Justin Stanley" }]
 requires-python = ">=3.12"
-dependencies = ["numpy", "pydantic>=2.6", "ruamel.yaml>=0.18", "pulp<3"]
+keywords = ["congress", "impeachment", "voting", "simulation", "political-science"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Sociology",
+    "Typing :: Typed",
+]
+dependencies = ["numpy>=1.26", "pydantic>=2.6", "ruamel.yaml>=0.18", "pulp>=2.8,<3"]
 
 [project.optional-dependencies]
-dev = ["pytest", "hypothesis", "ruff", "mypy"]
+dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.6", "mypy>=1.10"]
 
 [project.scripts]
 impsolver = "impsolver.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+impsolver = ["py.typed", "data/rules/*.yaml", "data/fixtures/*.yaml", "data/fixtures/members/*.yaml"]
 
 [tool.ruff]
 line-length = 100

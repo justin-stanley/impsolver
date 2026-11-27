@@ -5,14 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from .gates import evaluate_gate
-from .loader import load_fixture, load_rules
+from .loader import BUILTIN_FIXTURES, builtin_rules, load_fixture, load_rules
 from .model import Fixture, RuleSet
 from .paths import build_path
 from .results import BacktestCheck, BacktestReport
 
-REPO = Path(__file__).resolve().parents[2]
-DEFAULT_RULES = REPO / "rules" / "us-federal.yaml"
-DEFAULT_FIXTURES = REPO / "fixtures"
+DEFAULT_RULES = builtin_rules("us-federal")
+DEFAULT_FIXTURES = BUILTIN_FIXTURES
 
 
 def default_fixtures() -> list[Path]:

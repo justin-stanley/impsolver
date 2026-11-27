@@ -3,7 +3,7 @@
 schema_version: 1
 target: {name: Example Official, office: cabinet_secretary}
 articles: [I]
-rules: ../rules/us-federal.yaml
+rules: us-federal
 composition: ../compositions/us-119.yaml
 alignment: ../alignment/us-119.json
 alignment_weight: 1.0

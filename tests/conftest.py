@@ -10,7 +10,7 @@ from impsolver.model import Alignment, Composition, RuleSet, Scenario
 from impsolver.prepare import Prepared, prepare_objects
 
 REPO = Path(__file__).resolve().parents[1]
-RULES_PATH = REPO / "rules" / "us-federal.yaml"
+RULES_PATH = REPO / "src" / "impsolver" / "data" / "rules" / "us-federal.yaml"
 
 
 @pytest.fixture(scope="session")

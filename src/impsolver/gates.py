@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .model import Body, Stage
+from .model import Stage
 from .results import GateTally
 from .thresholds import has_quorum, membership_base, pro_wins, required_pro
 
@@ -39,8 +39,3 @@ def evaluate_gate(
         outcome=outcome,  # type: ignore[arg-type]
         short=max(0, need - pro),
     )
-
-
-def evaluate_gate_body(stage: Stage, body: Body, pro: int, con: int, present: int = 0) -> GateTally:
-    absent = body.sworn - pro - con - present
-    return evaluate_gate(stage, pro, con, present, absent, body.seats, body.vacancies)

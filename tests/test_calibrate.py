@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from impsolver.calibrate import calibrate
-from impsolver.loader import load_alignment, load_crossovers
+from impsolver.loader import BUILTIN_FIXTURES, load_alignment, load_crossovers
 from impsolver.model import Alignment, CrossoverFixture
 from tests import synth
 from tests.test_alignment import _alignment
@@ -41,7 +41,7 @@ def test_real_2021_crossovers() -> None:
     al = REPO / "alignment" / "us-116.json"
     if not al.exists():
         pytest.skip("alignment/us-116.json not generated (needs Voteview data)")
-    fx = load_crossovers(REPO / "fixtures" / "members" / "trump-2021-crossovers.yaml")
+    fx = load_crossovers(BUILTIN_FIXTURES / "members" / "trump-2021-crossovers.yaml")
     c = calibrate(fx, load_alignment(al), permutations=5000, seed=0)
     house, senate = (next(b for b in c.bodies if b.body == n) for n in ("house", "senate"))
     assert house.n_crossed == 8 and set(house.unmatched) == {"Peter Meijer", "David Valadao"}

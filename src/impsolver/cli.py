@@ -18,12 +18,14 @@ from .calibrate import calibrate
 from .deterministic import evaluate
 from .flips import ABSENCE_NOTE, FlipError, find_flips
 from .loader import (
+    BUILTIN_FIXTURES,
     LoadError,
     load_alignment,
     load_composition,
     load_crossovers,
     load_rules,
     load_scenario,
+    resolve_rules,
 )
 from .members import ResolutionError
 from .model import (
@@ -134,7 +136,7 @@ def prepare(path: str, composition: str | None = None) -> Prepared:
 
 def cmd_validate(a: argparse.Namespace) -> int:
     report: dict[str, str] = {}
-    rules = load_rules(a.rules)
+    rules = load_rules(resolve_rules(a.rules, Path.cwd() / "_"))
     report[a.rules] = f"rules ok: {len(rules.stages)} stages"
     if a.composition:
         c = load_composition(a.composition)
@@ -361,7 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
         return p
 
     p = add("validate", cmd_validate, help="validate rules, composition and scenario files")
-    p.add_argument("rules")
+    p.add_argument("rules", help="built-in rule set name (us-federal) or a YAML path")
     p.add_argument("composition", nargs="?")
     p.add_argument("scenario", nargs="?")
 
@@ -408,7 +410,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--html", metavar="OUT", help="also write a self-contained HTML planning page")
 
     p = add("calibrate", cmd_calibrate, help="check alignment against known crossovers")
-    p.add_argument("fixture")
+    p.add_argument(
+        "fixture",
+        nargs="?",
+        default=str(BUILTIN_FIXTURES / "members" / "trump-2021-crossovers.yaml"),
+        help="crossover fixture (default: the built-in 2021 crossovers)",
+    )
     p.add_argument("--alignment", required=True)
     p.add_argument("--min-votes", type=int, default=100)
     p.add_argument("--permutations", type=int, default=5000)

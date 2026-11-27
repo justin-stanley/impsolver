@@ -8,7 +8,14 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from .loader import load_alignment, load_composition, load_rules, load_scenario, resolve
+from .loader import (
+    load_alignment,
+    load_composition,
+    load_rules,
+    load_scenario,
+    resolve,
+    resolve_rules,
+)
 from .members import Resolver
 from .model import STAR, Alignment, Chamber, Composition, Member, RuleSet, Scenario
 from .priors import apply_defection_prior
@@ -91,16 +98,6 @@ class Prepared:
     def present_mask(self, chamber: Chamber) -> npt.NDArray[np.bool_]:
         return np.array([m.attendance == "present" for m in self.members(chamber)], dtype=bool)
 
-    def with_composition(self, comp: Composition) -> Prepared:
-        return Prepared(
-            self.rules,
-            comp,
-            self.scenario,
-            self.alignment,
-            self.source,
-            check_references(self.rules, comp, self.scenario),
-        )
-
 
 def prepare_objects(
     rules: RuleSet,
@@ -119,7 +116,7 @@ def prepare_objects(
 
 def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared:
     scen = load_scenario(path)
-    rules = load_rules(resolve(scen.rules, path))
+    rules = load_rules(resolve_rules(scen.rules, path))
     comp = load_composition(composition if composition else resolve(scen.composition, path))
     align = load_alignment(resolve(scen.alignment, path)) if scen.alignment else None
     return prepare_objects(rules, comp, scen, align, str(path))

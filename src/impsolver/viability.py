@@ -7,10 +7,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from pathlib import Path
 
 from .flips import find_flips
-from .prepare import Prepared, prepare
+from .prepare import Prepared
 from .results import ViabilityLabel, ViabilityRow
 from .simulate import p_complete
 
@@ -88,7 +87,3 @@ def assess(
         )
     )
     return rows
-
-
-def assess_paths(paths: list[str | Path], **kw: float) -> list[ViabilityRow]:
-    return assess([Case(str(p), prepare(p)) for p in paths], **kw)  # type: ignore[arg-type]
