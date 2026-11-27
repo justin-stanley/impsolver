@@ -371,8 +371,8 @@ class Portfolio(Strict):
     p_floor: Prob = 0.05
     top: int = Field(default=3, ge=1)
     draws: int = Field(default=5000, ge=100)
-    beam: int = Field(default=256, ge=1)
-    exact_limit: int = Field(default=16, ge=1)
+    beam: int = Field(default=4096, ge=1)
+    exact_limit: int = Field(default=10, ge=1)
     seed: int = 0
     calendar: Calendar = Calendar()
     candidates: list[PortfolioCandidate]

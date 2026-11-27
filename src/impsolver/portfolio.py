@@ -205,39 +205,87 @@ class Plan:
     state: LaneState
 
 
-def _dominates(a: Plan, b: Plan) -> bool:
+def _dominates(a: Plan, b: Plan, watched: frozenset[str]) -> bool:
+    """True if ``a`` is at least as good as ``b`` for every possible continuation.
+
+    Both plans cover the same subset, so future value depends only on when the House lanes and the
+    Senate free up, and on the trial ends that a still-unscheduled candidate's ``after`` can read
+    (``watched``). Other trial ends cannot affect anything that follows.
+    """
     if a.value < b.value - 1e-12 or a.state.senate_free > b.state.senate_free:
         return False
     if any(x > y for x, y in zip(a.state.house_free, b.state.house_free, strict=True)):
         return False
+    if not watched:
+        return True
     ea, eb = dict(a.state.trial_end), dict(b.state.trial_end)
-    return all(ea[k] <= eb[k] for k in ea)
+    return all(ea[k] <= eb[k] for k in watched if k in ea)
+
+
+def _watched(ctx: Ctx, subset: frozenset[str]) -> frozenset[str]:
+    """Scheduled candidates whose trial end some unscheduled candidate depends on."""
+    out: set[str] = set()
+    for cid in ctx.eligible:
+        if cid not in subset:
+            out.update(d for d in ctx.cands[cid].after if d in subset)
+    return frozenset(out)
+
+
+def _p_max(ctx: Ctx, cid: str, attempt: int) -> float:
+    """Highest fatigued P this candidate can still reach from attempt number ``attempt`` on."""
+    last = max(attempt, len(ctx.eligible) - 1)
+    return max(_fatigued(ctx.p0[cid], ctx.delta, attempt), _fatigued(ctx.p0[cid], ctx.delta, last))
+
+
+def _kth_best(found: list[Plan], k: int) -> float:
+    vals = sorted({round(p.value, 12) for p in found}, reverse=True)
+    return vals[k - 1] if len(vals) >= k else -math.inf
 
 
 def search(ctx: Ctx, exhaustive: bool = False) -> list[Plan]:
-    """Every reachable plan (exhaustive) or the non-dominated ones; best first."""
+    """Every reachable plan (exhaustive) or the non-dominated ones; best first.
+
+    Every partial plan is itself a valid plan, so the k-th best value seen so far is a lower
+    bound on what the reported top plans will be worth. A plan is not extended when its value plus
+    an optimistic bound on what could still be added cannot reach that (branch and bound).
+    """
     root = Plan((), (), 0.0, initial_state(ctx))
     frontier = [root]
     found: list[Plan] = [root]
     use_beam = not exhaustive and len(ctx.eligible) > ctx.pf.exact_limit
+    k = max(1, ctx.pf.top)
     while frontier:
         nxt: list[Plan] = []
+        thresh = -math.inf if exhaustive else _kth_best(found, k)
         for pl in frontier:
+            children: list[Plan] = []
+            bound = 0.0
             for cid in ctx.eligible:
                 if cid in pl.order or any(excluded_pair(ctx, cid, o) for o in pl.order):
                     continue
                 got = place(ctx, cid, pl.state, len(pl.order))
                 if got is None:
+                    # A candidate that misses its deadline now never fits later; one waiting on
+                    # an unscheduled dependency might, so count it optimistically.
+                    if any(d not in pl.order for d in ctx.cands[cid].after):
+                        bound += ctx.cands[cid].weight * _p_max(ctx, cid, len(pl.order))
                     continue
                 slot, st = got
-                nxt.append(
+                bound += slot.weight * _p_max(ctx, cid, len(pl.order))
+                children.append(
                     Plan(pl.order + (cid,), pl.slots + (slot,), pl.value + slot.weight * slot.p, st)
                 )
+            if not exhaustive and pl.value + bound < thresh - 1e-12:
+                continue
+            nxt += children
         if not exhaustive:
             groups: dict[frozenset[str], list[Plan]] = {}
+            watch: dict[frozenset[str], frozenset[str]] = {}
             for pl in sorted(nxt, key=lambda p: -p.value):
-                g = groups.setdefault(frozenset(pl.order), [])
-                if not any(_dominates(o, pl) for o in g):
+                key = frozenset(pl.order)
+                g = groups.setdefault(key, [])
+                w = watch.setdefault(key, _watched(ctx, key))
+                if not any(_dominates(o, pl, w) for o in g):
                     g.append(pl)
             nxt = [p for g in groups.values() for p in g]
             if use_beam:

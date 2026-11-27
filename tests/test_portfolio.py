@@ -108,22 +108,83 @@ def test_sensitivity_rows() -> None:
     assert len(r.sensitivity) == 6 and not r.fragile
 
 
-cand = st.builds(
-    lambda p, h, s: (p, h, s), st.floats(0.06, 0.99), st.integers(5, 60), st.integers(5, 40)
-)
-
-
-@settings(max_examples=30, deadline=None)
-@given(st.lists(cand, min_size=1, max_size=4), st.integers(1, 2), st.sampled_from([0.0, 0.3]))
-def test_pruned_equals_exhaustive(cs: list[tuple[float, int, int]], k: int, delta: float) -> None:
-    p = pf(
-        [c(f"c{i}", pp, h, s) for i, (pp, h, s) in enumerate(cs)],
+@st.composite
+def portfolios(draw: st.DrawFn) -> Portfolio:
+    """Random portfolios with dependencies, exclusions, release dates and deadlines."""
+    n = draw(st.integers(1, 6))
+    cands = []
+    for i in range(n):
+        kw: dict[str, Any] = {}
+        earlier = [f"c{j}" for j in range(i)]
+        if earlier and draw(st.booleans()):
+            kw["after"] = [draw(st.sampled_from(earlier))]
+        if earlier and draw(st.integers(0, 3)) == 0:
+            kw["excludes"] = [draw(st.sampled_from(earlier))]
+        if draw(st.integers(0, 2)) == 0:
+            kw["release"] = (
+                D(2027, 1, 4) + dt.timedelta(days=draw(st.integers(0, 120)))
+            ).isoformat()
+        if draw(st.integers(0, 2)) == 0:
+            kw["deadline"] = (
+                D(2027, 3, 1) + dt.timedelta(days=draw(st.integers(0, 200)))
+            ).isoformat()
+        if draw(st.integers(0, 3)) == 0:
+            kw["weight"] = draw(st.sampled_from([0.5, 2.0]))
+        cands.append(
+            c(
+                f"c{i}",
+                draw(st.floats(0.06, 0.99)),
+                h=draw(st.integers(5, 60)),
+                s=draw(st.integers(5, 40)),
+                **kw,
+            )
+        )
+    return pf(
+        cands,
         deadline="2027-09-30",
-        house_concurrency=k,
-        fatigue_delta=delta,
+        house_concurrency=draw(st.integers(1, 2)),
+        fatigue_delta=draw(st.sampled_from([0.0, 0.3, -0.2])),
     )
+
+
+@settings(max_examples=60, deadline=None)
+@given(portfolios())
+def test_pruned_equals_exhaustive(p: Portfolio) -> None:
     ctx, _ = make_ctx(p, {x.id: x.p or 0 for x in p.candidates})
     a = search(ctx)[0]
     b = search(ctx, exhaustive=True)[0]
     assert abs(a.value - b.value) < 1e-9
     assert abs(schedule_order(ctx, a.order).value - a.value) < 1e-9
+
+
+def _random_pf(n: int, seed: int, **kw: Any) -> Portfolio:
+    import numpy as np
+
+    rr = np.random.default_rng(seed)
+    cands = [
+        c(
+            f"c{i}",
+            float(rr.uniform(0.1, 0.9)),
+            h=int(rr.integers(10, 60)),
+            s=int(rr.integers(5, 30)),
+        )
+        for i in range(n)
+    ]
+    return pf(cands, fatigue_delta=0.1, **kw)
+
+
+def test_beam_matches_exact_on_ten_candidates() -> None:
+    exact = _random_pf(10, 105, deadline="2027-07-30")
+    beam = _random_pf(10, 105, deadline="2027-07-30", exact_limit=1)
+    a = search(make_ctx(exact, {x.id: x.p or 0 for x in exact.candidates})[0])[0]
+    b = search(make_ctx(beam, {x.id: x.p or 0 for x in beam.candidates})[0])[0]
+    assert abs(a.value - b.value) < 1e-9
+
+
+def test_sixteen_candidates_finish_quickly() -> None:
+    import time
+
+    p = _random_pf(16, 16, deadline="2028-12-15")
+    t = time.time()
+    plans = search(make_ctx(p, {x.id: x.p or 0 for x in p.candidates})[0])
+    assert time.time() - t < 30 and plans[0].order
