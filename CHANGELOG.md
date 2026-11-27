@@ -7,6 +7,11 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- The Floor time tab of the `portfolio --html` page draws each plan by resource: a lane calendar
+  with a row per House lane, a row for cases waiting for the Senate floor, the Senate committee
+  and the single Senate floor, with idle gaps, per-chamber recess bands and a whole-window view
+  to the deadline. It adds a session-day budget, the rule behind each case's dates, and the
+  numbers behind each left-out case. It replaces the one-row-per-case timeline. No result changes.
 - The `portfolio --html` page has four tabs (Votes, Floor time, Outcomes, What moves it) that work
   with the keyboard, keep the selected tab, case and gate in the URL fragment, and print as
   stacked sections. The new Votes tab replaces the gate chips and the pivot tables: per case a
