@@ -236,6 +236,13 @@
       "title": "National Swing",
       "type": "boolean"
     },
+    "gate_correlation": {
+      "default": 1.0,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Gate Correlation",
+      "type": "number"
+    },
     "senate_tie_break": {
       "default": "none",
       "enum": [

@@ -26,9 +26,24 @@ otherwise **contested**.
 u = √ρ · z_b + √(1 − ρ) · e_i, and the member is PRO when u < Φ⁻¹(p).
 
 z_b is a bloc-wide swing and e_i is individual noise. Every marginal probability is preserved;
-ρ (default 0.6) controls how much a bloc moves together. The same draw is reused at every gate in
-a chamber, so a member who is unusually favourable at H1 is also favourable at H2. With
-`national_swing: true` the House and Senate share one swing per bloc.
+ρ (default 0.6) controls how much a bloc moves together. By default the same draw is reused at
+every gate in a chamber, so a member who is unusually favourable at H1 is also favourable at H2.
+With `national_swing: true` the House and Senate share one swing per bloc.
+
+### Gate correlation
+
+`gate_correlation` (c, between 0 and 1, default 1) loosens the link between gates in the same
+chamber. For each gate after the first, every part of the draw (the bloc swing z_b, the
+co-defection factor weights if an alignment file is used, and the individual noise e_i) becomes
+
+x_g = √c · x_(g−1) + √(1 − c) · x′, with x′ a fresh standard normal.
+
+Each part stays standard normal, so every member's probability at every gate is unchanged; only
+the joint behaviour across gates moves. At c = 1 the draw is reused exactly as before. At c = 0 the
+gates are independent given the probabilities: an unusually favourable H1 says nothing about H2.
+Lower values usually make a full path harder to complete, because each gate is a separate chance
+to fall short. With `national_swing`, the first gate in each chamber uses the shared swing and
+later gates mix in their own fresh swing, so c < 1 also weakens the House–Senate link.
 
 ### Co-defection loadings
 

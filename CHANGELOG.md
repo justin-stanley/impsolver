@@ -7,6 +7,7 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- Scenario option `gate_correlation` (0 to 1, default 1) sets how much each member's Monte Carlo draw carries from one gate to the next in a chamber; marginals are preserved and default results do not change.
 
 ### Changed
 

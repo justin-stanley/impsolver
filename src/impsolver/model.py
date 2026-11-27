@@ -224,6 +224,9 @@ class Scenario(Strict):
     }
     # Draw one party swing per bloc shared by both chambers, instead of one per chamber.
     national_swing: bool = False
+    # Correlation of each member's latent draw between consecutive gates in a chamber. 1 reuses one
+    # draw at every gate (the original design); 0 makes gates independent given the probabilities.
+    gate_correlation: float = Field(default=1.0, ge=0.0, le=1.0)
     # How an exact tie on a Senate majority vote (S1, S3) is resolved. "none" keeps the plain
     # rule (a tie defeats the motion). Whether and how a presiding officer may break such a tie in
     # an impeachment trial is not settled, so this is the user's assumption to state.

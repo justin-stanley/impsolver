@@ -28,7 +28,7 @@ In the Senate they were not, so Senate alignment is off by default.
 | --- | --- | --- |
 | Bloc correlation ρ | 0.6 | Higher ρ widens the spread of outcomes |
 | Shared swing across chambers | off | On makes House and Senate outcomes move together |
-| Same draw at every gate in a chamber | always | H1 adds little risk once H2 is modelled |
+| Gate correlation (`gate_correlation`) | 1 (same draw at every gate in a chamber) | At 1, H1 adds little risk once H2 is modelled; lower values treat each gate as a fresh chance to fall short |
 | Senate tie-break | none | Changes S1 and S3 when the Senate splits evenly |
 | Senate alignment weight | 0 | On applies loadings that showed no validation signal |
 | Attendance | fixed by roster | Nobody is randomly absent |
