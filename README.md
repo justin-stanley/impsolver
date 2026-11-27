@@ -9,9 +9,10 @@
 <!-- DOI badge: added after the Zenodo integration mints the first DOI -->
 
 **Counts the votes needed to impeach and remove a U.S. official, and estimates the odds of getting
-them. You name the official; impsolver names no one.**
+them.**
 
-For each case you supply, impsolver reports:
+You describe a case: the official, the chamber rosters, and each member's probability of voting
+for it. impsolver reports:
 
 - the votes each of the 5 House and Senate gates requires, given who is present;
 - which gate decides the case, and how many members short it is;

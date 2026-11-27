@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use impsolver, please cite it and the Voteview data it builds on."
-title: "impsolver: neutral vote math for U.S. impeachment and conviction"
+title: "impsolver: vote math for U.S. impeachment and removal"
 type: software
 authors:
   - family-names: Stanley

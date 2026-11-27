@@ -1,9 +1,8 @@
 # impsolver: functional spec
 
-impsolver is a neutral vote-math tool for U.S. federal impeachment (House) and removal (Senate).
-The user supplies the targets, the chamber composition and per-member probabilities. The tool
-works out what the rules require and how close each user-supplied case is. It never nominates
-targets.
+impsolver does the vote math for U.S. federal impeachment (House) and removal (Senate). The user
+describes each case: the official, the chamber composition and per-member probabilities. The tool
+works out what the rules require and how close each case is.
 
 ## What it answers
 - **evaluate**: bounds per gate from cutoff classification (PASS, FAIL or CONTESTED), the binding

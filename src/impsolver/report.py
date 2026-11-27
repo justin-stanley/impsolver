@@ -18,7 +18,6 @@ from .model import Portfolio
 from .portfolio import PlanOut, PortfolioResult, Slot, TreeNode, excluded_reason_text
 
 OPTIONAL_GATES = {"S3"}
-NEUTRALITY = "Plans cover only the candidates you supplied. impsolver does not nominate targets."
 GATE_LABELS = {
     "H1": "House: motion to table fails",
     "H2": "House: article adopted",
@@ -394,7 +393,7 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(title)}</title><style>{CSS}</style></head><body><main>
 <h1>{e(title)}</h1>
-<p class="sub">{e(NEUTRALITY)} Window {pf.start} to {pf.deadline}; {pf.house_concurrency} House
+<p class="sub">Window {pf.start} to {pf.deadline}; {pf.house_concurrency} House
 lane(s), one Senate trial at a time.</p>
 <div class="kpis">
 <div class="kpi"><b>{rec_value:.2f}</b><span>expected removals, recommended plan</span></div>
