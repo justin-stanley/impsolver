@@ -8,10 +8,11 @@ All notable changes are listed here. The format follows
 
 ### Added
 - Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
-  Claiborne, Hastings, Nixon and Porteous, with their disqualification votes; the backtest now
-  scores completion per case, so a conviction on any article completes it.
+  Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
 
 ### Changed
+- `backtest` scores completion per case (a conviction on any article completes it) instead of per
+  article, adds a case-level line to `path_checks`, and fails a fixture with no required-stage vote.
 
 ### Fixed
 
@@ -20,9 +21,6 @@ All notable changes are listed here. The format follows
 First public release.
 
 ### Added
-- Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
-  Claiborne, Hastings, Nixon and Porteous, with their disqualification votes; the backtest now
-  scores completion per case, so a conviction on any article completes it.
 - Gate math for U.S. federal impeachment and removal (H1, H2, S1, S2, S3), paths A and B, quorum.
 - `evaluate`, `flips` (exact ILP by default, greedy optional), `simulate` (Gaussian copula with
   optional co-defection loadings), `viability`, `compare`, `backtest`, `calibrate`, `validate`,

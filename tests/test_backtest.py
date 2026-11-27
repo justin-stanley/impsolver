@@ -37,7 +37,7 @@ def test_judicial_and_earlier_trials() -> None:
     # Disqualification votes (S3): Archbald and Porteous carried, Ritter failed 0-76.
     assert got[("archbald-1913", "S3", "judgment")][0] == "PASS"
     assert got[("porteous-2010", "S3", "judgment")][0] == "PASS"
-    assert got[("ritter-1936", "S3", "VII")][0] == "FAIL"
+    assert got[("ritter-1936", "S3", "judgment")][0] == "FAIL"
     for case in ["porteous-2010", "nixon-1989", "hastings-1989", "claiborne-1986", "ritter-1936"]:
         assert f"{case}: completed" in rep.path_checks
     assert "archbald-1913: completed" in rep.path_checks
@@ -99,6 +99,17 @@ expected_ends_at: S2
     rep = run_backtest([_write(tmp_path, votes)])
     assert rep.ok
     assert rep.path_checks == ["mixed article I: path B ended at S2", "mixed: ended at S2"]
+
+
+def test_fixture_with_only_optional_stage_votes_fails(tmp_path: Path) -> None:
+    votes = """votes:
+  - {stage: S3, article: judgment, yea: 60, nay: 40, expected: PASS}
+expected_complete: false
+"""
+    rep = run_backtest([_write(tmp_path, votes)])
+    assert not rep.ok
+    assert [c.ok for c in rep.checks] == [True]
+    assert rep.path_checks == ["mixed: no vote on a required stage of path B"]
 
 
 def test_mismatch_exits_nonzero(tmp_path: Path) -> None:

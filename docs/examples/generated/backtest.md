@@ -66,7 +66,7 @@ OK       ritter-1936    S2 art IV   36-48      expected FAIL  got FAIL  short 20
 OK       ritter-1936    S2 art V    36-48      expected FAIL  got FAIL  short 20
 OK       ritter-1936    S2 art VI   46-37      expected FAIL  got FAIL  short 10
 OK       ritter-1936    S2 art VII  56-28      expected PASS  got PASS  short 0
-OK       ritter-1936    S3 art VII  0-76       expected FAIL  got FAIL  short 39
+OK       ritter-1936    S3 art judgment 0-76       expected FAIL  got FAIL  short 39
 OK       swayne-1905    S2 art I    33-49      expected FAIL  got FAIL  short 22
 OK       swayne-1905    S2 art II   32-50      expected FAIL  got FAIL  short 23
 OK       swayne-1905    S2 art III  32-50      expected FAIL  got FAIL  short 23

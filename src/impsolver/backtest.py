@@ -66,8 +66,10 @@ def check_fixture(fx: Fixture, rules: RuleSet) -> tuple[list[BacktestCheck], lis
     case_ends: str | None = None
     if not complete and ends:
         case_ends = max(ends.values(), key=lambda s: required.index(s or required[-1]))
-    case_ok = complete == fx.expected_complete and (
-        fx.expected_ends_at is None or case_ends == fx.expected_ends_at
+    # A fixture with no vote on a required stage has no case outcome to check.
+    case_ok = bool(ends) and (
+        complete == fx.expected_complete
+        and (fx.expected_ends_at is None or case_ends == fx.expected_ends_at)
     )
     all_ok = all(c.ok for c in checks) and case_ok
     for article, ends_at in ends.items():
@@ -75,6 +77,9 @@ def check_fixture(fx: Fixture, rules: RuleSet) -> tuple[list[BacktestCheck], lis
             f"{fx.case} article {article}: path {fx.path} "
             + ("completed" if ends_at is None else f"ended at {ends_at}")
         )
+    if not ends:
+        notes.append(f"{fx.case}: no vote on a required stage of path {fx.path}")
+        return checks, notes, False
     notes.append(
         f"{fx.case}: "
         + ("completed" if complete else f"ended at {case_ends}")

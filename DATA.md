@@ -51,4 +51,5 @@ The backtest fixtures in `src/impsolver/data/fixtures/` record public roll-call 
 fixture lists the House Clerk (<https://clerk.house.gov/Votes>) and U.S. Senate
 (<https://www.senate.gov/legislative/votes_new.htm>) pages it was checked against, and the date of
 that check. Trials before 1989 cite the senate.gov impeachment case pages or the House precedents
-(Hinds', Cannon's and Deschler's) published on <https://www.govinfo.gov>. These records are works of the U.S. government.
+(Hinds', Cannon's and Deschler's) published on <https://www.govinfo.gov>. These records are works
+of the U.S. government.

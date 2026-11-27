@@ -56,7 +56,8 @@ any one article removes the official, so `expected_complete` is a case-level out
 completes when at least one article passes S2. A case that did not complete ends at the furthest
 stage any article reached, and `expected_ends_at` names that stage. Votes on optional stages (S3)
 are checked but do not change where a case ends; an S3 vote taken on the judgment as a whole uses
-the label `judgment` rather than an article number.
+the label `judgment` rather than an article number. A fixture with no vote on any required stage
+has no case outcome and fails the backtest.
 
 ## Scenario resolution
 p_pro resolves in this order: override, member stage value, member `*`, party stage, party `*`.

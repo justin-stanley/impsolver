@@ -29,6 +29,6 @@ votes:
   - {stage: S2, article: VI, yea: 46, nay: 37, not_voting: 13, expected: FAIL, expected_short: 10}
   - {stage: S2, article: VII, yea: 56, nay: 28, not_voting: 12, expected: PASS,
      note: "56 of 84 is exactly two-thirds"}
-  - {stage: S3, article: VII, yea: 0, nay: 76, not_voting: 20, expected: FAIL,
+  - {stage: S3, article: judgment, yea: 0, nay: 76, not_voting: 20, expected: FAIL,
      note: "disqualification order, majority required"}
 expected_complete: true
