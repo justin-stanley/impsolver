@@ -9,6 +9,9 @@ All notable changes are listed here. The format follows
 ### Added
 
 ### Changed
+- `portfolio`: a candidate without `article` now counts removal on any article, P0 = P(at least one
+  article completes) from one simulation with shared draws across articles, also in the joint
+  removals distribution; default numbers change only for scenarios with more than one article.
 
 ### Fixed
 

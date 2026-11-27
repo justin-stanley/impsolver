@@ -1,7 +1,7 @@
 # Design reference
 
 Detailed formulas and defaults behind `docs/technical-design.md`. Where the two differ, the
-"Changes after the 2026-11-27 audit" section of the technical design wins.
+"Changes since the original design" section of the technical design wins.
 
 ## Alignment JSON
 Alignment{schema_version 1, encoding: Literal["unsigned_breaks"] (reject files without it), source,
@@ -63,6 +63,9 @@ Candidate{id, scenario|p (exactly one), article, house_days>=1, senate_days>=1, 
 weight=1 (>0), after, excludes, senate_committee, committee_floor_days=2,
 succession[{on_removal_of, becomes|null}], variant_of}
 ChamberCalendar{weekdays [0..4], recess [(d1,d2)]}; Calendar{house, senate, trial_saturdays=true}
+With `article` unset, P_i = P(any article completes) from one simulation with common random numbers
+across articles; gate paths are shown for the likeliest article. With `article` set, P_i is that
+article's P(complete).
 Senate trials one at a time; the House has k lanes; conservative time accounting.
 Objective E[removals] = sum w_i*P_i over candidates finished by their deadline.
 BFS over ordered subsets with dominance pruning (same subset, value no lower, times no later). Exact up

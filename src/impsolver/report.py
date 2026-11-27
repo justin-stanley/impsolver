@@ -259,9 +259,16 @@ def gate_paths(res: PortfolioResult, pf: Portfolio) -> str:
             if optional
             else ""
         )
+        p_rm = res.p0.get(c.id, sim.p_complete)
+        art_note = (
+            f"article {e(sim.article)}"
+            if abs(p_rm - sim.p_complete) < 1e-12
+            else f"gates for article {e(sim.article)} ({_pct(sim.p_complete)} alone), "
+            "the likeliest; removal on any article"
+        )
         out.append(
-            f"<tr><td>{e(_label(res, c.id))}<br><span class=note>path {e(sim.path)}, article "
-            f"{e(sim.article)}<br>P(removal) {_pct(sim.p_complete)}</span></td><td>"
+            f"<tr><td>{e(_label(res, c.id))}<br><span class=note>path {e(sim.path)}, "
+            f"{art_note}<br>P(removal) {_pct(p_rm)}</span></td><td>"
             f'<div class="path">{"<span class=arrow>→</span>".join(chips)}</div>{extra}</td></tr>'
         )
     if not out:

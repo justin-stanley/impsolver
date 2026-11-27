@@ -66,7 +66,7 @@ bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed)
 ## Alignment, defection prior, calibration, viability, portfolio
 See `docs/design-reference.md` and the module docstrings in `src/impsolver/`.
 
-## Changes after the 2026-11-27 audit
+## Changes since the original design
 These change behavior relative to the original design.
 - `alignment_chamber_weight` (default `{house: 1, senate: 0}`) multiplies `alignment_weight` for each
   chamber. The Senate defaults to 0 because the 2021 calibration found no Senate co-defection
@@ -81,6 +81,10 @@ These change behavior relative to the original design.
 - Succession is causal. Branches after a trigger differ only in work that starts after its verdict.
   A cancelled dependent whose House work had begun keeps its lane through its House phase, and a
   variant (for example a successor in the office) needs fresh House time from the day after the verdict.
+- A portfolio candidate without `article` is removed if any article convicts: P0 is P(at least one
+  article completes) from one simulation in which all articles share the party swings and member
+  draws, and the joint removals distribution uses the same rule. Before, P0 was the first article's
+  P(complete). Only scenarios with more than one article change.
 - Portfolio search: exact up to `exact_limit` = 10 eligible candidates, beam of 4096 above that.
 - `flips` uses the ILP by default (`--greedy` for the heuristic).
 - Unknown stage keys and shift articles are errors. Unknown member ids and blocs are warnings, and
