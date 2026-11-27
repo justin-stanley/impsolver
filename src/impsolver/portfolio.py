@@ -138,10 +138,12 @@ class Ctx:
         return own if self.pf.trial_carryover else min(own, self.pf.deadline)
 
 
-def place(ctx: Ctx, cid: str, st: LaneState, attempt: int) -> tuple[Slot, LaneState] | None:
-    """Schedule candidate ``cid`` after everything in ``st``; None if it misses its deadline."""
+def place_house(
+    ctx: Ctx, cid: str, st: LaneState, not_before: dt.date | None = None
+) -> tuple[dt.date, dt.date, tuple[dt.date, ...]] | None:
+    """House phase only: (start, end, new sorted lane free dates), or None if it cannot fit."""
     c = ctx.cands[cid]
-    earliest = max(ctx.pf.start, c.release or ctx.pf.start)
+    earliest = max(ctx.pf.start, c.release or ctx.pf.start, not_before or ctx.pf.start)
     for dep in c.after:
         end = st.end_of(dep)
         if end is None:
@@ -154,6 +156,22 @@ def place(ctx: Ctx, cid: str, st: LaneState, attempt: int) -> tuple[Slot, LaneSt
     if h_end >= FAR or h_end > ctx.pf.deadline:
         return None
     lanes[lane] = h_end + dt.timedelta(days=1)
+    return h_start, h_end, tuple(sorted(lanes))
+
+
+def place(
+    ctx: Ctx, cid: str, st: LaneState, attempt: int, not_before: dt.date | None = None
+) -> tuple[Slot, LaneState] | None:
+    """Schedule candidate ``cid`` after everything in ``st``; None if it misses its deadline.
+
+    ``not_before`` is the earliest day its House work may start (used when a plan is revised
+    after a verdict).
+    """
+    c = ctx.cands[cid]
+    house = place_house(ctx, cid, st, not_before)
+    if house is None:
+        return None
+    h_start, h_end, lanes = house
     ready = h_end + dt.timedelta(days=1)
     if c.senate_committee:
         com_end = ctx.cals.senate.nth_from(ready, ctx.days(c.senate_days))
@@ -180,9 +198,7 @@ def place(ctx: Ctx, cid: str, st: LaneState, attempt: int) -> tuple[Slot, LaneSt
         weight=c.weight,
         attempt=attempt,
     )
-    new = LaneState(
-        tuple(sorted(lanes)), t_end + dt.timedelta(days=1), st.trial_end + ((cid, t_end),)
-    )
+    new = LaneState(lanes, t_end + dt.timedelta(days=1), st.trial_end + ((cid, t_end),))
     return slot, new
 
 
@@ -323,15 +339,24 @@ def schedule_order(ctx: Ctx, order: tuple[str, ...]) -> Plan:
 
 
 class TreeNode(BaseModel):
+    """One segment of a plan. ``tried`` lists the candidates whose trials run in it.
+
+    A node whose ``at`` names a trigger branches after that trigger's verdict; ``(end)`` is a leaf.
+    """
+
     at: str
     p_removed: float
     removed: TreeNode | None = None
     not_removed: TreeNode | None = None
     value: float
     schedule: list[str]
+    tried: list[str] = []
+    tried_p: list[float] = []
+    verdict: dt.date | None = None
 
 
 def _dependents(ctx: Ctx, trigger: str, rest: list[str]) -> dict[str, str | None]:
+    """Later candidates whose case changes if ``trigger`` (or its base case) is removed."""
     base = ctx.cands[trigger].variant_of or trigger
     out: dict[str, str | None] = {}
     for cid in rest:
@@ -341,48 +366,120 @@ def _dependents(ctx: Ctx, trigger: str, rest: list[str]) -> dict[str, str | None
     return out
 
 
-def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNode | None]:
-    """Expected value of a fixed order when removals at trigger trials change later candidates."""
+@dataclass(frozen=True)
+class _Item:
+    cid: str
+    not_before: dt.date | None = None
+    sunk: bool = False  # House work already begun for a case that no longer exists
+
+
+def _later(a: dt.date | None, b: dt.date | None) -> dt.date | None:
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return max(a, b)
+
+
+def _preview_starts(
+    ctx: Ctx, items: list[_Item], st: LaneState, attempt: int, done: list[str]
+) -> dict[str, dt.date]:
+    """House start dates if ``items`` ran with no further branching."""
+    out: dict[str, dt.date] = {}
+    for it in items:
+        if it.sunk or any(excluded_pair(ctx, it.cid, o) for o in done):
+            continue
+        got = place(ctx, it.cid, st, attempt, it.not_before)
+        if got is None:
+            continue
+        slot, st = got
+        out[it.cid] = slot.house_start
+        done = done + [it.cid]
+        attempt += 1
+    return out
+
+
+def evaluate_branching(ctx: Ctx, order: tuple[str, ...]) -> tuple[float, TreeNode]:
+    """Expected value of a fixed order when a removal at a trigger's trial changes later cases.
+
+    The plan is causal: the branches after a trigger may differ only in work that starts after
+    the trigger's verdict. House work already begun on a dependent is kept as it was; if that
+    dependent is cancelled, its House lane stays used through the end of its House phase. A
+    variant (for example a successor now holding the office) needs fresh House time, starting the
+    day after the verdict. Everything else that has not started is re-planned from that day.
+    """
 
     def run(
-        rest: list[str], st: LaneState, attempt: int, depth: int, done: list[str]
-    ) -> tuple[float, TreeNode | None, list[str]]:
+        items: list[_Item], st: LaneState, attempt: int, depth: int, done: list[str]
+    ) -> tuple[float, TreeNode]:
         value = 0.0
         sched: list[str] = []
-        while rest:
-            cid, rest = rest[0], rest[1:]
-            if any(excluded_pair(ctx, cid, o) for o in done):
+        tried: list[str] = []
+        tried_p: list[float] = []
+        while items:
+            it, items = items[0], items[1:]
+            if it.sunk:
+                house = place_house(ctx, it.cid, st, it.not_before)
+                if house is not None:
+                    h_start, h_end, lanes = house
+                    st = LaneState(lanes, st.senate_free, st.trial_end)
+                    sched.append(f"{it.cid} House {h_start}..{h_end} (cancelled, time lost)")
                 continue
-            got = place(ctx, cid, st, attempt)
+            if any(excluded_pair(ctx, it.cid, o) for o in done):
+                continue
+            got = place(ctx, it.cid, st, attempt, it.not_before)
             if got is None:
                 continue
             slot, st = got
-            done = done + [cid]
+            done = done + [it.cid]
+            tried.append(it.cid)
+            tried_p.append(slot.p)
             value += slot.weight * slot.p
-            sched.append(f"{cid} trial {slot.trial_start}..{slot.trial_end} p={slot.p:.3f}")
+            sched.append(
+                f"{it.cid} House {slot.house_start}..{slot.house_end}, "
+                f"trial {slot.trial_start}..{slot.trial_end} p={slot.p:.3f}"
+            )
             attempt += 1
-            deps = _dependents(ctx, cid, rest)
-            if deps and depth < MAX_BRANCH_TRIGGERS:
-                removed_rest: list[str] = []
-                for r in rest:
-                    repl = deps[r] if r in deps else r
+            deps = _dependents(ctx, it.cid, [x.cid for x in items if not x.sunk])
+            if not deps or depth >= MAX_BRANCH_TRIGGERS:
+                continue
+            verdict = slot.trial_end
+            after = verdict + dt.timedelta(days=1)
+            starts = _preview_starts(ctx, items, st, attempt, done)
+            removed: list[_Item] = []
+            for x in items:
+                committed = x.cid in starts and starts[x.cid] <= verdict
+                if x.sunk:
+                    removed.append(x)
+                elif x.cid in deps:
+                    if committed:
+                        removed.append(_Item(x.cid, x.not_before, sunk=True))
+                    repl = deps[x.cid]
                     if repl is not None:
-                        removed_rest.append(repl)
-                vr, tr, sr = run(removed_rest, st, attempt, depth + 1, done)
-                vk, tk, sk = run(rest, st, attempt, depth + 1, done)
-                node = TreeNode(
-                    at=cid,
-                    p_removed=slot.p,
-                    value=slot.p * vr + (1 - slot.p) * vk,
-                    removed=tr or TreeNode(at="(end)", p_removed=0, value=vr, schedule=sr),
-                    not_removed=tk or TreeNode(at="(end)", p_removed=0, value=vk, schedule=sk),
-                    schedule=sched,
-                )
-                return value + node.value, node, sched
-        return value, None, sched
+                        removed.append(_Item(repl, _later(x.not_before, after)))
+                elif committed:
+                    removed.append(x)
+                else:
+                    removed.append(_Item(x.cid, _later(x.not_before, after)))
+            vr, tr = run(removed, st, attempt, depth + 1, done)
+            vk, tk = run(items, st, attempt, depth + 1, done)
+            node = TreeNode(
+                at=it.cid,
+                p_removed=slot.p,
+                value=slot.p * vr + (1 - slot.p) * vk,
+                removed=tr,
+                not_removed=tk,
+                schedule=sched,
+                tried=tried,
+                tried_p=tried_p,
+                verdict=verdict,
+            )
+            return value + node.value, node
+        return value, TreeNode(
+            at="(end)", p_removed=0.0, value=value, schedule=sched, tried=tried, tried_p=tried_p
+        )
 
-    v, tree, _ = run(list(order), initial_state(ctx), 0, 0, [])
-    return v, tree
+    return run([_Item(c) for c in order], initial_state(ctx), 0, 0, [])
 
 
 def has_succession(ctx: Ctx) -> bool:
@@ -602,31 +699,44 @@ def _match_shift(prep: Prepared, article: str | None, target: float, draws: int)
     return (lo + hi) / 2
 
 
+def _tree_nodes(node: TreeNode) -> list[TreeNode]:
+    out = [node]
+    for child in (node.removed, node.not_removed):
+        if child is not None:
+            out += _tree_nodes(child)
+    return out
+
+
 def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsDist:
+    """Distribution of the number of removals for a fixed order.
+
+    Each draw follows the same decision tree as ``evaluate_branching``: at a trigger the draw's own
+    outcome for that trial picks the branch, so succession is resolved per draw and with the same
+    timing and matching rules as the expected-value calculation.
+    """
     pf = loaded.pf
-    plan = schedule_order(ctx, order)
-    slots = {s.id: s for s in plan.slots}
-    involved: list[str] = list(plan.order)
-    for cid in plan.order:
-        for s in ctx.cands[cid].succession:
-            if s.becomes and s.becomes not in involved:
-                involved.append(s.becomes)
-    notes: list[str] = []
-
-    def attempt_of(cid: str) -> int:
-        if cid in slots:
-            return slots[cid].attempt
-        for c in plan.order:
-            if any(s.becomes == cid for s in ctx.cands[c].succession):
-                return slots[c].attempt
-        return 0
-
-    ps = {cid: _fatigued(ctx.p0[cid], ctx.delta, attempt_of(cid)) for cid in involved}
-    fixed = [c for c in involved if c not in loaded.preps]
-    if not any(c in loaded.preps for c in involved) and not any(
-        ctx.cands[c].succession for c in plan.order
-    ):
-        dist = poisson_binomial([ps[c] for c in plan.order])
+    _, tree = evaluate_branching(ctx, order)
+    nodes = _tree_nodes(tree)
+    keys: list[tuple[str, float]] = []
+    for nd in nodes:
+        for cid, p in zip(nd.tried, nd.tried_p, strict=True):
+            if (cid, p) not in keys:
+                keys.append((cid, p))
+    if not keys:
+        return RemovalsDist(
+            probabilities=[1.0],
+            mean=0.0,
+            sd=0.0,
+            independent_sd=0.0,
+            spread_ratio=1.0,
+            draws=0,
+            method="empty",
+            notes=[],
+        )
+    branches = len(nodes) > 1
+    fixed = sorted({cid for cid, _ in keys if cid not in loaded.preps})
+    if not branches and not any(cid in loaded.preps for cid, _ in keys):
+        dist = poisson_binomial(tree.tried_p)
         mean = sum(k * v for k, v in enumerate(dist))
         sd = math.sqrt(sum((k - mean) ** 2 * v for k, v in enumerate(dist)))
         return RemovalsDist(
@@ -642,40 +752,54 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
     draws = pf.draws
     rng = np.random.Generator(np.random.PCG64(pf.seed))
     shared: dict[tuple[str, str], np.ndarray] = {}
-    for cid in involved:
+    for cid, _ in keys:
         prep = loaded.preps.get(cid)
         if prep is None:
             continue
         for ch, body in prep.comp.bodies.items():
             for m in body.roster:
                 shared.setdefault((ch, m.bloc), rng.standard_normal(draws))
-    outcome: dict[str, np.ndarray] = {}
-    for i, cid in enumerate(involved):
+    outcome: dict[tuple[str, float], np.ndarray] = {}
+    for i, (cid, p) in enumerate(keys):
         prep = loaded.preps.get(cid)
         if prep is None:
-            outcome[cid] = rng.random(draws) < ps[cid]
+            outcome[(cid, p)] = rng.random(draws) < p
             continue
         art = ctx.cands[cid].article or prep.scenario.articles[0]
-        shift = _match_shift(prep, art, ps[cid], draws)
+        shift = _match_shift(prep, art, p, draws)
         path = path_for(prep.rules, prep.scenario, default_path(prep))
         raw = run_raw(prep, art, path, draws, pf.seed + 1000 + i, prep.scenario.rho, shift, shared)
-        outcome[cid] = raw.complete
+        outcome[(cid, p)] = raw.complete
+    counts = np.zeros(draws, dtype=int)
+
+    def walk(nd: TreeNode, mask: np.ndarray) -> None:
+        for cid, p in zip(nd.tried, nd.tried_p, strict=True):
+            counts[mask] += outcome[(cid, p)][mask]
+        if nd.removed is not None and nd.not_removed is not None:
+            hit = outcome[(nd.at, nd.tried_p[nd.tried.index(nd.at)])]
+            walk(nd.removed, mask & hit)
+            walk(nd.not_removed, mask & ~hit)
+
+    walk(tree, np.ones(draws, dtype=bool))
+    notes: list[str] = []
     if fixed:
         notes.append(f"fixed-p candidates drawn independently: {', '.join(fixed)}")
-    final = {cid: outcome[cid].copy() for cid in plan.order}
-    for j, cid in enumerate(plan.order):
-        for later in plan.order[j + 1 :]:
-            for s in ctx.cands[later].succession:
-                if s.on_removal_of == cid:
-                    repl = outcome[s.becomes] if s.becomes else np.zeros(draws, dtype=bool)
-                    final[later] = np.where(final[cid], repl, final[later])
-    counts = np.sum([final[c] for c in plan.order], axis=0).astype(int)
-    freq = np.bincount(counts, minlength=len(plan.order) + 1) / draws
+    notes.append("one shared party-swing stream across scenario candidates, plus member noise")
+    if branches:
+        notes.append("succession resolved per draw along the decision tree")
+    freq = np.bincount(counts, minlength=int(counts.max()) + 1) / draws
     mean = float(counts.mean())
     sd = float(counts.std())
-    marg = [float(final[c].mean()) for c in plan.order]
-    ind_sd = math.sqrt(sum(p * (1 - p) for p in marg))
-    notes.append("one shared party-swing stream across scenario candidates, plus member noise")
+    if branches:
+        # Which cases are tried depends on earlier outcomes, so there is no simple independent
+        # benchmark; report the joint spread against itself.
+        ind_sd = sd
+        notes.append("no independent benchmark with succession branches; spread_ratio is 1")
+    else:
+        qs = [
+            float(outcome[(cid, p)].mean()) for cid, p in zip(tree.tried, tree.tried_p, strict=True)
+        ]
+        ind_sd = math.sqrt(sum(q * (1 - q) for q in qs))
     return RemovalsDist(
         probabilities=[float(x) for x in freq],
         mean=mean,

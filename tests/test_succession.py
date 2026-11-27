@@ -51,3 +51,52 @@ def test_depth_cap() -> None:
         depth += 1
         tree = tree.not_removed
     assert depth == 3
+
+
+def test_branches_agree_on_work_started_before_the_verdict() -> None:
+    """Audit case: two House lanes, X is cancelled if T is removed, Y is unrelated."""
+    succ = [{"on_removal_of": "T", "becomes": None}]
+    p = pf(
+        [
+            c("T", 0.5, h=30, s=30),
+            c("X", 0.5, h=30, s=10, succession=succ),
+            c("Y", 0.5, h=30, s=10),
+        ],
+        deadline="2027-05-07",
+        house_concurrency=2,
+    )
+    _, tree = evaluate_branching(_ctx(p), ("T", "X", "Y"))
+    assert tree.at == "T" and tree.verdict is not None and tree.removed and tree.not_removed
+    verdict = tree.verdict.isoformat()
+
+    def house_starts(node: Any) -> dict[str, str]:
+        out = {}
+        for line in node.schedule:
+            cid, rest = line.split(" ", 1)
+            out[cid] = rest.split("House ")[1][:10]
+        return out
+
+    kept, gone = house_starts(tree.not_removed), house_starts(tree.removed)
+    for cid, start in kept.items():
+        if start <= verdict:
+            assert gone.get(cid) == start  # committed in both branches
+    for cid, start in gone.items():
+        if cid not in kept or kept[cid] != start:
+            assert start > verdict  # anything re-planned starts after the verdict
+    assert any("cancelled, time lost" in ln for ln in tree.removed.schedule)
+
+
+def test_variant_needs_fresh_house_time_after_verdict() -> None:
+    succ = [{"on_removal_of": "T", "becomes": "V"}]
+    p = pf(
+        [
+            c("T", 0.5, h=10, s=10),
+            c("X", 0.5, h=10, s=5, succession=succ),
+            c("V", 0.5, h=10, s=5, variant_of="X"),
+        ],
+        house_concurrency=2,
+    )
+    _, tree = evaluate_branching(_ctx(p), ("T", "X"))
+    assert tree.removed is not None and tree.verdict is not None
+    v_line = next(ln for ln in tree.removed.schedule if ln.startswith("V "))
+    assert v_line.split("House ")[1][:10] > tree.verdict.isoformat()
