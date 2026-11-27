@@ -86,8 +86,8 @@ and the [Senate party division](https://www.senate.gov/history/partydiv.htm).
 
 ## A roster for a new Congress from certified results
 
-Voteview lists a member only after they have been sworn in, so it cannot supply the roster of a
-new Congress before its first votes. `impsolver roster --from-results` builds one from certified
+Voteview reflects recorded votes, so it cannot supply the roster of a new Congress before that
+Congress votes. `impsolver roster --from-results` builds one from certified
 election results instead. The repository does not ship a 120th-Congress roster: build it yourself
 once the results are certified, and check it against official sources before you use it.
 
@@ -121,9 +121,10 @@ to a previous member of the same chamber and state with the same surname. The ma
 in the member's `notes` and in the file header. If two previous members share that surname, the
 member is not matched; it gets a placeholder and a flag. Previous senators whose seats were not
 up can be carried over with `--senate-holdovers`. A state keeps as many holdovers as it has seats
-not listed in the results. When a state has more candidates than open seats, the command stops:
-`--vacate ID` names a previous senator who does not hold over (retired, resigned or defeated
-elsewhere), or the CSV can list the seat itself.
+not listed in the results. A composition does not record Senate classes, so when a state has
+more candidates than open seats (any state where the senator whose seat was up retired, resigned
+or was defeated) the command stops and names them. Pass `--vacate ID` for each previous senator
+who does not hold over, or list the seat in the CSV. Expect to do this for every such state.
 
 The command fails if a seat appears twice, a state has more than 2 senators, a chamber has more
 rows than seats, or a named row has no party. It also fails when the results do not cover every
@@ -134,7 +135,8 @@ roster, and lists every vacancy, placeholder and flagged match.
 ```bash
 impsolver roster --from-results results-120.csv \
   --source "Clerk of the House, election statistics for November 3, 2026" \
-  --previous compositions/us-119.yaml --senate-holdovers --caucus I=D \
+  --previous compositions/us-119.yaml --senate-holdovers --vacate ID_OF_DEPARTING_SENATOR \
+  --caucus I=D \
   --name us-120 --as-of 2027-01-03 --accessed 2027-01-02 --out compositions/us-120.yaml
 ```
 

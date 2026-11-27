@@ -184,6 +184,8 @@ def test_holdover_ambiguity_and_flags() -> None:
         build(previous=None)
     with pytest.raises(ValueError, match="--vacate ids not found"):
         build(vacate=["Z000001"])
+    with pytest.raises(ValueError, match="applies only with --senate-holdovers"):
+        build(senate_holdovers=False)
 
 
 def test_surname_matching() -> None:
@@ -192,6 +194,9 @@ def test_surname_matching() -> None:
     assert same_surname("Derrick Van Orden", "VAN ORDEN, Derrick")
     assert same_surname("Cherfilus-McCormick, Sheila", "CHERFILUS-MCCORMICK, Sheila")
     assert same_surname("José Núñez", "NUNEZ, Jose")
+    assert same_surname("Nick Begich, III", "BEGICH, Nicholas J., III")
+    assert same_surname("John Smith, Jr.", "SMITH, John")
+    assert same_surname("Smith, John, Jr.", "SMITH, John")
     assert not same_surname("Orden", "VAN ORDEN, Derrick")
     assert not same_surname("Ann Smith", "SMYTH, Ann")
     assert not same_surname("Ann Smith", ",")

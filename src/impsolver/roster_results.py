@@ -56,8 +56,22 @@ def _norm(text: str) -> list[str]:
     return " ".join(toks).replace(" - ", "-").split()
 
 
+def _drop_suffix(name: str) -> str:
+    """Strip a trailing ", Jr." or ", III" so it is not read as "Last, First"."""
+    head, sep, tail = name.rpartition(",")
+    if sep and tail.strip() and all(t in SUFFIXES for t in _norm_raw(tail)):
+        return _drop_suffix(head)
+    return name
+
+
+def _norm_raw(text: str) -> list[str]:
+    s = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9 ]+", " ", s).split()
+
+
 def surname(name: str) -> list[str]:
     """Surname tokens: the text before the first comma ("LAST, First"), else the last word."""
+    name = _drop_suffix(name)
     if "," in name:
         return _norm(name.split(",", 1)[0])
     toks = _norm(name)
@@ -73,6 +87,7 @@ def same_surname(results_name: str, prev_name: str) -> bool:
     prev = surname(prev_name)
     if not prev:
         return False
+    results_name = _drop_suffix(results_name)
     if "," in results_name:
         return surname(results_name) == prev
     toks = _norm(results_name)
@@ -177,6 +192,8 @@ def build_from_results(
     vacate_set = set(vacate or [])
     if senate_holdovers and not previous:
         raise ValueError("--senate-holdovers needs --previous")
+    if vacate_set and not senate_holdovers:
+        raise ValueError("with --from-results, --vacate applies only with --senate-holdovers")
     rows, skipped = read_results(results)
     prev: dict[str, Member] = {}
     prev_chamber: dict[str, str] = {}
