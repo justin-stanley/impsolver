@@ -7,8 +7,12 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
+  Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
 
 ### Changed
+- `backtest` scores completion per case (a conviction on any article completes it) instead of per
+  article, adds a case-level line to `path_checks`, and fails a fixture with no required-stage vote.
 
 ### Fixed
 

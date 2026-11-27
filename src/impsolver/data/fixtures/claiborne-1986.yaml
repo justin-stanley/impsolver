@@ -1,0 +1,24 @@
+# Senate trial of Judge Harry E. Claiborne (D. Nev.). Convicted on articles I, II and IV. Article
+# III got 46 guilty, 17 not guilty and 35 "present": two-thirds of the 98 senators present is 66,
+# so it failed. No separate removal or disqualification vote. Tallies are from the senate.gov case
+# page (LIS roll-call pages start in 1989). not_voting is derived, not recorded: it assumes all 100
+# seats were filled, as the senate.gov party-division table shows for the 2nd session of the 99th
+# Congress. It affects only the quorum check.
+schema_version: 1
+case: claiborne-1986
+target: {name: Harry E. Claiborne, office: judge}
+date: 1986-10-09
+path: B
+sources:
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-claiborne.htm
+  - https://www.senate.gov/about/parties-leadership/party-division.htm
+verified: 2026-11-27
+bodies:
+  senate: {seats: 100}
+votes:
+  - {stage: S2, article: I, yea: 87, nay: 10, not_voting: 3, expected: PASS}
+  - {stage: S2, article: II, yea: 90, nay: 7, not_voting: 3, expected: PASS}
+  - {stage: S2, article: III, yea: 46, nay: 17, present: 35, not_voting: 2, expected: FAIL,
+     expected_short: 20, note: "35 voted present; they count toward the two-thirds"}
+  - {stage: S2, article: IV, yea: 89, nay: 8, not_voting: 3, expected: PASS}
+expected_complete: true

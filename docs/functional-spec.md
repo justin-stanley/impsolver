@@ -21,7 +21,9 @@ targets.
   sensitivity analysis and the joint distribution of removals. `--html OUT` writes a self-contained
   planning page: a timeline of House and Senate work for the top plans, each case's gate-by-gate
   odds, succession branches, the removals distribution, left-out candidates and sensitivity.
-- **backtest**: replays the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas roll calls.
+- **backtest**: replays the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas roll calls, the
+  Belknap trial (1876) and the Senate trials of Judges Swayne, Archbald, Ritter, Claiborne,
+  Hastings, Nixon and Porteous.
 - **calibrate**: checks the learned alignment against the 2021 Republican crossover votes.
 - **roster** and **align**: build the composition and the alignment files from Voteview CSVs.
 
