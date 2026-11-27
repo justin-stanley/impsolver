@@ -16,6 +16,11 @@ rate, independently of everything else. One attendance draw covers every gate of
 Absent members leave the votes cast, the two-thirds-of-present denominator and the quorum count.
 Absences come from a second generator seeded from the same seed, so the vote draws are exactly
 those of the fixed-attendance run (common random numbers).
+
+With ``gate_correlation`` c < 1, each gate after the first in a chamber gets its own draw of every
+component (z, w, e): x_g = sqrt(c) x_(g-1) + sqrt(1-c) x', with x' fresh standard normal. Each
+component stays standard normal, so every marginal is preserved, and u at adjacent gates has
+correlation c. c = 1 reuses one draw at every gate and consumes no extra random numbers.
 """
 
 from __future__ import annotations
@@ -108,27 +113,41 @@ class ChamberModel:
         return res
 
     def draw_pro(
-        self, rng: np.random.Generator, m: int, rho: float, z: FloatArr | None = None
+        self,
+        rng: np.random.Generator,
+        m: int,
+        rho: float,
+        z: FloatArr | None = None,
+        gate_correlation: float = 1.0,
     ) -> npt.NDArray[np.bool_]:
-        """Boolean PRO array [g, draws, n]. ``z`` ([draws, blocs]) lets callers share swings."""
+        """Boolean PRO array [g, draws, n]. ``z`` ([draws, blocs]) lets callers share swings.
+
+        ``gate_correlation`` (c) mixes each later gate's draw with a fresh one:
+        x_g = sqrt(c) x_(g-1) + sqrt(1-c) x', applied to the bloc swing, the factor weights and the
+        individual noise alike. ``z`` is used for the first gate.
+        """
         n = len(self.members)
         if z is None:
             z = rng.standard_normal((m, self.n_blocs))
         e = rng.standard_normal((m, n))
-        common = np.sqrt(rho) * z[:, self.bloc_idx]
-        if self.F is None:
-            u = common + np.sqrt(1 - rho) * e
-            res: npt.NDArray[np.bool_] = u[None, :, :] < self.thresholds[:, None, :]
-            return res
-        assert self.signs is not None
-        w = rng.standard_normal((m, self.F.shape[1]))
-        fw = w @ self.F.T  # [m, n]
-        norm2 = (self.F**2).sum(axis=1)
+        w = rng.standard_normal((m, self.F.shape[1])) if self.F is not None else None
+        a, b = np.sqrt(gate_correlation), np.sqrt(1.0 - gate_correlation)
         out = np.empty((len(self.stages), m, n), dtype=bool)
         for g in range(len(self.stages)):
-            s = self.signs[g]
-            idio = np.sqrt(np.clip(1.0 - s**2 * norm2, 0.0, 1.0))
-            u = common + np.sqrt(1 - rho) * (s * fw + idio * e)
+            if g > 0 and gate_correlation < 1.0:
+                z = a * z + b * rng.standard_normal(z.shape)
+                e = a * e + b * rng.standard_normal(e.shape)
+                if w is not None:
+                    w = a * w + b * rng.standard_normal(w.shape)
+            common = np.sqrt(rho) * z[:, self.bloc_idx]
+            if self.F is None or w is None:
+                u = common + np.sqrt(1 - rho) * e
+            else:
+                assert self.signs is not None
+                s = self.signs[g]
+                norm2 = (self.F**2).sum(axis=1)
+                idio = np.sqrt(np.clip(1.0 - s**2 * norm2, 0.0, 1.0))
+                u = common + np.sqrt(1 - rho) * (s * (w @ self.F.T) + idio * e)
             out[g] = u < self.thresholds[g]
         return out
 
@@ -224,7 +243,7 @@ def run_raw(
                     else:
                         cols.append(rng.standard_normal(m))
                 z = np.column_stack(cols)
-            votes = cm.draw_pro(rng, m, rho, z)
+            votes = cm.draw_pro(rng, m, rho, z, prep.scenario.gate_correlation)
             absent = cm.draw_absent(arng, m)
             n_in = np.full(m, len(cm.members), dtype=np.int64)
             if absent is not None:

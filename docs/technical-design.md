@@ -82,7 +82,8 @@ The verdict is PASS at pro_min, FAIL at pro_max, otherwise CONTESTED.
 Gaussian copula: u_i = sqrt(rho) z_bloc + sqrt(1-rho) e_i, and PRO iff u_i < Phi^-1(p).
 With alignment: u_ig = sqrt(rho) z_bloc + sqrt(1-rho)(s_ig F_i·w + sqrt(psi_i) e_i), where
 psi_i = 1-||F_i||^2. s_ig is the sign of (bloc lean - 0.5), and the lean is the mean p of the
-bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed).
+bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed). By default the
+same draw is reused at every gate in a chamber; `gate_correlation` < 1 loosens that (see below).
 Attendance (`attendance: fixed|random`, default fixed): with random, each present member is absent
 in a draw with probability Member.p_absent, else the alignment file's n_missed/n_possible, else
 `absence_rate` (default 0). One draw per chamber covers all its gates, from a separate stream
@@ -99,6 +100,10 @@ These change behavior relative to the original design.
   signal (permutation p = 0.75). Set it to 1 to restore the original behavior.
 - `national_swing` (default false) draws one party swing per bloc for both chambers instead of one
   per chamber.
+- `gate_correlation` c (default 1, the original design) sets how much each member's draw carries
+  from one gate to the next in a chamber: every component (bloc swing, factor weights, individual
+  noise) at a later gate is sqrt(c) times the previous gate's plus sqrt(1-c) times a fresh standard
+  normal, so marginals are preserved. Default results do not change.
 - `senate_tie_break` (`none` | `pro` | `con`, default `none`) says how an exact tie on a Senate
   majority vote (S1, S3) is resolved. With `none`, a tie defeats the motion, as in the original design. Whether
   and how a presiding officer may break such a tie in an impeachment trial is not settled here, so

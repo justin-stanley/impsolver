@@ -31,7 +31,8 @@ max norm^2 0.999. Merge the two rows a party switcher gets.
 CLI: python -m impsolver.alignment --votes --members (repeatable) --caucus 328=D --k --kappa --min-shared --out
 
 ## Copula MC
-100k draws in 10k chunks, PCG64(seed). Reuse the same u across gates within a draw. Marginals are
+100k draws in 10k chunks, PCG64(seed). Reuse the same u across gates within a draw (scenario
+`gate_correlation` < 1 mixes in a fresh draw per later gate, component by component). Marginals are
 preserved. Blocs are ordered by seat order. Outputs: P(pass|reached) per gate, P(complete), yes-count
 mean/p5/p50/p95, MC standard error, seed.
 

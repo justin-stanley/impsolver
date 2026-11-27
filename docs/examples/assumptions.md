@@ -16,6 +16,6 @@ favourable in the Senate, so the draws that get past the House are the ones more
 convict. This is one reason the [validation page](../methodology/validation.md) lists correlation
 choices among the assumptions that move results.
 
-Other inputs to try: `rho`, `senate_tie_break`, `alignment` with `alignment_chamber_weight`,
-`defection_prior`, and `attendance: random` with `absence_rate` (see
+Other inputs to try: `rho`, `gate_correlation`, `senate_tie_break`, `alignment` with
+`alignment_chamber_weight`, `defection_prior`, and `attendance: random` with `absence_rate` (see
 [attendance](../methodology/model.md#attendance)).

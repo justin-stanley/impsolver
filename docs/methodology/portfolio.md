@@ -47,5 +47,5 @@ cancelled case is lost; a replacement case needs fresh House time.
 The top plans, why any case was left out (`LOW_P`, `NO_FIT`, `EXCLUDED`, `DEPENDENCY_DROPPED`,
 `NOT_SELECTED`), sensitivity to fatigue and durations, the succession decision tree, and the
 distribution of the number of removals. The joint distribution shares party swings across cases
-and follows the same decision tree as the expected value. `--html` writes all of it as a
+(at the first gate in each chamber when a scenario sets `gate_correlation` below 1) and follows the same decision tree as the expected value. `--html` writes all of it as a
 planning page.

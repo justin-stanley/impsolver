@@ -152,8 +152,8 @@ pages they were checked against.
 - **Validation is thin.** The defection prior and alignment are checked against one event, the
   2021 crossover votes: 8 House members and 7 senators. House β = 1.31 ± 0.43. The Senate shows no
   signal (p = 0.75), so Senate alignment is off by default.
-- **Correlation choices move results.** The same draw is reused across gates in a chamber, House
-  and Senate swings are independent unless `national_swing` is set, and every scenario in a
+- **Correlation choices move results.** By default the same draw is reused across gates in a
+  chamber (`gate_correlation` loosens this), House and Senate swings are independent unless `national_swing` is set, and every scenario in a
   portfolio shares one party swing.
 - **Procedure is simplified.** Attendance is fixed by the roster unless a scenario sets
   `attendance: random` (Monte Carlo only, at missed-vote rates), nobody votes "present" in
