@@ -133,3 +133,19 @@ def test_portfolio_and_viability_print_scenario_warnings(
     assert rc == 0 and "warning: candidate a: override for NOPE" in err
     rc, _, err = run(capsys, "viability", str(scen), "--draws", "500")
     assert rc == 0 and "warning: override for NOPE" in err
+
+
+def test_random_attendance_notes(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    text = (
+        Path(SCEN)
+        .read_text(encoding="utf-8")
+        .replace("../compositions", str(REPO / "compositions"))
+    )
+    silent = tmp_path / "silent.yaml"
+    silent.write_text(text + "attendance: random\n", encoding="utf-8")
+    rc, _, err = run(capsys, "evaluate", str(silent))
+    assert rc == 0 and "every absence rate is 0" in err and "counts every present member" in err
+    noisy = tmp_path / "noisy.yaml"
+    noisy.write_text(text + "attendance: random\nabsence_rate: 0.05\n", encoding="utf-8")
+    rc, _, err = run(capsys, "evaluate", str(noisy))
+    assert rc == 0 and "every absence rate is 0" not in err

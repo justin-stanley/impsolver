@@ -4,6 +4,39 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
+  Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
+- Optional random attendance in the Monte Carlo (`attendance: random`, `absence_rate`, member
+  `p_absent`, and `n_missed`/`n_possible` in alignment files); the default `fixed` leaves results unchanged.
+- Scenario option `gate_correlation` (0 to 1, default 1) sets how much each member's Monte Carlo
+  draw carries from one gate to the next in a chamber; marginals are preserved and default
+  results do not change.
+- `evaluate` lists, per article, the members nearest the threshold at the binding gate (by the
+  supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
+- `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
+  `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
+
+### Changed
+- `backtest` scores completion per case (a conviction on any article completes it) instead of per
+  article, adds a case-level line to `path_checks`, and fails a fixture with no required-stage vote.
+- The ILP runs on PuLP 4 (`pulp[cbc]>=2.9,<5`; CBC now comes from the `cbcbox` wheel). Flip and
+  absence counts are unchanged; among near-tied solutions, the members or gates listed can differ
+  by CBC build (#9).
+- `portfolio`: a candidate without `article` now counts removal on any article, P0 = P(at least one
+  article completes) from one simulation with shared draws across articles, also in the joint
+  removals distribution; default numbers change only for scenarios with more than one article.
+
+### Fixed
+
+- Review fixes for PR #13: the planning page's pivot list uses the same article as its gate-path
+  row; `gate_correlation` keeps the bloc swing fixed across gates so national and portfolio-shared
+  swings stay shared; a multi-article candidate is simulated once per article; `attendance: random`
+  with no absence rates warns; `evaluate` and `flips` note that they use fixed attendance; CBC runs
+  with a zero gap on every PuLP version.
+
 ## [0.1.0] - 2026-11-27
 
 First public release.

@@ -1,0 +1,41 @@
+# Senate trial of Judge Alcee L. Hastings (S.D. Fla.). The House adopted 17 articles; the Senate
+# voted on 11, convicting on I-V and VII-IX. No disqualification vote was taken. Tallies and
+# absences are from the LIS roll-call pages (100 senators listed on each). The senate.gov case
+# page's narrative names article "11" for the 0-95 vote; its own table and the roll call say XVI.
+schema_version: 1
+case: hastings-1989
+target: {name: Alcee L. Hastings, office: judge}
+date: 1989-10-20
+path: B
+sources:
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-hastings.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00023.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00254.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00255.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00256.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00257.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00258.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00259.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00260.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00261.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00262.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00263.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00264.htm
+verified: 2026-11-27
+bodies:
+  senate: {seats: 100}
+votes:
+  - {stage: S1, article: XVII, yea: 0, nay: 93, not_voting: 7, expected: PASS,
+     note: "motion to dismiss article XVII, 1989-03-16, rejected"}
+  - {stage: S2, article: I, yea: 69, nay: 26, not_voting: 5, expected: PASS}
+  - {stage: S2, article: II, yea: 68, nay: 27, not_voting: 5, expected: PASS}
+  - {stage: S2, article: III, yea: 69, nay: 26, not_voting: 5, expected: PASS}
+  - {stage: S2, article: IV, yea: 67, nay: 28, not_voting: 5, expected: PASS}
+  - {stage: S2, article: V, yea: 67, nay: 28, not_voting: 5, expected: PASS}
+  - {stage: S2, article: VI, yea: 48, nay: 47, not_voting: 5, expected: FAIL, expected_short: 16}
+  - {stage: S2, article: VII, yea: 69, nay: 26, not_voting: 5, expected: PASS}
+  - {stage: S2, article: VIII, yea: 68, nay: 27, not_voting: 5, expected: PASS}
+  - {stage: S2, article: IX, yea: 70, nay: 25, not_voting: 5, expected: PASS}
+  - {stage: S2, article: XVI, yea: 0, nay: 95, not_voting: 5, expected: FAIL, expected_short: 64}
+  - {stage: S2, article: XVII, yea: 60, nay: 35, not_voting: 5, expected: FAIL, expected_short: 4}
+expected_complete: true

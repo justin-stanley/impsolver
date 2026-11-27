@@ -40,6 +40,30 @@
           },
           "title": "Loadings",
           "type": "array"
+        },
+        "n_missed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Missed"
+        },
+        "n_possible": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Possible"
         }
       },
       "required": [

@@ -20,14 +20,21 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel
 
-from .deterministic import default_path
+from .deterministic import default_path, evaluate_article
 from .loader import load_portfolio, resolve
 from .members import logit, sigmoid
 from .model import ChamberCalendar, Portfolio, PortfolioCandidate
 from .paths import path_for
 from .prepare import Prepared, prepare
-from .results import SimArticle
-from .simulate import p_complete, run_raw, simulate_article
+from .results import DeterministicArticle, SimArticle
+from .simulate import (
+    any_complete,
+    p_any_complete,
+    p_complete,
+    run_raw_articles,
+    simulate_article,
+    summarize_raw,
+)
 
 FAR = dt.date(9999, 12, 31)
 MAX_BRANCH_TRIGGERS = 3
@@ -564,6 +571,7 @@ class PortfolioResult(BaseModel):
     exhaustive: bool
     p0: dict[str, float]
     gate_paths: dict[str, SimArticle] = {}
+    pivots: dict[str, DeterministicArticle] = {}
     labels: dict[str, str] = {}
 
 
@@ -578,6 +586,22 @@ class Loaded:
     gates: dict[str, SimArticle] = field(default_factory=dict)
 
 
+def deterministic_articles(loaded: Loaded) -> dict[str, DeterministicArticle]:
+    """Deterministic bounds (with the binding-gate pivot list) for each scenario candidate."""
+    out: dict[str, DeterministicArticle] = {}
+    for c in loaded.pf.candidates:
+        prep = loaded.preps.get(c.id)
+        if prep is None:
+            continue
+        # Same article as the gate-path row: the one the simulation reported.
+        sim = loaded.gates.get(c.id)
+        art = c.article or (sim.article if sim else prep.scenario.articles[0])
+        out[c.id] = evaluate_article(
+            prep, art, path_for(prep.rules, prep.scenario, default_path(prep))
+        )
+    return out
+
+
 def load(path: str | Path) -> Loaded:
     pf = load_portfolio(path)
     preps: dict[str, Prepared] = {}
@@ -587,13 +611,20 @@ def load(path: str | Path) -> Loaded:
         if c.scenario is not None:
             prep = prepare(resolve(c.scenario, path))
             preps[c.id] = prep
-            art = c.article or prep.scenario.articles[0]
             path_ = path_for(prep.rules, prep.scenario, default_path(prep))
-            sim = simulate_article(
-                prep, art, path_, pf.draws, prep.scenario.seed, prep.scenario.rho
-            )
-            gates[c.id] = sim
-            p0[c.id] = sim.p_complete
+            seed, rho = prep.scenario.seed, prep.scenario.rho
+            if c.article is not None or len(prep.scenario.articles) == 1:
+                art = c.article or prep.scenario.articles[0]
+                sim = simulate_article(prep, art, path_, pf.draws, seed, rho)
+                gates[c.id] = sim
+                p0[c.id] = sim.p_complete
+            else:
+                # Removal happens if any article convicts: one joint simulation over articles.
+                arts = list(prep.scenario.articles)
+                raws = run_raw_articles(prep, arts, path_, pf.draws, seed, rho)
+                p0[c.id] = float(any_complete(raws).mean())
+                best = max(arts, key=lambda a: float(raws[a].complete.mean()))
+                gates[c.id] = summarize_raw(raws[best], best, path_, pf.draws)
         else:
             assert c.p is not None
             p0[c.id] = c.p
@@ -702,6 +733,7 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
         exhaustive=exhaustive,
         p0=p0,
         gate_paths=loaded.gates,
+        pivots=deterministic_articles(loaded),
         labels={cid: prep.scenario.target.name for cid, prep in loaded.preps.items()},
     )
     if has_succession(ctx):
@@ -752,15 +784,25 @@ def poisson_binomial(ps: list[float]) -> list[float]:
     return dist
 
 
+def _p_removal(prep: Prepared, article: str | None, draws: int, extra: float = 0.0) -> float:
+    """P(removal): the given article completes, or (``article`` None) any article does."""
+    if article is not None:
+        return p_complete(prep, article, draws=draws, extra=extra)
+    return p_any_complete(prep, draws=draws, extra=extra)
+
+
 def _match_shift(prep: Prepared, article: str | None, target: float, draws: int) -> float:
-    """Uniform logit shift that makes P(complete) equal ``target`` (common random numbers)."""
-    base = p_complete(prep, article, draws=draws)
+    """Uniform logit shift that makes P(removal) equal ``target`` (common random numbers).
+
+    ``article`` None means removal on any article, matching ``load``.
+    """
+    base = _p_removal(prep, article, draws)
     if abs(base - target) < 1e-9:
         return 0.0
     lo, hi = (-8.0, 0.0) if target < base else (0.0, 8.0)
     for _ in range(30):
         mid = (lo + hi) / 2
-        if p_complete(prep, article, draws=draws, extra=mid) < target:
+        if _p_removal(prep, article, draws, mid) < target:
             lo = mid
         else:
             hi = mid
@@ -835,11 +877,14 @@ def removals_dist(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> RemovalsD
         if prep is None:
             outcome[(cid, p)] = rng.random(draws) < p
             continue
-        art = ctx.cands[cid].article or prep.scenario.articles[0]
+        art = ctx.cands[cid].article
+        arts = [art] if art is not None else list(prep.scenario.articles)
         shift = _match_shift(prep, art, p, draws)
         path = path_for(prep.rules, prep.scenario, default_path(prep))
-        raw = run_raw(prep, art, path, draws, pf.seed + 1000 + i, prep.scenario.rho, shift, shared)
-        outcome[(cid, p)] = raw.complete
+        raws = run_raw_articles(
+            prep, arts, path, draws, pf.seed + 1000 + i, prep.scenario.rho, shift, shared
+        )
+        outcome[(cid, p)] = any_complete(raws)
     counts = np.zeros(draws, dtype=int)
 
     def walk(nd: TreeNode, mask: np.ndarray) -> None:

@@ -70,6 +70,8 @@ def check_references(rules: RuleSet, comp: Composition, scenario: Scenario) -> l
         for sh in scenario.shifts
         if sh.bloc != STAR and sh.bloc not in blocs
     ]
+    if scenario.attendance == "fixed" and scenario.absence_rate > 0:
+        warnings.append("absence_rate has no effect unless attendance is random")
     return warnings
 
 
@@ -100,6 +102,27 @@ class Prepared:
     def present_mask(self, chamber: Chamber) -> npt.NDArray[np.bool_]:
         return np.array([m.attendance == "present" for m in self.members(chamber)], dtype=bool)
 
+    def absence_rates(self, chamber: Chamber) -> npt.NDArray[np.float64]:
+        """Per-member chance of missing a vote, used when ``attendance`` is ``random``.
+
+        Resolved in order: the member's ``p_absent``, the alignment file's missed-vote rate
+        (``n_missed / n_possible``), then the scenario's ``absence_rate``.
+        """
+        missed: dict[str, float] = {}
+        if self.alignment is not None and chamber in self.alignment.bodies:
+            for am in self.alignment.bodies[chamber].members:
+                rate = am.missed_rate
+                if rate is not None:
+                    missed[am.id] = rate
+        default = self.scenario.absence_rate
+        return np.array(
+            [
+                m.p_absent if m.p_absent is not None else missed.get(m.id, default)
+                for m in self.members(chamber)
+            ],
+            dtype=float,
+        )
+
 
 def prepare_objects(
     rules: RuleSet,
@@ -113,7 +136,14 @@ def prepare_objects(
         if alignment is None:
             raise ValueError("defection_prior needs an alignment")
         comp = apply_defection_prior(scenario.defection_prior, scenario, comp, rules, alignment)
-    return Prepared(rules, comp, scenario, alignment, source, warnings)
+    prep = Prepared(rules, comp, scenario, alignment, source, warnings)
+    if scenario.attendance == "random":
+        if not any(prep.absence_rates(ch).any() for ch in comp.bodies):
+            prep.warnings.append(
+                "attendance is random but every absence rate is 0: set absence_rate, give members "
+                "p_absent, or use an alignment file with missed-vote counts"
+            )
+    return prep
 
 
 def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared:

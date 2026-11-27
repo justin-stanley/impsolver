@@ -14,6 +14,16 @@ removals: E = Σ wᵢ · Pᵢ over the cases that finish by their deadlines.
 - `senate_committee: true` sends evidence to a Senate committee first, then holds a short floor
   phase (`committee_floor_days`).
 
+## Which article counts
+
+A case backed by a scenario is removed if any of its articles convicts. When the candidate leaves
+`article` unset, P₀ is the chance that at least one of the scenario's articles completes its path,
+from one joint simulation: every article sees the same party swings and member draws, so articles
+are as correlated as the scenario's members make them. P₀ is therefore at least the best single
+article's chance and at most the sum. The gate-path panel shows the gates of the likeliest
+article. Set `article` to score one article alone. A scenario with one article gives the same P₀ as
+before.
+
 ## Fatigue
 
 Each later trial can be harder: P = σ(logit P₀ − δ · m), where m is the number of earlier trials.

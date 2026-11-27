@@ -11,6 +11,11 @@ support for not tabling at H1.
 
 The case ends at H2: even with every uncertain member counted as PRO, adoption falls 3 short.
 
+The last block lists the members nearest the threshold at the binding gate, by the supplied
+probabilities: the members not counted PRO, highest p first, enough to cover the shortfall plus
+five (at most 25). Every Republican here has the same party prior, so the order among them is by
+id alone. The list restates the inputs; it is not a forecast and suggests no one.
+
 ## Fewest changes needed
 
 `flips` finds the fewest stance changes that make a gate pass. Here it targets conviction alone:

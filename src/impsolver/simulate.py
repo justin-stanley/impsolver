@@ -10,6 +10,17 @@ With alignment loadings F_i (scaled by alignment_weight):
 where s_ig = sign(lean_bg - 0.5) and lean_bg is the mean p of the bloc's free members at the gate.
 A large F_i.w therefore means "breaking from the bloc's lean" at every gate. Every marginal is
 preserved because the variance of u_ig is 1.
+
+With ``attendance: random``, each present member is also absent in a draw with their missed-vote
+rate, independently of everything else. One attendance draw covers every gate of a chamber.
+Absent members leave the votes cast, the two-thirds-of-present denominator and the quorum count.
+Absences come from a second generator seeded from the same seed, so the vote draws are exactly
+those of the fixed-attendance run (common random numbers).
+
+With ``gate_correlation`` c < 1, each gate after the first in a chamber gets its own draw of every
+component (z, w, e): x_g = sqrt(c) x_(g-1) + sqrt(1-c) x', with x' fresh standard normal. Each
+component stays standard normal, so every marginal is preserved, and u at adjacent gates has
+correlation c. c = 1 reuses one draw at every gate and consumes no extra random numbers.
 """
 
 from __future__ import annotations
@@ -28,6 +39,7 @@ from .results import CountSummary, SimArticle, SimGate, Simulation
 from .thresholds import has_quorum, membership_base, pro_wins, tie_mode
 
 CHUNK = 10_000
+ATTENDANCE_STREAM = 0xA77E
 _ND = NormalDist()
 
 FloatArr = npt.NDArray[np.float64]
@@ -91,29 +103,51 @@ class ChamberModel:
     signs: FloatArr | None
     seats: int
     vacancies: int
+    p_absent: FloatArr | None = None  # [n]; None means fixed attendance
+
+    def draw_absent(self, rng: np.random.Generator, m: int) -> npt.NDArray[np.bool_] | None:
+        """Boolean ABSENT array [draws, n], or None when attendance is fixed."""
+        if self.p_absent is None:
+            return None
+        res: npt.NDArray[np.bool_] = rng.random((m, len(self.members))) < self.p_absent
+        return res
 
     def draw_pro(
-        self, rng: np.random.Generator, m: int, rho: float, z: FloatArr | None = None
+        self,
+        rng: np.random.Generator,
+        m: int,
+        rho: float,
+        z: FloatArr | None = None,
+        gate_correlation: float = 1.0,
     ) -> npt.NDArray[np.bool_]:
-        """Boolean PRO array [g, draws, n]. ``z`` ([draws, blocs]) lets callers share swings."""
+        """Boolean PRO array [g, draws, n]. ``z`` ([draws, blocs]) lets callers share swings.
+
+        ``gate_correlation`` (c) mixes each later gate's member-level draw with a fresh one:
+        x_g = sqrt(c) x_(g-1) + sqrt(1-c) x', applied to the factor weights and the individual
+        noise. The bloc swing ``z`` is one party mood for the whole chamber and stays fixed across
+        gates, so swings shared with other chambers or other cases stay fully shared.
+        """
         n = len(self.members)
         if z is None:
             z = rng.standard_normal((m, self.n_blocs))
         e = rng.standard_normal((m, n))
-        common = np.sqrt(rho) * z[:, self.bloc_idx]
-        if self.F is None:
-            u = common + np.sqrt(1 - rho) * e
-            res: npt.NDArray[np.bool_] = u[None, :, :] < self.thresholds[:, None, :]
-            return res
-        assert self.signs is not None
-        w = rng.standard_normal((m, self.F.shape[1]))
-        fw = w @ self.F.T  # [m, n]
-        norm2 = (self.F**2).sum(axis=1)
+        w = rng.standard_normal((m, self.F.shape[1])) if self.F is not None else None
+        a, b = np.sqrt(gate_correlation), np.sqrt(1.0 - gate_correlation)
         out = np.empty((len(self.stages), m, n), dtype=bool)
         for g in range(len(self.stages)):
-            s = self.signs[g]
-            idio = np.sqrt(np.clip(1.0 - s**2 * norm2, 0.0, 1.0))
-            u = common + np.sqrt(1 - rho) * (s * fw + idio * e)
+            if g > 0 and gate_correlation < 1.0:
+                e = a * e + b * rng.standard_normal(e.shape)
+                if w is not None:
+                    w = a * w + b * rng.standard_normal(w.shape)
+            common = np.sqrt(rho) * z[:, self.bloc_idx]
+            if self.F is None or w is None:
+                u = common + np.sqrt(1 - rho) * e
+            else:
+                assert self.signs is not None
+                s = self.signs[g]
+                norm2 = (self.F**2).sum(axis=1)
+                idio = np.sqrt(np.clip(1.0 - s**2 * norm2, 0.0, 1.0))
+                u = common + np.sqrt(1 - rho) * (s * (w @ self.F.T) + idio * e)
             out[g] = u < self.thresholds[g]
         return out
 
@@ -134,6 +168,10 @@ def chamber_models(
         idx = np.array([blocs.index(m.bloc) for m in members], dtype=np.int64)
         F = loadings_for(prep.alignment, chamber, members, chamber_weight(prep, chamber))
         signs = bloc_signs(p, idx, len(blocs)) if F is not None else None
+        absent = None
+        if prep.scenario.attendance == "random":
+            rates = prep.absence_rates(chamber)[mask]
+            absent = rates if rates.any() else None
         out[chamber] = ChamberModel(
             chamber,
             sts,
@@ -145,6 +183,7 @@ def chamber_models(
             signs,
             body.seats,
             body.vacancies,
+            absent,
         )
     return out
 
@@ -155,6 +194,7 @@ class RawSim:
     n_required: int
     pro: npt.NDArray[np.int64]  # [g, draws]
     passed: npt.NDArray[np.bool_]  # [g, draws]
+    present: npt.NDArray[np.int64]  # [g, draws] members in the chamber for the vote
 
     @property
     def complete(self) -> npt.NDArray[np.bool_]:
@@ -179,8 +219,11 @@ def run_raw(
     stages = list(path.all_stages)
     models = chamber_models(prep, article, stages, extra)
     rng = np.random.Generator(np.random.PCG64(seed))
+    # A separate stream for attendance keeps the vote draws identical to fixed attendance.
+    arng = np.random.Generator(np.random.PCG64([seed, ATTENDANCE_STREAM]))
     pro = np.zeros((len(stages), draws), dtype=np.int64)
     passed = np.zeros((len(stages), draws), dtype=bool)
+    present = np.zeros((len(stages), draws), dtype=np.int64)
     done = 0
     while done < draws:
         m = min(CHUNK, draws - done)
@@ -200,25 +243,31 @@ def run_raw(
                     else:
                         cols.append(rng.standard_normal(m))
                 z = np.column_stack(cols)
-            gate_pro = cm.draw_pro(rng, m, rho, z).sum(axis=2)
-            n = len(cm.members)
-            quorum = bool(has_quorum(n, cm.seats - cm.vacancies))
+            votes = cm.draw_pro(rng, m, rho, z, prep.scenario.gate_correlation)
+            absent = cm.draw_absent(arng, m)
+            n_in = np.full(m, len(cm.members), dtype=np.int64)
+            if absent is not None:
+                votes &= ~absent[None, :, :]
+                n_in -= absent.sum(axis=1)
+            gate_pro = votes.sum(axis=2)
+            quorum = has_quorum(n_in, cm.seats - cm.vacancies)
             for g, st in enumerate(cm.stages):
                 k = stages.index(st)
                 pro[k, done : done + m] = gate_pro[g]
+                present[k, done : done + m] = n_in
                 base = membership_base(st.rule, cm.seats, cm.vacancies)
                 wins = pro_wins(
                     st.rule,
                     st.pass_direction,
                     gate_pro[g],
-                    n - gate_pro[g],
+                    n_in - gate_pro[g],
                     np.zeros(m, dtype=np.int64),
                     base,
                     tie_mode(st, prep.scenario.senate_tie_break),
                 )
                 passed[k, done : done + m] = wins & quorum
         done += m
-    return RawSim(stages, len(path.stages), pro, passed)
+    return RawSim(stages, len(path.stages), pro, passed, present)
 
 
 def summarize(x: npt.NDArray[np.int64]) -> CountSummary:
@@ -229,7 +278,11 @@ def summarize(x: npt.NDArray[np.int64]) -> CountSummary:
 def simulate_article(
     prep: Prepared, article: str, path: Path, draws: int, seed: int, rho: float
 ) -> SimArticle:
-    raw = run_raw(prep, article, path, draws, seed, rho)
+    return summarize_raw(run_raw(prep, article, path, draws, seed, rho), article, path, draws)
+
+
+def summarize_raw(raw: RawSim, article: str, path: Path, draws: int) -> SimArticle:
+    """Per-gate pass rates and P(complete) from one simulation run."""
     reached = np.ones(draws, dtype=bool)
     gates: list[SimGate] = []
     for k, st in enumerate(raw.stages):
@@ -301,3 +354,57 @@ def p_complete(
         extra,
     )
     return float(raw.complete.mean())
+
+
+def run_raw_articles(
+    prep: Prepared,
+    articles: list[str],
+    path: Path,
+    draws: int,
+    seed: int,
+    rho: float,
+    extra: float = 0.0,
+    shared: dict[tuple[str, str], FloatArr] | None = None,
+) -> dict[str, RawSim]:
+    """Run :func:`run_raw` for each article with common random numbers.
+
+    Every article uses the same seed and the same ``shared`` swings. The generator draws the bloc
+    swings, member noise and alignment factors in an order and with shapes that depend only on the
+    members, blocs and loadings, never on the article, so draw ``j`` sees the same z, e and w for
+    every article. Only the thresholds (and alignment signs) differ. Articles are therefore
+    correlated through the shared member draws, as they are when one chamber votes on several
+    articles against the same official.
+    """
+    return {a: run_raw(prep, a, path, draws, seed, rho, extra, shared) for a in articles}
+
+
+def any_complete(raws: dict[str, RawSim]) -> npt.NDArray[np.bool_]:
+    """Per-draw indicator that at least one article completes its path."""
+    res: npt.NDArray[np.bool_] = np.logical_or.reduce([r.complete for r in raws.values()])
+    return res
+
+
+def p_any_complete(
+    prep: Prepared,
+    articles: list[str] | None = None,
+    draws: int = 20_000,
+    seed: int | None = None,
+    extra: float = 0.0,
+    path_name: str | None = None,
+) -> float:
+    """P(at least one article completes), from one joint simulation over ``articles``.
+
+    ``articles`` defaults to all of the scenario's articles. With one article this equals
+    :func:`p_complete` for the same seed and draws.
+    """
+    path = path_for(prep.rules, prep.scenario, path_name or default_path(prep))
+    raws = run_raw_articles(
+        prep,
+        articles or list(prep.scenario.articles),
+        path,
+        draws,
+        prep.scenario.seed if seed is None else seed,
+        prep.scenario.rho,
+        extra,
+    )
+    return float(any_complete(raws).mean())

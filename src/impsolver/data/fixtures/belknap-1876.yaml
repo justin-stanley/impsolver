@@ -1,0 +1,28 @@
+# Senate trial of William W. Belknap, former Secretary of War (he resigned before the House
+# vote). Acquitted on all five articles, each five votes short; most "not guilty" votes were cast
+# on the ground that the Senate lacked jurisdiction over a former officer. Tallies are from
+# Hinds' Precedents vol. 3 sec. 2467, citing Senate Journal pp. 992-1012; the managers' report
+# there says "a change of 5 votes" would have convicted. not_voting is derived, not recorded: it
+# assumes 73 of 74 seats filled, as the senate.gov party-division table shows for the 1st session
+# of the 44th Congress (Colorado's senators were not seated until December 1876). It affects only
+# the quorum check.
+schema_version: 1
+case: belknap-1876
+target: {name: William W. Belknap, office: secretary_of_war}
+date: 1876-08-01
+path: B
+sources:
+  - https://www.govinfo.gov/content/pkg/GPO-HPREC-HINDS-V3/html/GPO-HPREC-HINDS-V3-26.htm
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-belknap.htm
+  - https://www.senate.gov/about/parties-leadership/party-division.htm
+verified: 2026-11-27
+bodies:
+  senate: {seats: 74, vacancies: 1}
+votes:
+  - {stage: S2, article: I, yea: 35, nay: 25, not_voting: 13, expected: FAIL, expected_short: 5}
+  - {stage: S2, article: II, yea: 36, nay: 25, not_voting: 12, expected: FAIL, expected_short: 5}
+  - {stage: S2, article: III, yea: 36, nay: 25, not_voting: 12, expected: FAIL, expected_short: 5}
+  - {stage: S2, article: IV, yea: 36, nay: 25, not_voting: 12, expected: FAIL, expected_short: 5}
+  - {stage: S2, article: V, yea: 37, nay: 25, not_voting: 11, expected: FAIL, expected_short: 5}
+expected_complete: false
+expected_ends_at: S2

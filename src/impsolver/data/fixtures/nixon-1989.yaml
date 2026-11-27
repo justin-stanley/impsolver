@@ -1,0 +1,24 @@
+# Senate trial of Judge Walter L. Nixon, Jr. (S.D. Miss.). Convicted on articles I and II,
+# acquitted on article III; no disqualification vote. Tallies and absences are from the LIS
+# roll-call pages (100 senators listed on each).
+schema_version: 1
+case: nixon-1989
+target: {name: Walter L. Nixon Jr., office: judge}
+date: 1989-11-03
+path: B
+sources:
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-list.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00285.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00286.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00287.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00288.htm
+verified: 2026-11-27
+bodies:
+  senate: {seats: 100}
+votes:
+  - {stage: S1, article: III, yea: 34, nay: 63, not_voting: 3, expected: PASS,
+     note: "motion to dismiss article III, rejected"}
+  - {stage: S2, article: I, yea: 89, nay: 8, not_voting: 3, expected: PASS}
+  - {stage: S2, article: II, yea: 78, nay: 19, not_voting: 3, expected: PASS}
+  - {stage: S2, article: III, yea: 57, nay: 40, not_voting: 3, expected: FAIL, expected_short: 8}
+expected_complete: true

@@ -4,6 +4,10 @@ All inputs are YAML (or JSON) validated against strict schemas: unknown keys are
 schemas are generated from the models with `impsolver schema --out schemas`. A test fails when
 the committed copies fall out of date.
 
+`impsolver init composition|scenario|portfolio` writes a commented starter for each of the files
+you edit by hand, and `impsolver validate` checks them (`--portfolio FILE` for a portfolio and
+the scenarios it references). See [Getting started](../getting-started.md#start-from-templates).
+
 | File | Schema | Example |
 | --- | --- | --- |
 | Rule set | `schemas/rules.schema.json` | `src/impsolver/data/rules/us-federal.yaml` |

@@ -1,14 +1,16 @@
 # Design reference
 
 Detailed formulas and defaults behind `docs/technical-design.md`. Where the two differ, the
-"Changes after the 2026-11-27 audit" section of the technical design wins.
+"Changes since the original design" section of the technical design wins.
 
 ## Alignment JSON
 Alignment{schema_version 1, encoding: Literal["unsigned_breaks"] (reject files without it), source,
 congresses[int], kappa, min_shared, bodies{name: AlignmentBody}}
 AlignmentBody{k, n_contested, members[AlignedMember], bloc_mean_loadings{bloc:[k]},
 bloc_break_rate{bloc:float}}. Each vector has length k and norm^2<=1.
-AlignedMember{id, name, party, bloc, n_votes, breaks:int|None, loadings[k]}
+AlignedMember{id, name, party, bloc, n_votes, breaks:int|None, loadings[k], n_missed:int|None,
+n_possible:int|None}. n_missed counts roll calls whose only code is 9 (not voting); n_possible
+counts every roll call listing the member. Both default to None so older files load.
 
 ## Alignment fit
 VOTEVIEW_PARTY {100:D,200:R,328:I}; YEA 1,2,3; NAY 4,5,6; K=5 KAPPA=50 MIN_SHARED=10 MIN_BLOC_VOTES=5,
@@ -29,7 +31,9 @@ max norm^2 0.999. Merge the two rows a party switcher gets.
 CLI: python -m impsolver.alignment --votes --members (repeatable) --caucus 328=D --k --kappa --min-shared --out
 
 ## Copula MC
-100k draws in 10k chunks, PCG64(seed). Reuse the same u across gates within a draw. Marginals are
+100k draws in 10k chunks, PCG64(seed). Reuse the same u across gates within a draw (scenario
+`gate_correlation` < 1 mixes a fresh draw into each later gate's member-level noise and factor
+weights; the bloc swing stays fixed). Marginals are
 preserved. Blocs are ordered by seat order. Outputs: P(pass|reached) per gate, P(complete), yes-count
 mean/p5/p50/p95, MC standard error, seed.
 
@@ -63,6 +67,9 @@ Candidate{id, scenario|p (exactly one), article, house_days>=1, senate_days>=1, 
 weight=1 (>0), after, excludes, senate_committee, committee_floor_days=2,
 succession[{on_removal_of, becomes|null}], variant_of}
 ChamberCalendar{weekdays [0..4], recess [(d1,d2)]}; Calendar{house, senate, trial_saturdays=true}
+With `article` unset, P_i = P(any article completes) from one simulation with common random numbers
+across articles; gate paths are shown for the likeliest article. With `article` set, P_i is that
+article's P(complete).
 Senate trials one at a time; the House has k lanes; conservative time accounting.
 Objective E[removals] = sum w_i*P_i over candidates finished by their deadline.
 BFS over ordered subsets with dominance pruning (same subset, value no lower, times no later). Exact up

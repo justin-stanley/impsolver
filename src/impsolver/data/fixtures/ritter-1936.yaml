@@ -1,0 +1,34 @@
+# Senate trial of Judge Halsted L. Ritter (S.D. Fla.). Acquitted on articles I-VI, convicted on
+# article VII by 56 of 84, exactly two-thirds. Removal followed without a vote; the separate
+# disqualification order failed 0-76. The House impeachment resolution (1936-03-02) passed
+# 181-146, 7 present, 96 not voting (430 members). Tallies are from Deschler's Precedents ch. 14
+# sec. 18, citing 80 Cong. Rec. 3091 and 5606-07. Senate not_voting is derived, not recorded: it
+# assumes 96 senators seated, as the senate.gov party-division table shows for the 2nd session of
+# the 74th Congress. It affects only the quorum check.
+schema_version: 1
+case: ritter-1936
+target: {name: Halsted L. Ritter, office: judge}
+date: 1936-04-17
+path: B
+sources:
+  - https://www.govinfo.gov/content/pkg/GPO-HPREC-DESCHLERS-V3/html/GPO-HPREC-DESCHLERS-V3-5-5-5.htm
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-list.htm
+  - https://www.senate.gov/about/parties-leadership/party-division.htm
+verified: 2026-11-27
+bodies:
+  house: {seats: 435, vacancies: 5}
+  senate: {seats: 96}
+votes:
+  - {stage: H2, article: VII, yea: 181, nay: 146, present: 7, not_voting: 96, expected: PASS,
+     note: "resolution of impeachment, 1936-03-02 (the articles were amended later)"}
+  - {stage: S2, article: I, yea: 55, nay: 29, not_voting: 12, expected: FAIL, expected_short: 1}
+  - {stage: S2, article: II, yea: 52, nay: 32, not_voting: 12, expected: FAIL, expected_short: 4}
+  - {stage: S2, article: III, yea: 44, nay: 39, not_voting: 13, expected: FAIL, expected_short: 12}
+  - {stage: S2, article: IV, yea: 36, nay: 48, not_voting: 12, expected: FAIL, expected_short: 20}
+  - {stage: S2, article: V, yea: 36, nay: 48, not_voting: 12, expected: FAIL, expected_short: 20}
+  - {stage: S2, article: VI, yea: 46, nay: 37, not_voting: 13, expected: FAIL, expected_short: 10}
+  - {stage: S2, article: VII, yea: 56, nay: 28, not_voting: 12, expected: PASS,
+     note: "56 of 84 is exactly two-thirds"}
+  - {stage: S3, article: judgment, yea: 0, nay: 76, not_voting: 20, expected: FAIL,
+     note: "disqualification order, majority required"}
+expected_complete: true

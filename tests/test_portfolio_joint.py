@@ -78,3 +78,19 @@ def test_succession_resolved_per_draw(tmp_path: Path) -> None:
     assert r.succession_order == ["T", "X"]
     d = r.removals_dist
     assert d is not None and d.mean == pytest.approx(1.06, abs=0.05)
+
+
+def test_multi_article_pivots_match_reported_article(tmp_path: Path) -> None:
+    """The pivot list and the gate-path row describe the same article."""
+    from impsolver.portfolio import deterministic_articles, load
+
+    pf = _write(tmp_path, "  - {id: a, scenario: s.yaml, house_days: 5, senate_days: 5}\n")
+    scen = tmp_path / "s.yaml"
+    scen.write_text(
+        scen.read_text(encoding="utf-8")
+        + "articles: [I, II]\nshifts: [{label: two, bloc: R, delta: 2.0, article: II}]\n",
+        encoding="utf-8",
+    )
+    loaded = load(pf)
+    assert loaded.gates["a"].article == "II"
+    assert deterministic_articles(loaded)["a"].article == "II"

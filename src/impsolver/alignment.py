@@ -27,6 +27,7 @@ from .model import AlignedMember, Alignment, AlignmentBody
 VOTEVIEW_PARTY = {100: "D", 200: "R", 328: "I"}
 YEA = {1, 2, 3}
 NAY = {4, 5, 6}
+NOT_VOTING = 9
 K = 5
 KAPPA = 50.0
 MIN_SHARED = 10
@@ -211,6 +212,29 @@ def cell_blocs(
     return out.astype(str)
 
 
+def missed_votes(
+    members: list[VVMember], rolls: dict[tuple[int, int], dict[int, int]]
+) -> list[tuple[int, int]]:
+    """(n_missed, n_possible) per member over every roll call, not only contested ones.
+
+    A roll call is possible for a member when Voteview lists any of their icpsrs on it (Voteview
+    omits members who were not serving). It is missed when the only code recorded is 9 (not
+    voting). Yea, nay and present (codes 1 to 8) all count as attending.
+    """
+    out: list[tuple[int, int]] = []
+    for m in members:
+        missed = possible = 0
+        for votes in rolls.values():
+            codes = [votes[ic] for ic in m.icpsrs if ic in votes]
+            if not codes:
+                continue
+            possible += 1
+            if all(c == NOT_VOTING for c in codes):
+                missed += 1
+        out.append((missed, possible))
+    return out
+
+
 # ----------------------------------------------------------------------- the model
 
 
@@ -379,7 +403,9 @@ def fit_body(
     return BodyFit(members, blocs, br, int(mask.sum()), load, has)
 
 
-def to_alignment_body(fit: BodyFit, k: int) -> AlignmentBody:
+def to_alignment_body(
+    fit: BodyFit, k: int, missed: list[tuple[int, int]] | None = None
+) -> AlignmentBody:
     rows = bloc_rows(fit.blocs)
     means: dict[str, list[float]] = {}
     rates: dict[str, float] = {}
@@ -404,6 +430,8 @@ def to_alignment_body(fit: BodyFit, k: int) -> AlignmentBody:
                 n_votes=nv,
                 breaks=int(np.nansum(x)) if hist else None,
                 loadings=[float(v) for v in fit.loadings[i]] if hist else means[fit.blocs[i]],
+                n_missed=missed[i][0] if missed is not None else None,
+                n_possible=missed[i][1] if missed is not None else None,
             )
         )
     return AlignmentBody(
@@ -436,7 +464,7 @@ def build_alignment(
         keep = (~np.isnan(x)).any(axis=1)
         ms = [m for m, kk in zip(ms, keep, strict=True) if kk]
         fit = fit_body(ms, x[keep], caucus, k, kappa, min_shared, caster[keep], member_caucus)
-        bodies[chamber] = to_alignment_body(fit, k)
+        bodies[chamber] = to_alignment_body(fit, k, missed_votes(ms, rc))
     return Alignment(
         schema_version=1,
         encoding="unsigned_breaks",

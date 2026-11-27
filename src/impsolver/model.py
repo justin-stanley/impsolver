@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 Chamber = Literal["house", "senate"]
 Direction = Literal["pass", "fail"]
 TieBreak = Literal["none", "pro", "con"]
+AttendanceMode = Literal["fixed", "random"]
 RuleKind = Literal["majority_of_votes_cast", "fraction_of_present", "fraction_of_membership"]
 Prob = Annotated[float, Field(ge=0.0, le=1.0)]
 LooseDate = Annotated[dt.date, Field(strict=False)]
@@ -119,6 +120,8 @@ class Member(Strict):
     p_source: str | None = None
     ideology: float | None = None
     attendance: Literal["present", "absent"] = "present"
+    # Chance of missing a vote in a draw when the scenario sets ``attendance: random``.
+    p_absent: Prob | None = None
     notes: str | None = None
 
     @property
@@ -224,10 +227,18 @@ class Scenario(Strict):
     }
     # Draw one party swing per bloc shared by both chambers, instead of one per chamber.
     national_swing: bool = False
+    # Correlation of each member's latent draw between consecutive gates in a chamber. 1 reuses one
+    # draw at every gate (the original design); 0 makes gates independent given the probabilities.
+    gate_correlation: float = Field(default=1.0, ge=0.0, le=1.0)
     # How an exact tie on a Senate majority vote (S1, S3) is resolved. "none" keeps the plain
     # rule (a tie defeats the motion). Whether and how a presiding officer may break such a tie in
     # an impeachment trial is not settled, so this is the user's assumption to state.
     senate_tie_break: TieBreak = "none"
+    # "random": in each Monte Carlo draw every present member is absent with their missed-vote
+    # rate (member p_absent, then the alignment file's n_missed / n_possible, then absence_rate).
+    # "fixed" keeps attendance exactly as the roster gives it.
+    attendance: AttendanceMode = "fixed"
+    absence_rate: Prob = 0.0
     defection_prior: DefectionPrior | None = None
 
     @model_validator(mode="after")
@@ -258,6 +269,24 @@ class AlignedMember(Strict):
     n_votes: int
     breaks: int | None
     loadings: list[float]
+    # Roll calls missed ("not voting") and roll calls the member could have voted on. Optional so
+    # alignment files written before these fields existed still load.
+    n_missed: int | None = None
+    n_possible: int | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> AlignedMember:
+        if (self.n_missed is None) != (self.n_possible is None):
+            raise ValueError(f"{self.id}: give both n_missed and n_possible, or neither")
+        if self.n_missed is not None and not (0 <= self.n_missed <= (self.n_possible or 0)):
+            raise ValueError(f"{self.id}: need 0 <= n_missed <= n_possible")
+        return self
+
+    @property
+    def missed_rate(self) -> float | None:
+        if self.n_missed is None or not self.n_possible:
+            return None
+        return self.n_missed / self.n_possible
 
 
 class AlignmentBody(Strict):

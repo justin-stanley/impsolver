@@ -3,9 +3,9 @@
 The user supplies every case and every probability; the tool computes what the rules require.
 
 ## Stack
-Python 3.12, pydantic v2 (strict, extra=forbid), ruamel.yaml (safe), numpy, PuLP<3 (CBC),
-pytest + hypothesis, ruff, mypy strict, uv. The CLI uses argparse (`impsolver = impsolver.cli:main`)
-and runs fully offline.
+Python 3.12, pydantic v2 (strict, extra=forbid), ruamel.yaml (safe), numpy, PuLP 4 (CBC from
+`pulp[cbc]`; PuLP 2.9 also works), pytest + hypothesis, ruff, mypy strict, uv. The CLI uses
+argparse (`impsolver = impsolver.cli:main`) and runs fully offline.
 
 ## Gate math
 - Stances: PRO / CON / PRESENT / ABSENT. With `pass_direction: pass`, yea = PRO; with `fail`, nay = PRO.
@@ -41,6 +41,23 @@ S2 and ends at the first failed gate. S3 applies only when S2 passes.
 - Trump 2021: H2 232-197 PASS; S2 57-43 FAIL, 10 short.
 - Mayorkas 2024: H2 214-216 FAIL, then 214-213 PASS; S1 51-48-1 and 51-49, point of order
   sustained, path ends.
+- Belknap 1876: S2 35-25, 36-25 (x3), 37-25 FAIL, each 5 short.
+- Swayne 1905: twelve S2 votes FAIL; the closest, 35-47, is 20 short.
+- Archbald 1913: S2 PASS on I, III, IV, V and XIII (42-20, just over two-thirds), FAIL on the other
+  eight; S3 39-35 PASS.
+- Ritter 1936: S2 FAIL on I-VI (55-29 is 1 short), PASS on VII at exactly 56 of 84; S3 0-76 FAIL.
+- Claiborne 1986: S2 PASS on I, II and IV; III 46-17 with 35 present FAIL, 20 short of 66.
+- Hastings 1989: S2 PASS on I-V and VII-IX; VI 48-47, XVI 0-95 and XVII 60-35 FAIL.
+- Nixon 1989: S1 34-63 (dismissal rejected); S2 89-8 and 78-19 PASS, 57-40 FAIL, 8 short.
+- Porteous 2010: H2 412-0, 410-0, 416-0, 423-0; S2 96-0, 69-27, 88-8, 90-6 PASS; S3 94-2 PASS.
+
+Each article walks the path's required stages and ends at its first failed gate. Conviction on
+any one article removes the official, so `expected_complete` is a case-level outcome: the case
+completes when at least one article passes S2. A case that did not complete ends at the furthest
+stage any article reached, and `expected_ends_at` names that stage. Votes on optional stages (S3)
+are checked but do not change where a case ends; an S3 vote taken on the judgment as a whole uses
+the label `judgment` rather than an article number. A fixture with no vote on any required stage
+has no case outcome and fails the backtest.
 
 ## Scenario resolution
 p_pro resolves in this order: override, member stage value, member `*`, party stage, party `*`.
@@ -54,6 +71,10 @@ The verdict is PASS at pro_min, FAIL at pro_max, otherwise CONTESTED.
   - Majority: sum x - sum(1-x-a-present) >= 1 (>= 0 in the fail direction).
   - 2/3: 3*sum x >= 2*sum(1-a).
   - Objective: 1e4 times the change count plus secondary costs; a flip beats an absence.
+  - Solved with CBC (`COIN_CMD` on PuLP 4, the bundled `PULP_CBC_CMD` on PuLP 2.9). The counts are
+    exact. When solutions have the same count and secondary costs within about `TIE_EPS` (1e-6),
+    which members are listed, and at which gates under `--per-gate-stance` (every gate flip costs
+    the same), can depend on the CBC build.
 - Constraints `BLOC<=N` and `--exclude`. Report INFEASIBLE. Absences are labelled
   "procedural sensitivity, not a recommendation".
 
@@ -61,18 +82,29 @@ The verdict is PASS at pro_min, FAIL at pro_max, otherwise CONTESTED.
 Gaussian copula: u_i = sqrt(rho) z_bloc + sqrt(1-rho) e_i, and PRO iff u_i < Phi^-1(p).
 With alignment: u_ig = sqrt(rho) z_bloc + sqrt(1-rho)(s_ig F_i·w + sqrt(psi_i) e_i), where
 psi_i = 1-||F_i||^2. s_ig is the sign of (bloc lean - 0.5), and the lean is the mean p of the
-bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed).
+bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed). By default the
+same draw is reused at every gate in a chamber; `gate_correlation` < 1 loosens that (see below).
+Attendance (`attendance: fixed|random`, default fixed): with random, each present member is absent
+in a draw with probability Member.p_absent, else the alignment file's n_missed/n_possible, else
+`absence_rate` (default 0). One draw per chamber covers all its gates, from a separate stream
+PCG64([seed, 0xA77E]). Absent members leave votes cast, the 2/3-of-present denominator and quorum.
+Deterministic `evaluate` and `flips` keep fixed attendance.
 
 ## Alignment, defection prior, calibration, viability, portfolio
 See `docs/design-reference.md` and the module docstrings in `src/impsolver/`.
 
-## Changes after the 2026-11-27 audit
+## Changes since the original design
 These change behavior relative to the original design.
 - `alignment_chamber_weight` (default `{house: 1, senate: 0}`) multiplies `alignment_weight` for each
   chamber. The Senate defaults to 0 because the 2021 calibration found no Senate co-defection
   signal (permutation p = 0.75). Set it to 1 to restore the original behavior.
 - `national_swing` (default false) draws one party swing per bloc for both chambers instead of one
   per chamber.
+- `gate_correlation` c (default 1, the original design) sets how much each member's draw carries
+  from one gate to the next in a chamber: the factor weights and individual noise at a later gate
+  are sqrt(c) times the previous gate's plus sqrt(1-c) times a fresh standard normal, so marginals
+  are preserved. The bloc swing stays fixed across gates, so national and portfolio-shared swings
+  stay fully shared. Default results do not change.
 - `senate_tie_break` (`none` | `pro` | `con`, default `none`) says how an exact tie on a Senate
   majority vote (S1, S3) is resolved. With `none`, a tie defeats the motion, as in the original design. Whether
   and how a presiding officer may break such a tie in an impeachment trial is not settled here, so
@@ -81,7 +113,12 @@ These change behavior relative to the original design.
 - Succession is causal. Branches after a trigger differ only in work that starts after its verdict.
   A cancelled dependent whose House work had begun keeps its lane through its House phase, and a
   variant (for example a successor in the office) needs fresh House time from the day after the verdict.
+- A portfolio candidate without `article` is removed if any article convicts: P0 is P(at least one
+  article completes) from one simulation in which all articles share the party swings and member
+  draws, and the joint removals distribution uses the same rule. Before, P0 was the first article's
+  P(complete). Only scenarios with more than one article change.
 - Portfolio search: exact up to `exact_limit` = 10 eligible candidates, beam of 4096 above that.
 - `flips` uses the ILP by default (`--greedy` for the heuristic).
 - Unknown stage keys and shift articles are errors. Unknown member ids and blocs are warnings, and
-  `validate` exits 2 on any warning.
+  `validate` exits 2 on any warning. `validate --portfolio` applies the same checks to every
+  scenario a portfolio references, without simulating them.

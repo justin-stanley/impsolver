@@ -4,10 +4,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    ignore:
-      # PuLP 3+ changed its API; impsolver pins pulp<3 until the ILP code is ported.
-      - dependency-name: pulp
-        update-types: ["version-update:semver-major"]
     groups:
       python:
         patterns: ["*"]

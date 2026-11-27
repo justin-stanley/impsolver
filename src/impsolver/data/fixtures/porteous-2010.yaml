@@ -1,0 +1,36 @@
+# Senate trial of Judge G. Thomas Porteous, Jr. (E.D. La.). Convicted on all four articles and
+# disqualified. Senate tallies and absences are from the LIS roll-call pages (100 senators listed
+# on each). House tallies are from the Clerk's roll calls; the four House roll calls each account
+# for 430 members, so the House had 5 vacancies that day.
+schema_version: 1
+case: porteous-2010
+target: {name: G. Thomas Porteous Jr., office: judge}
+date: 2010-12-08
+path: B
+sources:
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-list.htm
+  - https://clerk.house.gov/Votes/2010102
+  - https://clerk.house.gov/Votes/2010103
+  - https://clerk.house.gov/Votes/2010104
+  - https://clerk.house.gov/Votes/2010105
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1112/vote_111_2_00261.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1112/vote_111_2_00262.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1112/vote_111_2_00263.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1112/vote_111_2_00264.htm
+  - https://www.senate.gov/legislative/LIS/roll_call_votes/vote1112/vote_111_2_00265.htm
+verified: 2026-11-27
+bodies:
+  house: {seats: 435, vacancies: 5}
+  senate: {seats: 100}
+votes:
+  - {stage: H2, article: I, yea: 412, nay: 0, not_voting: 18, expected: PASS, note: "2010-03-11"}
+  - {stage: H2, article: II, yea: 410, nay: 0, not_voting: 20, expected: PASS, note: "2010-03-11"}
+  - {stage: H2, article: III, yea: 416, nay: 0, not_voting: 14, expected: PASS, note: "2010-03-11"}
+  - {stage: H2, article: IV, yea: 423, nay: 0, not_voting: 7, expected: PASS, note: "2010-03-11"}
+  - {stage: S2, article: I, yea: 96, nay: 0, not_voting: 4, expected: PASS}
+  - {stage: S2, article: II, yea: 69, nay: 27, not_voting: 4, expected: PASS}
+  - {stage: S2, article: III, yea: 88, nay: 8, not_voting: 4, expected: PASS}
+  - {stage: S2, article: IV, yea: 90, nay: 6, not_voting: 4, expected: PASS}
+  - {stage: S3, article: judgment, yea: 94, nay: 2, not_voting: 4, expected: PASS,
+     note: "motion to forever disqualify; one vote on the whole judgment, not on an article"}
+expected_complete: true
