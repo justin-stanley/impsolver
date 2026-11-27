@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "AlignedMember": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "party": {
+          "title": "Party",
+          "type": "string"
+        },
+        "bloc": {
+          "title": "Bloc",
+          "type": "string"
+        },
+        "n_votes": {
+          "title": "N Votes",
+          "type": "integer"
+        },
+        "breaks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Breaks"
+        },
+        "loadings": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Loadings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "party",
+        "bloc",
+        "n_votes",
+        "breaks",
+        "loadings"
+      ],
+      "title": "AlignedMember",
+      "type": "object"
+    },
+    "AlignmentBody": {
+      "additionalProperties": false,
+      "properties": {
+        "k": {
+          "title": "K",
+          "type": "integer"
+        },
+        "n_contested": {
+          "title": "N Contested",
+          "type": "integer"
+        },
+        "members": {
+          "items": {
+            "$ref": "#/$defs/AlignedMember"
+          },
+          "title": "Members",
+          "type": "array"
+        },
+        "bloc_mean_loadings": {
+          "additionalProperties": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "Bloc Mean Loadings",
+          "type": "object"
+        },
+        "bloc_break_rate": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Bloc Break Rate",
+          "type": "object"
+        }
+      },
+      "required": [
+        "k",
+        "n_contested",
+        "members",
+        "bloc_mean_loadings",
+        "bloc_break_rate"
+      ],
+      "title": "AlignmentBody",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "encoding": {
+      "const": "unsigned_breaks",
+      "title": "Encoding",
+      "type": "string"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "congresses": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Congresses",
+      "type": "array"
+    },
+    "kappa": {
+      "title": "Kappa",
+      "type": "number"
+    },
+    "min_shared": {
+      "title": "Min Shared",
+      "type": "integer"
+    },
+    "bodies": {
+      "additionalProperties": {
+        "$ref": "#/$defs/AlignmentBody"
+      },
+      "title": "Bodies",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "encoding",
+    "source",
+    "congresses",
+    "kappa",
+    "min_shared",
+    "bodies"
+  ],
+  "title": "Alignment",
+  "type": "object"
+}

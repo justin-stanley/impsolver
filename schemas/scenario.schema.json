@@ -1,0 +1,235 @@
+{
+  "$defs": {
+    "DefectionPrior": {
+      "additionalProperties": false,
+      "properties": {
+        "beta": {
+          "default": 1.0,
+          "title": "Beta",
+          "type": "number"
+        },
+        "pseudo_votes": {
+          "default": 20.0,
+          "exclusiveMinimum": 0,
+          "title": "Pseudo Votes",
+          "type": "number"
+        },
+        "stages": {
+          "default": [
+            "*"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Stages",
+          "type": "array"
+        }
+      },
+      "title": "DefectionPrior",
+      "type": "object"
+    },
+    "Shift": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "bloc": {
+          "title": "Bloc",
+          "type": "string"
+        },
+        "delta": {
+          "title": "Delta",
+          "type": "number"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stage"
+        },
+        "article": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Article"
+        }
+      },
+      "required": [
+        "label",
+        "bloc",
+        "delta"
+      ],
+      "title": "Shift",
+      "type": "object"
+    },
+    "Target": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "office": {
+          "title": "Office",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "office"
+      ],
+      "title": "Target",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "target": {
+      "$ref": "#/$defs/Target"
+    },
+    "articles": {
+      "default": [
+        "I"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "title": "Articles",
+      "type": "array"
+    },
+    "rules": {
+      "title": "Rules",
+      "type": "string"
+    },
+    "composition": {
+      "title": "Composition",
+      "type": "string"
+    },
+    "party_priors": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "type": "object"
+      },
+      "default": {},
+      "title": "Party Priors",
+      "type": "object"
+    },
+    "overrides": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "type": "object"
+      },
+      "default": {},
+      "title": "Overrides",
+      "type": "object"
+    },
+    "cutoffs": {
+      "default": [
+        0.1,
+        0.9
+      ],
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Cutoffs",
+      "type": "array"
+    },
+    "rho": {
+      "default": 0.6,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Rho",
+      "type": "number"
+    },
+    "seed": {
+      "default": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "shifts": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Shift"
+      },
+      "title": "Shifts",
+      "type": "array"
+    },
+    "committee_reports": {
+      "default": false,
+      "title": "Committee Reports",
+      "type": "boolean"
+    },
+    "alignment": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Alignment"
+    },
+    "alignment_weight": {
+      "default": 1.0,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Alignment Weight",
+      "type": "number"
+    },
+    "defection_prior": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DefectionPrior"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "schema_version",
+    "target",
+    "rules",
+    "composition"
+  ],
+  "title": "Scenario",
+  "type": "object"
+}

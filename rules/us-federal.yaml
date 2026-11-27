@@ -1,0 +1,50 @@
+# U.S. federal impeachment (House) and removal (Senate) gates.
+schema_version: 1
+jurisdiction: us-federal
+quorum:
+  house: majority_of_sworn
+  senate: majority_of_sworn
+entry: [H1, H2]
+paths:
+  - name: A
+    start: H1
+  - name: B
+    start: H2
+    requires: committee_reports
+stages:
+  - id: H1
+    chamber: house
+    label: table/refer privileged resolution
+    rule: {kind: majority_of_votes_cast}
+    pass_direction: fail
+    next: [H2]
+  - id: H2
+    chamber: house
+    label: adopt article
+    rule: {kind: majority_of_votes_cast}
+    pass_direction: pass
+    next: [S1]
+  - id: S1
+    chamber: senate
+    label: dismiss/point of order/table
+    rule: {kind: majority_of_votes_cast}
+    pass_direction: fail
+    next: [S2]
+  - id: S2
+    chamber: senate
+    label: conviction
+    rule: {kind: fraction_of_present, p: 2, q: 3, present_in_denominator: true}
+    pass_direction: pass
+    terminal_on_pass: true
+    presiding_officer:
+      if_office: president
+      then: chief_justice
+      otherwise: president_pro_tempore_or_vp
+    next: [S3]
+  - id: S3
+    chamber: senate
+    label: disqualification
+    rule: {kind: majority_of_votes_cast}
+    pass_direction: pass
+    optional: true
+    next: []

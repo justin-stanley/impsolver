@@ -1,0 +1,13 @@
+# Hypothetical scenario on a party-shorthand chamber. The user supplies the target.
+schema_version: 1
+target: {name: Example Official, office: cabinet_secretary}
+articles: [I]
+rules: ../rules/us-federal.yaml
+composition: ../compositions/shorthand-119.yaml
+party_priors:
+  D: {"*": 0.95}
+  I: {"*": 0.9}
+  R: {"*": 0.08, H1: 0.15}
+cutoffs: [0.1, 0.9]
+rho: 0.6
+seed: 7

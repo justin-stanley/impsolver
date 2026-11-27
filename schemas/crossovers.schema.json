@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "CrossedMember": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Id"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "CrossedMember",
+      "type": "object"
+    },
+    "CrossoverBody": {
+      "additionalProperties": false,
+      "properties": {
+        "crossed": {
+          "items": {
+            "$ref": "#/$defs/CrossedMember"
+          },
+          "title": "Crossed",
+          "type": "array"
+        }
+      },
+      "required": [
+        "crossed"
+      ],
+      "title": "CrossoverBody",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "case": {
+      "title": "Case",
+      "type": "string"
+    },
+    "history_congress": {
+      "title": "History Congress",
+      "type": "integer"
+    },
+    "party": {
+      "title": "Party",
+      "type": "string"
+    },
+    "bodies": {
+      "additionalProperties": {
+        "$ref": "#/$defs/CrossoverBody"
+      },
+      "propertyNames": {
+        "enum": [
+          "house",
+          "senate"
+        ]
+      },
+      "title": "Bodies",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "case",
+    "history_congress",
+    "party",
+    "bodies"
+  ],
+  "title": "CrossoverFixture",
+  "type": "object"
+}

@@ -1,0 +1,6 @@
+schema_version: 1
+name: shorthand-119
+as_of: 2026-11-01
+bodies:
+  house: {seats: 435, vacancies: 2, party_shorthand: {R: 219, D: 214}}
+  senate: {seats: 100, party_shorthand: {R: 53, D: 45, I: 2}}

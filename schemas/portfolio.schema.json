@@ -1,0 +1,365 @@
+{
+  "$defs": {
+    "Calendar": {
+      "additionalProperties": false,
+      "properties": {
+        "house": {
+          "$ref": "#/$defs/ChamberCalendar",
+          "default": {
+            "weekdays": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "recess": []
+          }
+        },
+        "senate": {
+          "$ref": "#/$defs/ChamberCalendar",
+          "default": {
+            "weekdays": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "recess": []
+          }
+        },
+        "trial_saturdays": {
+          "default": true,
+          "title": "Trial Saturdays",
+          "type": "boolean"
+        }
+      },
+      "title": "Calendar",
+      "type": "object"
+    },
+    "ChamberCalendar": {
+      "additionalProperties": false,
+      "properties": {
+        "weekdays": {
+          "default": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "items": {
+            "maximum": 6,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Weekdays",
+          "type": "array"
+        },
+        "recess": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "format": "date",
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Recess",
+          "type": "array"
+        }
+      },
+      "title": "ChamberCalendar",
+      "type": "object"
+    },
+    "PortfolioCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "scenario": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scenario"
+        },
+        "p": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P"
+        },
+        "article": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Article"
+        },
+        "house_days": {
+          "minimum": 1,
+          "title": "House Days",
+          "type": "integer"
+        },
+        "senate_days": {
+          "minimum": 1,
+          "title": "Senate Days",
+          "type": "integer"
+        },
+        "release": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Release"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        },
+        "weight": {
+          "default": 1.0,
+          "exclusiveMinimum": 0.0,
+          "title": "Weight",
+          "type": "number"
+        },
+        "after": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "After",
+          "type": "array"
+        },
+        "excludes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Excludes",
+          "type": "array"
+        },
+        "senate_committee": {
+          "default": false,
+          "title": "Senate Committee",
+          "type": "boolean"
+        },
+        "committee_floor_days": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Committee Floor Days",
+          "type": "integer"
+        },
+        "succession": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Succession"
+          },
+          "title": "Succession",
+          "type": "array"
+        },
+        "variant_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Variant Of"
+        }
+      },
+      "required": [
+        "id",
+        "house_days",
+        "senate_days"
+      ],
+      "title": "PortfolioCandidate",
+      "type": "object"
+    },
+    "Succession": {
+      "additionalProperties": false,
+      "properties": {
+        "on_removal_of": {
+          "title": "On Removal Of",
+          "type": "string"
+        },
+        "becomes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Becomes"
+        }
+      },
+      "required": [
+        "on_removal_of",
+        "becomes"
+      ],
+      "title": "Succession",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "start": {
+      "format": "date",
+      "title": "Start",
+      "type": "string"
+    },
+    "deadline": {
+      "format": "date",
+      "title": "Deadline",
+      "type": "string"
+    },
+    "house_concurrency": {
+      "default": 2,
+      "minimum": 1,
+      "title": "House Concurrency",
+      "type": "integer"
+    },
+    "fatigue_delta": {
+      "default": 0.0,
+      "title": "Fatigue Delta",
+      "type": "number"
+    },
+    "trial_carryover": {
+      "default": false,
+      "title": "Trial Carryover",
+      "type": "boolean"
+    },
+    "p_floor": {
+      "default": 0.05,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "P Floor",
+      "type": "number"
+    },
+    "top": {
+      "default": 3,
+      "minimum": 1,
+      "title": "Top",
+      "type": "integer"
+    },
+    "draws": {
+      "default": 5000,
+      "minimum": 100,
+      "title": "Draws",
+      "type": "integer"
+    },
+    "beam": {
+      "default": 256,
+      "minimum": 1,
+      "title": "Beam",
+      "type": "integer"
+    },
+    "exact_limit": {
+      "default": 16,
+      "minimum": 1,
+      "title": "Exact Limit",
+      "type": "integer"
+    },
+    "seed": {
+      "default": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "calendar": {
+      "$ref": "#/$defs/Calendar",
+      "default": {
+        "house": {
+          "recess": [],
+          "weekdays": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "senate": {
+          "recess": [],
+          "weekdays": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "trial_saturdays": true
+      }
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/PortfolioCandidate"
+      },
+      "title": "Candidates",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "start",
+    "deadline",
+    "candidates"
+  ],
+  "title": "Portfolio",
+  "type": "object"
+}

@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "PathSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "string"
+        },
+        "requires": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requires"
+        }
+      },
+      "required": [
+        "name",
+        "start"
+      ],
+      "title": "PathSpec",
+      "type": "object"
+    },
+    "PresidingRule": {
+      "additionalProperties": false,
+      "properties": {
+        "if_office": {
+          "default": "president",
+          "title": "If Office",
+          "type": "string"
+        },
+        "then": {
+          "default": "chief_justice",
+          "title": "Then",
+          "type": "string"
+        },
+        "otherwise": {
+          "default": "president_pro_tempore_or_vp",
+          "title": "Otherwise",
+          "type": "string"
+        }
+      },
+      "title": "PresidingRule",
+      "type": "object"
+    },
+    "Stage": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "chamber": {
+          "enum": [
+            "house",
+            "senate"
+          ],
+          "title": "Chamber",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "rule": {
+          "$ref": "#/$defs/ThresholdRule"
+        },
+        "pass_direction": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Pass Direction",
+          "type": "string"
+        },
+        "next": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Next",
+          "type": "array"
+        },
+        "terminal_on_pass": {
+          "default": false,
+          "title": "Terminal On Pass",
+          "type": "boolean"
+        },
+        "optional": {
+          "default": false,
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "presiding_officer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PresidingRule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "chamber",
+        "label",
+        "rule",
+        "pass_direction"
+      ],
+      "title": "Stage",
+      "type": "object"
+    },
+    "ThresholdRule": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "majority_of_votes_cast",
+            "fraction_of_present",
+            "fraction_of_membership"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "p": {
+          "default": 1,
+          "title": "P",
+          "type": "integer"
+        },
+        "q": {
+          "default": 2,
+          "title": "Q",
+          "type": "integer"
+        },
+        "present_in_denominator": {
+          "default": true,
+          "title": "Present In Denominator",
+          "type": "boolean"
+        },
+        "vacancies_reduce_base": {
+          "default": true,
+          "title": "Vacancies Reduce Base",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ThresholdRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "jurisdiction": {
+      "title": "Jurisdiction",
+      "type": "string"
+    },
+    "quorum": {
+      "additionalProperties": {
+        "const": "majority_of_sworn",
+        "type": "string"
+      },
+      "propertyNames": {
+        "enum": [
+          "house",
+          "senate"
+        ]
+      },
+      "title": "Quorum",
+      "type": "object"
+    },
+    "entry": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entry",
+      "type": "array"
+    },
+    "paths": {
+      "items": {
+        "$ref": "#/$defs/PathSpec"
+      },
+      "title": "Paths",
+      "type": "array"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/Stage"
+      },
+      "title": "Stages",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "jurisdiction",
+    "quorum",
+    "entry",
+    "paths",
+    "stages"
+  ],
+  "title": "RuleSet",
+  "type": "object"
+}

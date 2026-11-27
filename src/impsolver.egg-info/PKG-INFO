@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: impsolver
+Version: 0.1.0
+Summary: Neutral vote-math solver for impeachment (House) and conviction (Senate)
+Requires-Python: >=3.12
+Requires-Dist: numpy
+Requires-Dist: pydantic>=2.6
+Requires-Dist: ruamel.yaml>=0.18
+Requires-Dist: pulp<3
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: hypothesis; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"

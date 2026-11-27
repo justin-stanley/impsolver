@@ -1,0 +1,15 @@
+# Hypothetical scenario on the generated us-119 roster, with learned alignment and the
+# defection prior. The target and probabilities are placeholders for the user to replace.
+schema_version: 1
+target: {name: Example Official, office: cabinet_secretary}
+articles: [I]
+rules: ../rules/us-federal.yaml
+composition: ../compositions/us-119.yaml
+alignment: ../alignment/us-119.json
+alignment_weight: 1.0
+defection_prior: {beta: 1.0, pseudo_votes: 20}
+party_priors:
+  D: {"*": 0.95}
+  R: {"*": 0.1}
+rho: 0.6
+seed: 11

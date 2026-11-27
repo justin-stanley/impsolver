@@ -1,0 +1,10 @@
+numpy
+pydantic>=2.6
+ruamel.yaml>=0.18
+pulp<3
+
+[dev]
+pytest
+hypothesis
+ruff
+mypy

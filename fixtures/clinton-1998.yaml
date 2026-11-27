@@ -1,0 +1,16 @@
+schema_version: 1
+case: clinton-1998
+target: {name: William J. Clinton, office: president}
+date: 1999-02-12
+path: B
+source: Clerk roll calls 543 and 545 (1998); Senate roll calls 17 and 18 (1999)
+bodies:
+  house: {seats: 435}
+  senate: {seats: 100}
+votes:
+  - {stage: H2, article: I, yea: 228, nay: 206, not_voting: 1, expected: PASS}
+  - {stage: H2, article: III, yea: 221, nay: 212, not_voting: 2, expected: PASS}
+  - {stage: S2, article: I, yea: 45, nay: 55, expected: FAIL, expected_short: 22}
+  - {stage: S2, article: III, yea: 50, nay: 50, expected: FAIL, expected_short: 17}
+expected_complete: false
+expected_ends_at: S2

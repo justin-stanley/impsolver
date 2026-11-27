@@ -1,0 +1,199 @@
+{
+  "$defs": {
+    "FixtureBody": {
+      "additionalProperties": false,
+      "properties": {
+        "seats": {
+          "title": "Seats",
+          "type": "integer"
+        },
+        "vacancies": {
+          "default": 0,
+          "title": "Vacancies",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seats"
+      ],
+      "title": "FixtureBody",
+      "type": "object"
+    },
+    "FixtureVote": {
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "article": {
+          "default": "I",
+          "title": "Article",
+          "type": "string"
+        },
+        "yea": {
+          "title": "Yea",
+          "type": "integer"
+        },
+        "nay": {
+          "title": "Nay",
+          "type": "integer"
+        },
+        "present": {
+          "default": 0,
+          "title": "Present",
+          "type": "integer"
+        },
+        "not_voting": {
+          "default": 0,
+          "title": "Not Voting",
+          "type": "integer"
+        },
+        "expected": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NO_QUORUM"
+          ],
+          "title": "Expected",
+          "type": "string"
+        },
+        "expected_short": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Short"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "stage",
+        "yea",
+        "nay",
+        "expected"
+      ],
+      "title": "FixtureVote",
+      "type": "object"
+    },
+    "Target": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "office": {
+          "title": "Office",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "office"
+      ],
+      "title": "Target",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "case": {
+      "title": "Case",
+      "type": "string"
+    },
+    "target": {
+      "$ref": "#/$defs/Target"
+    },
+    "date": {
+      "format": "date",
+      "title": "Date",
+      "type": "string"
+    },
+    "path": {
+      "default": "A",
+      "title": "Path",
+      "type": "string"
+    },
+    "bodies": {
+      "additionalProperties": {
+        "$ref": "#/$defs/FixtureBody"
+      },
+      "propertyNames": {
+        "enum": [
+          "house",
+          "senate"
+        ]
+      },
+      "title": "Bodies",
+      "type": "object"
+    },
+    "votes": {
+      "items": {
+        "$ref": "#/$defs/FixtureVote"
+      },
+      "title": "Votes",
+      "type": "array"
+    },
+    "expected_complete": {
+      "default": false,
+      "title": "Expected Complete",
+      "type": "boolean"
+    },
+    "expected_ends_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Ends At"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source"
+    }
+  },
+  "required": [
+    "schema_version",
+    "case",
+    "target",
+    "date",
+    "bodies",
+    "votes"
+  ],
+  "title": "Fixture",
+  "type": "object"
+}

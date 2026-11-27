@@ -1,0 +1,14 @@
+schema_version: 1
+case: trump-2021
+target: {name: Donald J. Trump, office: president}
+date: 2021-02-13
+path: A
+source: Clerk roll call 17 (2021); Senate roll call 59 (2021)
+bodies:
+  house: {seats: 435, vacancies: 2}
+  senate: {seats: 100}
+votes:
+  - {stage: H2, article: I, yea: 232, nay: 197, not_voting: 4, expected: PASS}
+  - {stage: S2, article: I, yea: 57, nay: 43, expected: FAIL, expected_short: 10}
+expected_complete: false
+expected_ends_at: S2

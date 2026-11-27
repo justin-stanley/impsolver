@@ -1,0 +1,29 @@
+# Republicans who voted to impeach (House, 2021-01-13) or convict (Senate, 2021-02-13) in the
+# second Trump impeachment. Ids are bioguide ids. Members with id null were not seated in the
+# 116th Congress, so they have no history in the calibration window.
+schema_version: 1
+case: trump-2021
+history_congress: 116
+party: R
+bodies:
+  house:
+    crossed:
+      - {id: C001109, name: Liz Cheney}
+      - {id: K000378, name: Adam Kinzinger}
+      - {id: U000031, name: Fred Upton}
+      - {id: H001056, name: Jaime Herrera Beutler}
+      - {id: N000189, name: Dan Newhouse}
+      - {id: K000386, name: John Katko}
+      - {id: G000588, name: Anthony Gonzalez}
+      - {id: R000597, name: Tom Rice}
+      - {id: null, name: Peter Meijer, note: first seated in the 117th Congress}
+      - {id: null, name: David Valadao, note: not seated in the 116th Congress}
+  senate:
+    crossed:
+      - {id: B001135, name: Richard Burr}
+      - {id: C001075, name: Bill Cassidy}
+      - {id: C001035, name: Susan Collins}
+      - {id: M001153, name: Lisa Murkowski}
+      - {id: R000615, name: Mitt Romney}
+      - {id: S001197, name: Ben Sasse}
+      - {id: T000461, name: Pat Toomey}

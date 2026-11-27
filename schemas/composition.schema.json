@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "Body": {
+      "additionalProperties": false,
+      "properties": {
+        "seats": {
+          "exclusiveMinimum": 0,
+          "title": "Seats",
+          "type": "integer"
+        },
+        "vacancies": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Vacancies",
+          "type": "integer"
+        },
+        "members": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Member"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Members"
+        },
+        "party_shorthand": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Party Shorthand"
+        }
+      },
+      "required": [
+        "seats"
+      ],
+      "title": "Body",
+      "type": "object"
+    },
+    "Member": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "party": {
+          "title": "Party",
+          "type": "string"
+        },
+        "caucus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Caucus"
+        },
+        "state": {
+          "default": "??",
+          "title": "State",
+          "type": "string"
+        },
+        "district": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District"
+        },
+        "p_pro": {
+          "additionalProperties": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "default": {},
+          "title": "P Pro",
+          "type": "object"
+        },
+        "p_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P Source"
+        },
+        "ideology": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ideology"
+        },
+        "attendance": {
+          "default": "present",
+          "enum": [
+            "present",
+            "absent"
+          ],
+          "title": "Attendance",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "party"
+      ],
+      "title": "Member",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+    },
+    "bodies": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Body"
+      },
+      "propertyNames": {
+        "enum": [
+          "house",
+          "senate"
+        ]
+      },
+      "title": "Bodies",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "name",
+    "as_of",
+    "bodies"
+  ],
+  "title": "Composition",
+  "type": "object"
+}

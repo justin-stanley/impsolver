@@ -1,0 +1,20 @@
+schema_version: 1
+case: mayorkas-2024
+target: {name: Alejandro Mayorkas, office: secretary_of_homeland_security}
+date: 2024-04-17
+path: B
+source: Clerk roll calls 30 and 43 (2024); Senate roll calls 141 and 142 (2024)
+bodies:
+  house: {seats: 435, vacancies: 3}   # approximate; vacancies changed between the two votes
+  senate: {seats: 100}
+votes:
+  - {stage: H2, article: I, yea: 214, nay: 216, not_voting: 2, expected: FAIL,
+     note: "first attempt, 2024-02-06"}
+  - {stage: H2, article: I, yea: 214, nay: 213, not_voting: 5, expected: PASS,
+     note: "second attempt, 2024-02-13; superseded the first"}
+  - {stage: S1, article: I, yea: 51, nay: 48, present: 1, expected: FAIL,
+     note: "point of order that article I is unconstitutional, sustained"}
+  - {stage: S1, article: II, yea: 51, nay: 49, expected: FAIL,
+     note: "point of order against article II, sustained"}
+expected_complete: false
+expected_ends_at: S1
