@@ -1,14 +1,15 @@
 ```text
 usage: impsolver [-h] [--format {text,json}]
-                 {validate,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
+                 {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
                  ...
 
 Neutral vote-math solver for impeachment (House) and conviction (Senate). impsolver evaluates only
 the targets you supply; it does not nominate targets.
 
 positional arguments:
-  {validate,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
-    validate            validate rules, composition and scenario files
+  {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
+    validate            validate rules, composition, scenario and portfolio files
+    init                write a commented starter file (placeholder officials only)
     evaluate            deterministic bounds per gate
     flips               minimal changes for the gates to pass
     simulate            copula Monte Carlo
@@ -29,7 +30,10 @@ options:
 ### `impsolver validate`
 
 ```text
-usage: impsolver validate [-h] [--format {text,json}] rules [composition] [scenario]
+usage: impsolver validate [-h] [--format {text,json}] [--portfolio FILE]
+                          [rules] [composition] [scenario]
+
+Check input files without running them. Exits 2 on any error or warning.
 
 positional arguments:
   rules                 built-in rule set name (us-federal) or a YAML path
@@ -39,6 +43,26 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --format {text,json}
+  --portfolio FILE      also check a portfolio and every scenario its candidates reference
+```
+
+### `impsolver init`
+
+```text
+usage: impsolver init [-h] [--format {text,json}] [--out FILE] [--force]
+                      {composition,portfolio,scenario}
+
+Write a commented template that validates. composition.yaml, scenario.yaml and portfolio.yaml in
+one folder refer to each other.
+
+positional arguments:
+  {composition,portfolio,scenario}
+
+options:
+  -h, --help            show this help message and exit
+  --format {text,json}
+  --out FILE            write here instead of standard output
+  --force               overwrite an existing --out file
 ```
 
 ### `impsolver evaluate`

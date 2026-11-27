@@ -16,6 +16,8 @@ All notable changes are listed here. The format follows
   results do not change.
 - `evaluate` lists, per article, the members nearest the threshold at the binding gate (by the
   supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
+- `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
+  `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per
