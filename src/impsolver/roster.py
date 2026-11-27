@@ -51,10 +51,13 @@ def build_roster(
     vacancy_gap: int = 50,
     as_of: dt.date | None = None,
     name: str = "us-119",
+    vacate: list[str] | None = None,
 ) -> RosterReport:
     caucus = caucus or {}
     member_caucus = member_caucus or {}
     keep_set = set(keep or [])
+    vacate_set = set(vacate or [])
+    known_ids: set[str] = set()
     members = read_members(member_paths)
     last, end = last_votes(vote_paths)
     lines: list[str] = []
@@ -78,6 +81,10 @@ def build_roster(
             group.sort(key=last_of, reverse=True)
             winners = group[:per_seat]
             for w in winners:
+                known_ids.add(w.id)
+                if w.id in vacate_set:
+                    suspected.append(f"{w.name} ({w.id}) vacated by --vacate")
+                    continue
                 sole = len(group) <= per_seat
                 lv = last_of(w)
                 stale = lv != newest and (lv[0] < end_c[0] or end_c[1] - lv[1] > vacancy_gap)
@@ -127,6 +134,9 @@ def build_roster(
         )
         lines += [f"  suspected vacancy: {s}" for s in suspected]
         lines += [f"  caucus from party mapping: {f}" for f in flagged]
+    unknown = sorted((vacate_set | keep_set | set(member_caucus)) - known_ids)
+    if unknown:
+        raise ValueError(f"ids not found among current seat holders: {', '.join(unknown)}")
     comp = Composition(schema_version=1, name=name, as_of=as_of or dt.date.today(), bodies=bodies)  # type: ignore[arg-type]
     return RosterReport(comp, lines)
 
@@ -165,6 +175,9 @@ def main(argv: list[str] | None = None) -> int:
         help="ID=BLOC ('none' = own party); beats --caucus",
     )
     ap.add_argument("--keep", action="append", default=[], help="never mark ID as a vacancy")
+    ap.add_argument(
+        "--vacate", action="append", default=[], help="treat ID's seat as vacant (e.g. resigned)"
+    )
     ap.add_argument("--vacancy-gap", type=int, default=50)
     ap.add_argument("--as-of", type=dt.date.fromisoformat, default=None)
     ap.add_argument("--name", default="us-119")
@@ -180,6 +193,7 @@ def main(argv: list[str] | None = None) -> int:
             a.vacancy_gap,
             a.as_of,
             a.name,
+            a.vacate,
         )
     except (OSError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)

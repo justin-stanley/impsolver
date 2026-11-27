@@ -117,5 +117,17 @@ def test_real_us119_counts() -> None:
 
     h = Counter(x.party for x in c.bodies["house"].roster)
     s = Counter(x.party for x in c.bodies["senate"].roster)
-    assert len(c.bodies["house"].roster) == 433 and h == {"R": 218, "D": 214, "I": 1}
+    # Official count on 2026-11-27 was 218R/214D/1I with 2 vacancies; Hern (R-OK) resigned that day.
+    assert len(c.bodies["house"].roster) == 432 and h == {"R": 217, "D": 214, "I": 1}
+    kiley = next(x for x in c.bodies["house"].roster if x.id == "K000401")
+    assert kiley.bloc == "R"
     assert len(c.bodies["senate"].roster) == 100 and s == {"R": 53, "D": 45, "I": 2}
+
+
+def test_vacate_and_unknown_ids(files: tuple[Path, Path]) -> None:
+    m, v = files
+    rep = build_roster([m], [v], vacate=["A000001"])
+    assert "A000001" not in {x.id for x in rep.comp.bodies["house"].roster}
+    assert any("vacated by --vacate" in ln for ln in rep.lines)
+    with pytest.raises(ValueError, match="not found"):
+        build_roster([m], [v], vacate=["Z999999"])

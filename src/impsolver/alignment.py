@@ -154,15 +154,33 @@ def vote_matrix(
     return x, keys, caster
 
 
+def member_bloc(m: VVMember, caucus: dict[str, str], member_caucus: dict[str, str]) -> str:
+    """A member's current bloc: a per-member mapping beats the party-level one."""
+    own = member_caucus.get(m.id)
+    if own is not None:
+        return m.party if own.lower() == "none" else own
+    return caucus.get(m.party, m.party)
+
+
 def cell_blocs(
-    members: list[VVMember], caster: npt.NDArray[np.int64], caucus: dict[str, str]
+    members: list[VVMember],
+    caster: npt.NDArray[np.int64],
+    caucus: dict[str, str],
+    member_caucus: dict[str, str] | None = None,
 ) -> npt.NDArray[np.str_]:
-    """Bloc label for every cell: the bloc of the party the casting icpsr belonged to."""
+    """Bloc label for every cell: the bloc of the party the casting icpsr belonged to.
+
+    Votes cast under the member's current party use the member's current bloc, so a per-member
+    caucus mapping applies to them; votes cast under an earlier party keep that party's bloc.
+    """
+    member_caucus = member_caucus or {}
     out = np.empty(caster.shape, dtype=object)
     for i, m in enumerate(members):
-        final = caucus.get(m.party, m.party)
+        final = member_bloc(m, caucus, member_caucus)
         out[i, :] = final
         for ic, code in m.icpsr_party.items():
+            if code == m.party_code:
+                continue
             party = party_letter(code)
             out[i, caster[i] == ic] = caucus.get(party, party)
     return out.astype(str)
@@ -318,9 +336,11 @@ def fit_body(
     kappa: float = KAPPA,
     min_shared: int = MIN_SHARED,
     caster: npt.NDArray[np.int64] | None = None,
+    member_caucus: dict[str, str] | None = None,
 ) -> BodyFit:
-    blocs = [caucus.get(m.party, m.party) for m in members]
-    cells = cell_blocs(members, caster, caucus) if caster is not None else None
+    mc = member_caucus or {}
+    blocs = [member_bloc(m, caucus, mc) for m in members]
+    cells = cell_blocs(members, caster, caucus, mc) if caster is not None else None
     mask = contested_mask(votes, blocs, cells=cells)
     br = unsigned_breaks(votes[:, mask], blocs, cells[:, mask] if cells is not None else None)
     has = (~np.isnan(br)).sum(axis=1) > 0
@@ -377,6 +397,7 @@ def build_alignment(
     k: int = K,
     kappa: float = KAPPA,
     min_shared: int = MIN_SHARED,
+    member_caucus: dict[str, str] | None = None,
 ) -> Alignment:
     members = read_members(member_paths)
     rolls = read_votes(vote_paths)
@@ -388,7 +409,7 @@ def build_alignment(
         congresses |= {c for c, _ in keys}
         keep = (~np.isnan(x)).any(axis=1)
         ms = [m for m, kk in zip(ms, keep, strict=True) if kk]
-        fit = fit_body(ms, x[keep], caucus, k, kappa, min_shared, caster[keep])
+        fit = fit_body(ms, x[keep], caucus, k, kappa, min_shared, caster[keep], member_caucus)
         bodies[chamber] = to_alignment_body(fit, k)
     return Alignment(
         schema_version=1,
@@ -410,13 +431,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--votes", action="append", required=True, type=Path)
     ap.add_argument("--members", action="append", required=True, type=Path)
     ap.add_argument("--caucus", action="append", default=[], help="PARTY=BLOC, e.g. 328=D")
+    ap.add_argument(
+        "--member-caucus",
+        action="append",
+        default=[],
+        help="ID=BLOC ('none' = own party); beats --caucus",
+    )
     ap.add_argument("--k", type=int, default=K)
     ap.add_argument("--kappa", type=float, default=KAPPA)
     ap.add_argument("--min-shared", type=int, default=MIN_SHARED)
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args(argv)
     try:
-        al = build_alignment(a.votes, a.members, parse_caucus(a.caucus), a.k, a.kappa, a.min_shared)
+        mc = dict(x.split("=", 1) for x in a.member_caucus)
+        al = build_alignment(
+            a.votes, a.members, parse_caucus(a.caucus), a.k, a.kappa, a.min_shared, mc
+        )
     except (OSError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

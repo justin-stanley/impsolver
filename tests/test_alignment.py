@@ -190,3 +190,7 @@ def test_party_switcher_scored_against_bloc_at_time_of_vote(tmp_path: Path) -> N
     sw = next(m for m in a.bodies["house"].members if m.id == "S0000001")
     assert sw.party == "D" and sw.bloc == "D"
     assert sw.breaks == 0 and sw.n_votes == 40
+    # A per-member mapping says the switcher still caucuses with R: the later votes are breaks.
+    b = build_alignment([votes], [members], {}, member_caucus={"S0000001": "R"})
+    sw = next(m for m in b.bodies["house"].members if m.id == "S0000001")
+    assert sw.bloc == "R" and sw.breaks == 20
