@@ -52,8 +52,8 @@ cd impsolver
 uv sync --extra dev          # or: pip install -e '.[dev]'
 ```
 
-The ILP solver uses CBC, which ships with PuLP; nothing else needs to be installed. impsolver runs
-fully offline once installed.
+The ILP solver uses CBC, which installs with PuLP's `cbc` extra (the `cbcbox` wheel), so nothing else
+needs to be installed on macOS, Linux or Windows x64. impsolver runs fully offline once installed.
 
 ## Quickstart
 

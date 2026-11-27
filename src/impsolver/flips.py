@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -28,6 +29,51 @@ GATE_STANCE_COST = 1e-3
 
 class FlipError(Exception):
     pass
+
+
+# PuLP 4 creates variables through the problem, returns solve statistics instead of a status code
+# and no longer bundles CBC (PULP_CBC_CMD is gone; the pulp[cbc] extra installs it). PuLP 2.9 does
+# none of this. These three helpers are the only version-specific code.
+
+
+def _binary(prob: pulp.LpProblem, name: str) -> pulp.LpVariable:
+    """A 0/1 variable owned by ``prob``."""
+    add: Any = getattr(prob, "add_variable", None)
+    if add is None:  # pragma: no cover - PuLP 2.9 builds free-standing variables
+        add = pulp.LpVariable
+    var: pulp.LpVariable = add(name, cat="Binary")
+    return var
+
+
+def _cbc() -> Any:
+    """A silent CBC solver: the one bundled with PuLP < 4, else ``COIN_CMD`` (``pulp[cbc]``)."""
+    bundled = getattr(pulp, "PULP_CBC_CMD", None)
+    if bundled is not None:  # PuLP < 4
+        solver = bundled(msg=False)
+    else:
+        coin: Any = pulp.COIN_CMD  # untyped in PuLP 4
+        solver = coin(msg=False, gapRel=0.0)
+    if not solver.available():
+        raise FlipError(
+            "the ILP needs the CBC solver: reinstall with `pip install 'pulp[cbc]'`, "
+            "put `cbc` on PATH, or use --greedy"
+        )
+    return solver
+
+
+def _optimal(solved: Any) -> bool:
+    """Whether ``LpProblem.solve`` returned a proven optimum.
+
+    PuLP 4 returns an ``LpSolveStats``; older releases return the integer status (1 is optimal).
+    PuLP 4 also reports CBC's "Optimal (within gap tolerance)" as ``GapLimit``, which PuLP 2.9
+    called optimal. impsolver runs CBC with a zero relative gap, so the change count
+    (``CHANGE_WEIGHT`` apart) is exact. Choices that differ only by ``TIE_EPS`` sit within CBC's
+    numerical tolerances and can differ between CBC builds.
+    """
+    if not hasattr(solved, "status"):  # PuLP < 4
+        return int(solved) == 1
+    ok = (pulp.LpSolveStatus.Optimal, pulp.LpSolveStatus.GapLimit)
+    return bool(solved.has_solution) and solved.status in ok
 
 
 def parse_constraints(specs: list[str]) -> dict[str, int]:
@@ -252,7 +298,9 @@ def _ilp(
     rank = 0
     for ci, d in enumerate(data):
         n_g, n_m = d.base.shape
-        pro_terms: list[list[pulp.LpAffineExpression | int]] = [[] for _ in range(n_g)]
+        pro_terms: list[list[pulp.LpAffineExpression | pulp.LpVariable | int]] = [
+            [] for _ in range(n_g)
+        ]
         absent_terms: list[pulp.LpVariable] = []
         for i, m in enumerate(d.members):
             frozen = m.id in excl
@@ -262,17 +310,17 @@ def _ilp(
             needs = [g for g in range(n_g) if not d.base[g, i]]
             if needs and not frozen:
                 if per_gate:
-                    y = pulp.LpVariable(f"y_{ci}_{i}", cat="Binary")
+                    y = _binary(prob, f"y_{ci}_{i}")
                     for g in needs:
-                        xg[g] = pulp.LpVariable(f"x_{ci}_{g}_{i}", cat="Binary")
+                        xg[g] = _binary(prob, f"x_{ci}_{g}_{i}")
                         prob += xg[g] <= y
                         objective.append(GATE_STANCE_COST * xg[g])  # no needless gate flips
                 else:
-                    y = pulp.LpVariable(f"x_{ci}_{i}", cat="Binary")
+                    y = _binary(prob, f"x_{ci}_{i}")
                     for g in needs:
                         xg[g] = y
                 if allow_absence and len(needs) == n_g:
-                    a = pulp.LpVariable(f"a_{ci}_{i}", cat="Binary")
+                    a = _binary(prob, f"a_{ci}_{i}")
                     prob += y + a <= 1
                     absent_terms.append(a)
             for g in range(n_g):
@@ -309,8 +357,7 @@ def _ilp(
         if bloc in caps:
             prob += pulp.lpSum(terms) <= caps[bloc]
     prob += pulp.lpSum(objective)
-    prob.solve(pulp.PULP_CBC_CMD(msg=False))
-    if pulp.LpStatus[prob.status] != "Optimal":
+    if not _optimal(prob.solve(_cbc())):
         return FlipResult(
             article=art,
             gates=gate_ids,

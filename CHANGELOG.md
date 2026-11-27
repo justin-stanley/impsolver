@@ -15,6 +15,9 @@ All notable changes are listed here. The format follows
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per
   article, adds a case-level line to `path_checks`, and fails a fixture with no required-stage vote.
+- The ILP runs on PuLP 4 (`pulp[cbc]>=2.9,<5`; CBC now comes from the `cbcbox` wheel). Flip and
+  absence counts are unchanged; among near-tied solutions, the members or gates listed can differ
+  by CBC build (#9).
 
 ### Fixed
 
