@@ -67,7 +67,8 @@ impsolver portfolio examples/portfolio-example.yaml --html plan.html
 
 `plan.html` is a self-contained planning page: a timeline of House and Senate work for the best
 plans, each case's gate-by-gate odds, succession branches, the distribution of removals,
-candidates left out and why, and sensitivity to fatigue and durations. A rendered copy is in
+candidates left out and why, a tornado chart of what moves each case's odds, and sensitivity to
+fatigue and durations. A rendered copy is in
 [`examples/portfolio-example.html`](examples/portfolio-example.html).
 
 Add `--format json` to any command for machine-readable output.
@@ -99,6 +100,7 @@ majority of sworn members) is required at every gate.
 | `backtest` | Replays 13 past cases against the rules: the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas votes, Belknap (1876) and seven trials of federal judges. |
 | `calibrate` | Tests whether learned alignment picks out members who actually crossed party lines. |
 | `roster`, `align` | Build a composition and alignment loadings from Voteview data. |
+| `compare-plans` | Puts two portfolios or two scenarios side by side, with a tornado chart of how each case's P(removal) moves when one input moves one notch (`--html` for a page). |
 | `validate`, `init`, `compare`, `schema` | Check files (portfolios too), write starter templates, compare compositions, write JSON schemas. |
 
 File formats are documented by the JSON schemas in [`schemas/`](schemas/) and the examples in

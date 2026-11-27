@@ -17,6 +17,8 @@ from . import alignment as alignment_mod
 from . import roster as roster_mod
 from .backtest import run_backtest
 from .calibrate import calibrate
+from .compare import CompareError, Comparison, PortfolioSide
+from .compare import compare as compare_plans
 from .deterministic import default_path, evaluate
 from .flips import ABSENCE_NOTE, FlipError, find_flips
 from .loader import (
@@ -49,6 +51,7 @@ from .prepare import Prepared
 from .prepare import prepare as _prepare_raw
 from .priors import PriorError
 from .report import render as render_report
+from .report import render_comparison
 from .results import Evaluation, FlipResult, Simulation
 from .simulate import simulate
 from .templates import DEFAULT_NAMES, TEMPLATES
@@ -286,6 +289,42 @@ def cmd_compare(a: argparse.Namespace) -> int:
     return 0
 
 
+def render_comparison_text(c: Comparison) -> str:
+    out = [NEUTRALITY]
+    for tag, side in (("A", c.a), ("B", c.b)):
+        if isinstance(side, PortfolioSide):
+            out.append(
+                f"\n{tag}: {side.file}\n  E[removals]={side.expected_removals:.3f}  order "
+                f"{' > '.join(side.recommended_order) or 'none'}"
+            )
+            tornadoes = list(side.result.tornado.values())
+        else:
+            out.append(
+                f"\n{tag}: {side.file}\n  {side.target} ({side.office}) on {side.composition}: "
+                f"P(removal)={side.p_removal:.4f}"
+            )
+            tornadoes = [side.tornado]
+        for t in tornadoes:
+            out.append(f"  {t.id or t.label}: {t.basis} {t.base:.4f}")
+            out += [
+                f"    {b.input:16} {b.low_setting:>18} {b.p_low:.4f}  "
+                f"{b.high_setting:>18} {b.p_high:.4f}  swing {b.swing:.4f}"
+                for b in t.bars
+            ]
+    return "\n".join(out)
+
+
+def cmd_compare_plans(a: argparse.Namespace) -> int:
+    c, warnings = compare_plans(a.a, a.b, draws=a.draws, exhaustive=a.exhaustive)
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    if a.html:
+        Path(a.html).write_text(render_comparison(c), encoding="utf-8")
+        print(f"wrote {a.html}", file=sys.stderr)
+    _emit(a, c, lambda: render_comparison_text(c))
+    return 0
+
+
 def cmd_viability(a: argparse.Namespace) -> int:
     cases = [Case(str(p), prepare(p)) for p in a.scenarios]
     rows = assess(cases, target_p=a.target_p, max_gap=a.max_gap, draws=a.draws)
@@ -487,6 +526,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("scenario")
     p.add_argument("--composition", action="append", required=True)
 
+    p = add(
+        "compare-plans",
+        cmd_compare_plans,
+        help="two portfolios or two scenarios side by side, with tornado sensitivity",
+        description="Compute two portfolios (or two scenarios) as their own commands would, "
+        "and show them side by side with one-notch sensitivity of each case's P(removal).",
+    )
+    p.add_argument("a", metavar="A.yaml")
+    p.add_argument("b", metavar="B.yaml")
+    p.add_argument("--html", metavar="OUT", help="also write a self-contained comparison page")
+    p.add_argument(
+        "--draws",
+        type=int,
+        default=20_000,
+        help="draws per run for scenarios (portfolios use their own draws)",
+    )
+    p.add_argument("--exhaustive", action="store_true", help="exhaustive portfolio search")
+
     p = add("viability", cmd_viability, help="rank the scenarios you supply")
     p.add_argument("scenarios", nargs="+")
     p.add_argument("--target-p", type=float, default=0.5)
@@ -533,6 +590,7 @@ ERRORS = (
     FlipError,
     PriorError,
     PortfolioError,
+    CompareError,
     CliError,
     ValueError,
     KeyError,

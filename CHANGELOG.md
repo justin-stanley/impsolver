@@ -18,6 +18,10 @@ All notable changes are listed here. The format follows
   supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 - `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
   `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
+- The `portfolio --html` page has a tornado chart per scenario case (P with each bloc prior ±0.05,
+  rho ±0.2 and fatigue ±0.2, common random numbers; also `tornado` in the JSON), and
+  `impsolver compare-plans A.yaml B.yaml [--html OUT]` shows two portfolios or two scenarios side
+  by side; default results do not change.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

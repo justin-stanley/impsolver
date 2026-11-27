@@ -1,19 +1,20 @@
 ```text
 usage: impsolver [-h] [--format {text,json}]
-                 {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
+                 {validate,init,evaluate,flips,simulate,compare,compare-plans,viability,backtest,portfolio,calibrate,schema,roster,align}
                  ...
 
 Neutral vote-math solver for impeachment (House) and conviction (Senate). impsolver evaluates only
 the targets you supply; it does not nominate targets.
 
 positional arguments:
-  {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
+  {validate,init,evaluate,flips,simulate,compare,compare-plans,viability,backtest,portfolio,calibrate,schema,roster,align}
     validate            validate rules, composition, scenario and portfolio files
     init                write a commented starter file (placeholder officials only)
     evaluate            deterministic bounds per gate
     flips               minimal changes for the gates to pass
     simulate            copula Monte Carlo
     compare             evaluate one scenario against several compositions
+    compare-plans       two portfolios or two scenarios side by side, with tornado sensitivity
     viability           rank the scenarios you supply
     backtest            replay historical roll calls
     portfolio           schedule a portfolio of candidates
@@ -136,6 +137,28 @@ options:
   -h, --help            show this help message and exit
   --format {text,json}
   --composition COMPOSITION
+```
+
+### `impsolver compare-plans`
+
+```text
+usage: impsolver compare-plans [-h] [--format {text,json}] [--html OUT] [--draws DRAWS]
+                               [--exhaustive]
+                               A.yaml B.yaml
+
+Compute two portfolios (or two scenarios) as their own commands would, and show them side by side
+with one-notch sensitivity of each case's P(removal).
+
+positional arguments:
+  A.yaml
+  B.yaml
+
+options:
+  -h, --help            show this help message and exit
+  --format {text,json}
+  --html OUT            also write a self-contained comparison page
+  --draws DRAWS         draws per run for scenarios (portfolios use their own draws)
+  --exhaustive          exhaustive portfolio search
 ```
 
 ### `impsolver viability`

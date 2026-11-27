@@ -15,8 +15,10 @@ import html
 import json
 from collections.abc import Iterable
 
+from .compare import Comparison, PortfolioSide, ScenarioSide
 from .model import Portfolio
 from .portfolio import PlanOut, PortfolioResult, Slot, TreeNode, excluded_reason_text
+from .tornado import TORNADO_NOTE, Tornado
 
 OPTIONAL_GATES = {"S3"}
 NEUTRALITY = "Plans cover only the candidates you supplied. impsolver does not nominate targets."
@@ -50,7 +52,7 @@ padding:5px 12px;cursor:pointer}.tabs button[aria-selected=true]{background:var(
 color:var(--bg);border-color:var(--ink)}.plan{display:none}.plan.on{display:block}
 table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:6px 8px;
 border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:8px}
 .sw{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:6px;
 vertical-align:middle}
@@ -65,6 +67,12 @@ font-size:13px;line-height:1.3}
 border-radius:8px;padding:4px 8px;font-size:13px}
 .tree .yes{color:var(--ok)}.tree .no{color:var(--warn)}.note{color:var(--muted);font-size:13px}
 svg text{fill:var(--ink);font-size:12px}svg .muted{fill:var(--muted)}
+.tornado{max-width:560px}.tornado svg text{font-size:13px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.cols>.panel{min-width:0}h3{font-size:15px;margin:14px 0 6px}
+.file{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--muted);
+overflow-wrap:anywhere}
 """
 
 JS = """
@@ -321,6 +329,89 @@ def pivots_html(res: PortfolioResult, pf: Portfolio) -> str:
     )
 
 
+# ----------------------------------------------------------------------- tornado
+
+TORNADO_HEADING = "What moves each case (one notch per input)"
+
+
+def tornado_svg(t: Tornado) -> str:
+    """Inline SVG tornado chart: one row per input, sorted by swing, labels above the bars.
+
+    The upper bar of each row is the input moved down a notch, the lower bar the input moved up.
+    Values are printed as text so the chart does not depend on color.
+    """
+    w, pad, row_h, top = 400, 12, 46, 8
+    vals = [t.base] + [v for b in t.bars for v in (b.p_low, b.p_high)]
+    lo, hi = min(vals), max(vals)
+    if hi - lo < 0.02:
+        lo, hi = max(0.0, t.base - 0.01), min(1.0, t.base + 0.01)
+        if hi - lo < 1e-9:
+            lo, hi = lo - 0.01, hi + 0.01
+    span = hi - lo
+    height = top + row_h * max(1, len(t.bars)) + 34
+
+    def x(p: float) -> float:
+        return pad + (w - 2 * pad) * (p - lo) / span
+
+    xb = x(t.base)
+    parts = [
+        f'<svg viewBox="0 0 {w} {height}" width="100%" role="img" '
+        f'aria-label="{e(f"Tornado chart for {t.label}: P(removal) when each input moves")}">'
+        f"<title>{e(t.label)}: base {_pct(t.base)}</title>"
+    ]
+    for i, b in enumerate(t.bars):
+        y = top + i * row_h
+        parts.append(
+            f'<text x="{pad}" y="{y + 13}">{e(b.input)}</text>'
+            f'<text x="{w - pad}" y="{y + 13}" text-anchor="end" class="muted">'
+            f"{e(b.low_setting)}: {_pct(b.p_low)} · {e(b.high_setting)}: {_pct(b.p_high)}</text>"
+        )
+        parts.append(
+            f'<line x1="{xb:.1f}" x2="{xb:.1f}" y1="{y + 17}" y2="{y + 40}" stroke="var(--ink)" '
+            f'stroke-width="1.5" stroke-dasharray="3 2"/>'
+        )
+        for k, (p, fill, setting) in enumerate(
+            ((b.p_low, "var(--house)", b.low_setting), (b.p_high, "var(--trial)", b.high_setting))
+        ):
+            x1, x2 = sorted((xb, x(p)))
+            parts.append(
+                f'<rect x="{x1:.1f}" y="{y + 19 + 10 * k}" width="{max(1.5, x2 - x1):.1f}" '
+                f'height="9" rx="2" fill="{fill}"><title>{e(b.input)} {e(setting)}: '
+                f"{_pct(p)}{' (' + e(b.note) + ')' if b.note else ''}</title></rect>"
+            )
+    yb = top + row_h * max(1, len(t.bars))
+    parts.append(
+        f'<line x1="{pad}" x2="{w - pad}" y1="{yb + 2}" y2="{yb + 2}" stroke="var(--line)"/>'
+        f'<text x="{pad}" y="{yb + 18}" class="muted">{_pct(lo)}</text>'
+        f'<text x="{w - pad}" y="{yb + 18}" text-anchor="end" class="muted">{_pct(hi)}</text>'
+        f'<text x="{xb:.1f}" y="{yb + 32}" text-anchor="middle">base {_pct(t.base)}</text>'
+        "</svg>"
+    )
+    legend = (
+        '<div class="legend"><span><i class="sw" style="background:var(--house)"></i>input '
+        'one notch down</span><span><i class="sw" style="background:var(--trial)"></i>input one '
+        "notch up</span></div>"
+    )
+    notes = "".join(f"<br>{e(n)}" for n in t.notes)
+    return (
+        f'<div class="tornado"><h3>{e(t.id or t.label)}'
+        f"{' (' + e(t.label) + ')' if t.id and t.label != t.id else ''}</h3>"
+        f"<p class=note>{e(t.basis)}: {_pct(t.base)}; {t.draws:,} draws per run{notes}</p>"
+        f"{''.join(parts)}{legend}</div>"
+    )
+
+
+def tornado_section(tornadoes: Iterable[Tornado]) -> str:
+    charts = [tornado_svg(t) for t in tornadoes]
+    if not charts:
+        return ""
+    return (
+        f'<section id="tornado"><h2>{e(TORNADO_HEADING)}</h2><div class="panel">'
+        f'<p class=note>{e(TORNADO_NOTE)}</p><div class="tgrid">{"".join(charts)}</div>'
+        "</div></section>"
+    )
+
+
 # ------------------------------------------------------------------ succession
 
 
@@ -460,10 +551,166 @@ lane(s), one Senate trial at a time.</p>
 <h2>Removals</h2><div class="panel">{removals_svg(res)}</div>
 <h2>Left out</h2><div class="panel"><table><tr><th>Candidate</th><th>Reason</th><th>Detail</th>
 </tr>{dropped}</table></div>
+{tornado_section(res.tornado.values())}
 <h2>Sensitivity</h2><div class="panel"><p class=note>Regret is the expected removals lost by keeping
 the recommended order when an input changes. It is flagged fragile above max(0.01, 5% of the
 best).</p><table><tr><th>Change</th><th class=num>Best</th><th class=num>Recommended order
 </th><th class=num>Regret</th><th></th></tr>{sens}</table></div>
 <script type="application/json" id="impsolver-data">{data}</script>
 <script>{JS}</script></main></body></html>
+"""
+
+
+# ------------------------------------------------------------------- comparison
+
+COMPARE_NOTE = (
+    "Each side is computed on its own, exactly as the single-file commands would. The page only "
+    "lines them up."
+)
+
+
+def _diff_rows(rows: list[tuple[str, float | None, float | None, str]]) -> str:
+    out: list[str] = []
+    for label, a, b, fmt in rows:
+
+        def f(v: float | None, fmt: str = fmt) -> str:
+            if v is None:
+                return "—"
+            return _pct(v) if fmt == "pct" else f"{v:.2f}"
+
+        if a is None or b is None:
+            d = "—"
+        elif fmt == "pct":
+            d = f"{100 * (b - a):+.1f} pts"
+        else:
+            d = f"{b - a:+.2f}"
+        out.append(
+            f"<tr><td>{e(label)}</td><td class=num>{f(a)}</td><td class=num>{f(b)}</td>"
+            f"<td class=num>{d}</td></tr>"
+        )
+    return (
+        "<table><tr><th>Measure</th><th class=num>A</th><th class=num>B</th>"
+        f"<th class=num>B − A</th></tr>{''.join(out)}</table>"
+    )
+
+
+def _portfolio_column(tag: str, side: PortfolioSide) -> str:
+    res = side.result
+    in_order = {s.id: s for s in side.slots}
+    left = {d.id: d for d in res.dropped}
+    rows = []
+    for cid, p0 in res.p0.items():
+        slot = in_order.get(cid)
+        status = (
+            f"trial {slot.attempt + 1}: {_pct(slot.p)}"
+            if slot is not None
+            else (
+                e(excluded_reason_text(left[cid].reason) or left[cid].reason)
+                if cid in left
+                else "not scheduled unless a succession rule applies"
+            )
+        )
+        rows.append(
+            f"<tr><td>{e(_label(res, cid))}</td><td class=num>{_pct(p0)}</td><td>{status}</td></tr>"
+        )
+    rd = res.removals_dist
+    dist = (
+        f"<p>Removals: mean {rd.mean:.2f}, standard deviation {rd.sd:.2f} ({e(rd.method)}).</p>"
+        if rd is not None
+        else ""
+    )
+    return (
+        f'<div class="panel"><h2>{e(tag)}</h2><p class="file">{e(side.file)}</p>'
+        f'<div class="kpis"><div class="kpi"><b>{side.expected_removals:.2f}</b><span>expected '
+        f'removals</span></div><div class="kpi"><b>{len(side.recommended_order)}</b><span>cases '
+        f'attempted</span></div><div class="kpi"><b class="{"fragile" if res.fragile else ""}">'
+        f"{'Fragile' if res.fragile else 'Robust'}</b><span>to fatigue and durations</span></div>"
+        f"</div><p>Order: {e(' → '.join(side.recommended_order) or 'none')}</p>{dist}"
+        "<table><tr><th>Candidate</th><th class=num>P alone</th><th>In the plan</th></tr>"
+        f"{''.join(rows)}</table>"
+        + "".join(tornado_svg(t) for t in res.tornado.values())
+        + "</div>"
+    )
+
+
+def _scenario_column(tag: str, side: ScenarioSide) -> str:
+    parts = [
+        f'<div class="panel"><h2>{e(tag)}: {e(side.target)}</h2><p class="file">{e(side.file)}'
+        f"</p><p class=note>Office {e(side.office)}; composition {e(side.composition)}; "
+        f"{side.simulation.draws:,} draws, rho {side.simulation.rho:g}</p>"
+        f'<div class="kpis"><div class="kpi"><b>{_pct(side.p_removal)}</b><span>P(removal)'
+        "</span></div></div>"
+    ]
+    ev = {a.article: a for a in side.evaluation.articles}
+    for art in side.simulation.articles:
+        det = ev.get(art.article)
+        gates = "".join(
+            f"<tr><td>{e(g.stage)}</td><td>{e(GATE_LABELS.get(g.stage, ''))}</td>"
+            f"<td class=num>{_pct(g.p_reached)}</td><td class=num>{_pct(g.p_pass_given_reached)}"
+            f"</td><td class=num>{g.pro_count.p50:.0f}</td></tr>"
+            for g in art.gates
+        )
+        verdict = (
+            f"; deterministic {e(det.verdict)}, binding gate {e(det.binding_gate)}"
+            if det is not None
+            else ""
+        )
+        parts.append(
+            f"<h3>Article {e(art.article)}, path {e(art.path)}</h3><p class=note>P(complete) "
+            f"{_pct(art.p_complete)}{verdict}</p><table><tr><th>Gate</th><th>Vote</th>"
+            "<th class=num>Reached</th><th class=num>Pass if reached</th><th class=num>Median "
+            f"PRO</th></tr>{gates}</table>"
+        )
+    parts.append(tornado_svg(side.tornado) + "</div>")
+    return "".join(parts)
+
+
+def _summary(cmp: Comparison) -> str:
+    a, b = cmp.a, cmp.b
+    rows: list[tuple[str, float | None, float | None, str]] = []
+    if isinstance(a, PortfolioSide) and isinstance(b, PortfolioSide):
+        ra, rb = a.result, b.result
+        rows.append(
+            ("Expected removals, recommended plan", a.expected_removals, b.expected_removals, "num")
+        )
+        rows.append(
+            (
+                "Cases attempted",
+                float(len(a.recommended_order)),
+                float(len(b.recommended_order)),
+                "num",
+            )
+        )
+        rows.append(("Left out", float(len(ra.dropped)), float(len(rb.dropped)), "num"))
+        for cid in list(dict.fromkeys([*ra.p0, *rb.p0])):
+            rows.append((f"P alone: {cid}", ra.p0.get(cid), rb.p0.get(cid), "pct"))
+    elif isinstance(a, ScenarioSide) and isinstance(b, ScenarioSide):
+        rows.append(("P(removal)", a.p_removal, b.p_removal, "pct"))
+        pa = {x.article: x.p_complete for x in a.simulation.articles}
+        pb = {x.article: x.p_complete for x in b.simulation.articles}
+        for art in list(dict.fromkeys([*pa, *pb])):
+            rows.append((f"Article {art}: P(complete)", pa.get(art), pb.get(art), "pct"))
+    return _diff_rows(rows)
+
+
+def render_comparison(cmp: Comparison, title: str = "Plan comparison") -> str:
+    """Return a self-contained HTML page with two portfolios or two scenarios side by side."""
+    cols = "".join(
+        _portfolio_column(tag, side)
+        if isinstance(side, PortfolioSide)
+        else _scenario_column(tag, side)
+        for tag, side in (("A", cmp.a), ("B", cmp.b))
+    )
+    data = json.dumps(cmp.model_dump(mode="json"), default=str).replace("</", "<\\/")
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{e(title)}</title><style>{CSS}</style></head><body><main>
+<h1>{e(title)}</h1>
+<p class="sub">{e(NEUTRALITY)} {e(COMPARE_NOTE)}</p>
+<p class="file">A: {e(cmp.a.file)}<br>B: {e(cmp.b.file)}</p>
+<h2>Summary</h2><div class="panel">{_summary(cmp)}</div>
+<h2>Side by side</h2><p class=note>{e(TORNADO_NOTE)}</p><div class="cols">{cols}</div>
+<script type="application/json" id="impsolver-data">{data}</script>
+</main></body></html>
 """

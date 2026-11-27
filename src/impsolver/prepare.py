@@ -83,6 +83,8 @@ class Prepared:
     alignment: Alignment | None
     source: str = "<memory>"
     warnings: list[str] = field(default_factory=list)
+    # The composition before any defection prior was applied; ``None`` means ``comp`` itself.
+    raw_comp: Composition | None = None
     resolver: Resolver = field(init=False)
 
     def __post_init__(self) -> None:
@@ -132,11 +134,13 @@ def prepare_objects(
     source: str = "<memory>",
 ) -> Prepared:
     warnings = check_references(rules, comp, scenario)
+    raw: Composition | None = None
     if scenario.defection_prior is not None:
         if alignment is None:
             raise ValueError("defection_prior needs an alignment")
+        raw = comp
         comp = apply_defection_prior(scenario.defection_prior, scenario, comp, rules, alignment)
-    return Prepared(rules, comp, scenario, alignment, source, warnings)
+    return Prepared(rules, comp, scenario, alignment, source, warnings, raw)
 
 
 def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared:

@@ -34,6 +34,7 @@ from .simulate import (
     run_raw_articles,
     simulate_article,
 )
+from .tornado import Tornado, tornado
 
 FAR = dt.date(9999, 12, 31)
 MAX_BRANCH_TRIGGERS = 3
@@ -572,6 +573,7 @@ class PortfolioResult(BaseModel):
     gate_paths: dict[str, SimArticle] = {}
     pivots: dict[str, DeterministicArticle] = {}
     labels: dict[str, str] = {}
+    tornado: dict[str, Tornado] = {}
 
 
 # ------------------------------------------------------------------- top level
@@ -702,11 +704,46 @@ def _order_value(ctx: Ctx, order: tuple[str, ...]) -> float:
     return schedule_order(ctx, order).value
 
 
-def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> PortfolioResult:
+def tornadoes(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> dict[str, Tornado]:
+    """One-notch sensitivity of each scenario candidate's P in the recommended order.
+
+    A candidate in the order is measured at its position there (its attempt number in the
+    order's schedule, without succession branches), so fatigue applies. A candidate left out is
+    measured alone, without a fatigue bar.
+    """
+    attempts = {s.id: s.attempt for s in schedule_order(ctx, order).slots}
+    out: dict[str, Tornado] = {}
+    for c in loaded.pf.candidates:
+        prep = loaded.preps.get(c.id)
+        if prep is None:
+            continue
+        art = c.article
+        if art is None and len(prep.scenario.articles) == 1:
+            art = prep.scenario.articles[0]
+        fat = (loaded.pf.fatigue_delta, attempts[c.id]) if c.id in attempts else None
+        t = tornado(
+            prep,
+            art,
+            loaded.pf.draws,
+            cid=c.id,
+            label=prep.scenario.target.name,
+            fatigue=fat,
+            base=loaded.p0[c.id],
+        )
+        if fat is None:
+            t.notes.append("not in the recommended order; measured alone")
+        out[c.id] = t
+    return out
+
+
+def solve(
+    loaded: Loaded, exhaustive: bool = False, joint: bool = True, sensitivities: bool = True
+) -> PortfolioResult:
     """Best plans, the recommended order and its sensitivity.
 
     With succession rules, the recommended order is the one that is best once removals are
     allowed to change later cases; dropped reasons and sensitivity are reported for that order.
+    ``sensitivities`` adds the one-notch tornado data for each scenario candidate.
     """
     pf, p0 = loaded.pf, loaded.p0
     ctx, dropped = make_ctx(pf, p0)
@@ -738,6 +775,8 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
         res.succession_order, res.succession_value, res.decision_tree = list(order), v, tree
     if joint and order:
         res.removals_dist = removals_dist(loaded, ctx, order)
+    if sensitivities:
+        res.tornado = tornadoes(loaded, ctx, order)
     return res
 
 
