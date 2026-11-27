@@ -376,3 +376,12 @@ def test_render_flags_low_draws_on_best_by_brier() -> None:
     line = next(x for x in out.splitlines() if "best by Brier" in x)
     assert "low effective draws" in line
     assert "best settings skip points below 100" in out
+
+
+def test_weights_are_reported_per_chamber() -> None:
+    s = S.sweep([_fixture("a", GROUP_A)], [AL], **{**SMALL, "weights": [0.0]})
+    (c,) = s.chambers
+    # The house grid is the request plus the house default; the top level lists only the request.
+    assert s.weights == [0.0]
+    assert c.weights == sorted({0.0, S.ALIGNMENT_CHAMBER_DEFAULT[c.body]})
+    assert {p.weight for p in c.conditional} == set(c.weights)

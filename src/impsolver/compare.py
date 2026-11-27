@@ -78,7 +78,7 @@ def portfolio_side(path: str | Path, exhaustive: bool = False) -> tuple[Portfoli
         if res.succession_value is not None
         else (res.plans[0].expected_removals if res.plans else 0.0)
     )
-    ctx, _ = make_ctx(loaded.pf, loaded.p0)
+    ctx, _ = make_ctx(loaded.pf, loaded.p0, p0e=loaded.p0_epochs)
     slots = list(schedule_order(ctx, tuple(order)).slots)
     side = PortfolioSide(
         file=str(path), result=res, recommended_order=order, expected_removals=value, slots=slots
@@ -96,7 +96,11 @@ def scenario_side(prep: Prepared, path: str | Path, draws: int) -> ScenarioSide:
         office=scen.target.office,
         composition=prep.comp.name,
         p_removal=base,
-        simulation=simulate(prep, draws=draws),
+        # Same basis as p_removal: point priors, no outer uncertainty loop.
+        simulation=simulate(
+            prep.with_scenario(prep.scenario.model_copy(update={"uncertainty_draws": 0})),
+            draws=draws,
+        ),
         evaluation=evaluate(prep),
         tornado=tornado(prep, article, draws, cid="", base=base),
     )

@@ -95,6 +95,24 @@ def sample_scenario(scenario: Scenario, rng: np.random.Generator) -> Scenario:
     )
 
 
+def bound_scenario(scenario: Scenario, bound: Bound) -> Scenario:
+    """A copy of ``scenario`` with every uncertain prior replaced by its ``bound`` value."""
+
+    def fix(tables: dict[str, dict[str, PriorValue]]) -> dict[str, dict[str, PriorValue]]:
+        return {
+            name: {k: value(v, bound) if is_uncertain(v) else v for k, v in table.items()}
+            for name, table in tables.items()
+        }
+
+    return scenario.model_copy(
+        update={
+            "party_priors": fix(scenario.party_priors),
+            "overrides": fix(scenario.overrides),
+            "uncertainty_draws": 0,
+        }
+    )
+
+
 # ------------------------------------------------------------------ Beta quantiles
 
 

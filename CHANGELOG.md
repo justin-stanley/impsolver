@@ -57,6 +57,12 @@ All notable changes are listed here. The format follows
   swings stay shared; a multi-article candidate is simulated once per article; `attendance: random`
   with no absence rates warns; `evaluate` and `flips` note that they use fixed attendance; CBC runs
   with a zero gap on every PuLP version.
+- Review fixes for PR #14: `compare-plans` and the tornado charts use the P0 of the roster in
+  force at each trial; `evaluate` widens its bounds for range and Beta priors when a defection
+  prior is set; warnings from later rosters are reported; `compare-plans` scenario rows use point
+  priors throughout; `score` lists alignment weights per chamber. `roster_changes` now accepts
+  Senate changes only, because a case's roster is chosen by its trial start, after its House vote
+  (#15).
 
 ## [0.1.0] - 2026-11-27
 

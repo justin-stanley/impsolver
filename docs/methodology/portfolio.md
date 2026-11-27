@@ -46,9 +46,13 @@ roster_changes:
   - date: 2027-04-15
     chamber: senate
     seat: {id: SEN-NEW-1, name: Placeholder successor, party: B}  # fills a vacancy
-  - {date: 2027-05-01, chamber: house, vacate: REP-A-12,           # one member replaces another
-     seat: {id: REP-NEW-1, name: Placeholder member, party: A}}
+  - {date: 2027-05-01, chamber: senate, vacate: SEN-A-12,          # one member replaces another
+     seat: {id: SEN-NEW-2, name: Placeholder member, party: A}}
 ```
+
+Only Senate changes are accepted for now. A case's roster is chosen by the day its Senate trial
+starts, which is after its House vote, so a House change could be applied to a vote that has
+already happened ([issue #15](https://github.com/justin-stanley/impsolver/issues/15)).
 
 `vacate` names a member of the scenario's composition and adds one vacancy; `seat` is a full
 member entry (the same fields as in a composition) and fills one vacancy. Give both to replace a

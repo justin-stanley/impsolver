@@ -22,7 +22,7 @@ from .loader import (
 from .members import Resolver
 from .model import STAR, Alignment, Chamber, Composition, Member, RuleSet, Scenario
 from .priors import apply_defection_prior
-from .uncertainty import Bound, has_uncertainty
+from .uncertainty import Bound, bound_scenario, has_uncertainty
 
 
 class ScenarioError(ValueError):
@@ -106,11 +106,31 @@ class Prepared:
         bound: Bound = "point",
     ) -> npt.NDArray[np.float64]:
         """P(PRO) per member. ``bound`` picks the point value or the low / high bound of
-        uncertain priors (see :mod:`impsolver.uncertainty`)."""
+        uncertain priors (see :mod:`impsolver.uncertainty`).
+
+        With a defection prior, members whose party prior was adjusted carry one number in
+        ``p_pro``; their bounds come from re-applying the prior to the low and high party values.
+        The adjustment pushes away from the party's lean, so it is not monotone across 0.5: the
+        lower of the two results is the low bound and the higher is the high bound.
+        """
+        if bound != "point" and self.scenario.defection_prior is not None:
+            if self.input_comp is not None and self.alignment is not None:
+                ends = [
+                    self._bound_prep(b).probs(chamber, stage, article, extra)
+                    for b in ("low", "high")
+                ]
+                return np.minimum(*ends) if bound == "low" else np.maximum(*ends)
         return np.array(
             [self.resolver.resolve(m, stage, article, extra, bound) for m in self.members(chamber)],
             dtype=float,
         )
+
+    def _bound_prep(self, bound: Bound) -> Prepared:
+        cache = self.__dict__.setdefault("_bound_cache", {})
+        if bound not in cache:
+            cache[bound] = self.with_scenario(bound_scenario(self.scenario, bound))
+        prep: Prepared = cache[bound]
+        return prep
 
     def with_scenario(self, scenario: Scenario) -> Prepared:
         """The same inputs under another scenario (for example one with sampled priors).

@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Chamber = Literal["house", "senate"]
 Direction = Literal["pass", "fail"]
@@ -215,6 +215,13 @@ class PriorBeta(Strict):
     """A probability with a Beta(a, b) distribution, given as ``{beta: [a, b]}``."""
 
     beta: Annotated[tuple[BetaShape, BetaShape], Field(strict=False)]
+
+    @field_validator("beta", mode="before")
+    @classmethod
+    def _as_tuple(cls, v: object) -> object:
+        # YAML gives a list. Older pydantic releases apply the model's strict mode to this field
+        # inside a union, so convert before validation rather than rely on strict=False.
+        return tuple(v) if isinstance(v, list) else v
 
 
 # A party prior or override value: a number, a range {low, high} or a distribution {beta: [a, b]}.
@@ -455,7 +462,8 @@ class RosterChange(Strict):
     """A seat that changes hands on ``date``: ``vacate`` empties a seat, ``seat`` fills one.
 
     Give both to replace a member. Changes apply to every scenario candidate whose Senate trial
-    starts on or after ``date``.
+    starts on or after ``date``. Portfolios accept Senate changes only: a case's roster is chosen
+    by its trial start, which comes after its House vote (GitHub issue #15).
     """
 
     date: LooseDate
@@ -489,6 +497,14 @@ class Portfolio(Strict):
 
     @model_validator(mode="after")
     def _check(self) -> Portfolio:
+        house = [rc.date.isoformat() for rc in self.roster_changes if rc.chamber == "house"]
+        if house:
+            raise ValueError(
+                "roster_changes: House changes are not supported yet (dated "
+                + ", ".join(house)
+                + "); a case's roster is chosen by its Senate trial start, after its House vote. "
+                "See https://github.com/justin-stanley/impsolver/issues/15"
+            )
         ids = [c.id for c in self.candidates]
         if len(set(ids)) != len(ids):
             raise ValueError("duplicate candidate ids")

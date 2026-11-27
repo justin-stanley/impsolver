@@ -110,7 +110,7 @@ def test_portfolio_side_with_succession_and_left_out() -> None:
 
 
 def test_cli_text_json_and_html(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    a = _scenario(tmp_path, "a<1>.yaml", NASTY, 0.35)
+    a = _scenario(tmp_path, "a&b.yaml", NASTY, 0.35)
     b = _scenario(tmp_path, "b.yaml", "Official B", 0.25)
     out = tmp_path / "cmp.html"
     rc = main(["compare-plans", str(a), str(b), "--draws", "500", "--html", str(out)])
@@ -119,9 +119,9 @@ def test_cli_text_json_and_html(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert "P(removal)=" in cap.out and "R prior" in cap.out
     page = out.read_text()
     visible = page.split('id="impsolver-data"')[0]
-    assert "<script>alert" not in visible and "a<1>" not in visible
+    assert "<script>alert" not in visible and "a&b" not in visible
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;" in visible
-    assert "a&lt;1&gt;.yaml" in visible
+    assert "a&amp;b.yaml" in visible
     assert "</script>" not in page.split('id="impsolver-data">')[1].split("</script>")[0]
     rc = main(["--format", "json", "compare-plans", str(a), str(b), "--draws", "500"])
     data = json.loads(capsys.readouterr().out)
@@ -154,3 +154,17 @@ def test_scenario_page_omits_fatigue_and_portfolio_json_has_tornado(
     assert main(["--format", "json", "portfolio", str(pf)]) == 0
     data = json.loads(capsys.readouterr().out)
     assert set(data["tornado"]) == {"one"}
+
+
+def test_scenario_side_uses_point_priors_throughout(tmp_path: Path) -> None:
+    from impsolver.compare import scenario_side
+    from impsolver.prepare import prepare
+
+    p = _scenario(tmp_path, "u.yaml", "Placeholder", 0.3)
+    p.write_text(
+        p.read_text().replace('R: {"*": 0.3}', 'R: {"*": {low: 0.2, high: 0.4}}')
+        + "uncertainty_draws: 50\n"
+    )
+    side = scenario_side(prepare(p), p, 2000)
+    assert side.simulation.articles[0].p_complete == pytest.approx(side.p_removal)
+    assert side.simulation.articles[0].p_complete_interval is None

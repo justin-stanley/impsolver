@@ -295,3 +295,76 @@ def test_low_p_uses_best_epoch() -> None:
     )
     res = solve(Loaded(p, {}, {"c": 0.0}, p0_epochs={"c": [0.0, 0.01]}), joint=False)
     assert res.dropped[0].reason == "LOW_P" and "under any roster" in res.dropped[0].detail
+
+
+# ------------------------------------------------------------- PR #14 review fixes
+
+
+def test_house_changes_are_rejected() -> None:
+    base: dict[str, Any] = {
+        "schema_version": 1,
+        "start": "2027-01-04",
+        "deadline": "2027-12-17",
+        "candidates": [{"id": "a", "p": 0.5, "house_days": 5, "senate_days": 5}],
+    }
+    with pytest.raises(ValidationError, match="issues/15"):
+        Portfolio.model_validate(
+            {**base, "roster_changes": [{"date": "2027-03-20", "chamber": "house", "vacate": "X"}]}
+        )
+    Portfolio.model_validate(
+        {**base, "roster_changes": [{"date": "2027-03-20", "chamber": "senate", "vacate": "X"}]}
+    )
+
+
+def test_compare_plans_uses_the_epoch_p0(tmp_path: Path) -> None:
+    from impsolver.compare import portfolio_side
+
+    side, _ = portfolio_side(_write(tmp_path, VACATE_CON))
+    slot = {s.id: s for s in side.slots}["s2"]
+    assert slot.epoch == 1 and slot.p == 1.0
+    assert sum(s.weight * s.p for s in side.slots) == pytest.approx(side.expected_removals)
+
+
+def test_tornado_uses_the_trial_roster(tmp_path: Path) -> None:
+    res = solve(load(_write(tmp_path, VACATE_CON)))
+    t = res.tornado["s2"]
+    assert t.base == pytest.approx(1.0)  # epoch-1 P0, as in the plan's slot
+    assert any("roster from 2027-01-13" in n for n in t.notes)
+
+
+def test_warnings_from_later_rosters_are_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A new senator whose bloc has a prior but no members yet: fine. One whose party is unknown to
+    # the overrides list raises a reference warning only under the later roster.
+    extra = (
+        "  - {date: 2027-01-13, chamber: senate, vacate: B-001,\n"
+        "     seat: {id: N-001, name: Placeholder, party: A}}\n"
+    )
+    pf = _write(tmp_path, extra)
+    (tmp_path / "s.yaml").write_text(SCEN + 'overrides: {N-001: {"*": 1.0}}\n')
+    loaded = load(pf)
+    # The override names a member who exists only from the change on: no warning then, but one
+    # for the starting roster, where N-001 does not sit yet.
+    assert any("N-001" in w and "roster from" not in w for w in loaded.preps["s2"].warnings)
+    assert not any(w.startswith("roster from") for w in loaded.preps["s2"].warnings)
+    # A senator who leaves in 2027-01-13: an override for them warns only under the later roster.
+    senate = "\n".join(
+        f"      - {{id: SEN-{p}{i:02d}, name: s, party: {p}}}"
+        for p, n in (("A", 66), ("B", 34))
+        for i in range(n)
+    )
+    (tmp_path / "comp.yaml").write_text(
+        COMP.split("  senate:")[0] + "  senate:\n    seats: 100\n    members:\n" + senate + "\n"
+    )
+    leave = "  - {date: 2027-01-13, chamber: senate, vacate: SEN-B00}\n"
+    pf = _write(tmp_path, leave)
+    (tmp_path / "comp.yaml").write_text(
+        COMP.split("  senate:")[0] + "  senate:\n    seats: 100\n    members:\n" + senate + "\n"
+    )
+    (tmp_path / "s.yaml").write_text(SCEN + 'overrides: {SEN-B00: {"*": 0.0}}\n')
+    loaded = load(pf)
+    assert any(
+        w.startswith("roster from 2027-01-13") and "SEN-B00" in w
+        for w in loaded.preps["s2"].warnings
+    )

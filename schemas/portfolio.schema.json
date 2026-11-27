@@ -348,7 +348,7 @@
     },
     "RosterChange": {
       "additionalProperties": false,
-      "description": "A seat that changes hands on ``date``: ``vacate`` empties a seat, ``seat`` fills one.\n\nGive both to replace a member. Changes apply to every scenario candidate whose Senate trial\nstarts on or after ``date``.",
+      "description": "A seat that changes hands on ``date``: ``vacate`` empties a seat, ``seat`` fills one.\n\nGive both to replace a member. Changes apply to every scenario candidate whose Senate trial\nstarts on or after ``date``. Portfolios accept Senate changes only: a case's roster is chosen\nby its trial start, which comes after its House vote (GitHub issue #15).",
       "properties": {
         "date": {
           "format": "date",

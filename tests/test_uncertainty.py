@@ -392,3 +392,27 @@ def test_cli_simulate_with_uncertainty(tmp_path: Path, capsys: pytest.CaptureFix
     assert main(["simulate", str(two), "--draws", "300", "--uncertainty-draws", "4"]) == 0
     assert "Any article: P(removal)=" in capsys.readouterr().out
     assert main(["validate", "us-federal", str(tmp_path / "comp.yaml"), str(scen)]) == 0
+
+
+def test_evaluate_bounds_widen_with_defection_prior(rules: RuleSet) -> None:
+    """A range party prior widens evaluate's bounds even when the defection prior adjusts it."""
+    house = [{"id": f"M{i}", "name": f"m{i}", "party": "R"} for i in range(4)]
+    comp = make_comp(house, {"R": 1})
+    align = _alignment({f"M{i}": 10 for i in range(4)})
+    ranged = make_scenario(
+        party_priors={"R": {"*": {"low": 0.02, "high": 0.97}}},
+        alignment="a.json",
+        defection_prior={"beta": 1.0},
+    )
+    fixed = make_scenario(
+        party_priors={"R": {"*": 0.495}}, alignment="a.json", defection_prior={"beta": 1.0}
+    )
+    p_r = prepare_objects(rules, comp, ranged, align)
+    p_f = prepare_objects(rules, comp, fixed, align)
+    lo = p_r.probs("house", "H2", "I", bound="low")
+    hi = p_r.probs("house", "H2", "I", bound="high")
+    mid = p_f.probs("house", "H2", "I")
+    assert (lo < mid).all() and (hi > mid).all()
+    assert (lo < 0.1).all() and (hi > 0.9).all()
+    # The point value is unchanged by the fix.
+    assert np.allclose(p_r.probs("house", "H2", "I"), p_r.probs("house", "H2", "I", bound="point"))

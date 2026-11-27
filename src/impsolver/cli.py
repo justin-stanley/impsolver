@@ -44,7 +44,7 @@ from .model import (
     Scenario,
 )
 from .paths import PathError, path_for
-from .portfolio import PortfolioError, epoch_preps
+from .portfolio import PortfolioError, change_dates, epoch_preps
 from .portfolio import load as load_portfolio_inputs
 from .portfolio import solve as solve_portfolio
 from .prepare import Prepared
@@ -195,8 +195,12 @@ def _validate_portfolio(path: str) -> tuple[str, list[str]]:
                 )
             path_for(prep.rules, prep.scenario, default_path(prep))
             evaluate(prep)  # resolves every probability
-            for ep in epoch_preps(pf, resolve(c.scenario, path), f"candidate {c.id}"):
+            eps = epoch_preps(pf, resolve(c.scenario, path), f"candidate {c.id}")
+            for d, ep in zip(change_dates(pf), eps, strict=True):
                 evaluate(ep)  # each roster epoch, so a new seat without a prior fails here
+                prep.warnings += [
+                    f"roster from {d}: {w}" for w in ep.warnings if w not in prep.warnings
+                ]
         except ERRORS as e:
             msg = str(e) if not isinstance(e, KeyError) else f"unknown key {e}"
             raise CliError(f"{path}: candidate {c.id}: {msg}") from e

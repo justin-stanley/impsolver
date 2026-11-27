@@ -152,6 +152,8 @@ class ChamberSweep(BaseModel):
     loeo_marginal: list[HeldOut]
     loeo_conditional: list[HeldOut]
     min_effective_draws: float | None
+    # Alignment weights scored for this chamber: the requested grid plus the chamber's default.
+    weights: list[float] = []
 
 
 class Sweep(BaseModel):
@@ -163,6 +165,7 @@ class Sweep(BaseModel):
     seed: int
     betas: list[float]
     rhos: list[float]
+    # The requested grid; each chamber also scores its own default (see ChamberSweep.weights).
     weights: list[float]
     kappas: list[float]
     chambers: list[ChamberSweep]
@@ -500,6 +503,7 @@ def sweep(
             c_points, c_default, c_held = _sweep_table(cond, dkey, names)
         chambers.append(
             ChamberSweep(
+                weights=[float(w) for w in weight_grid],
                 body=chamber,
                 events=[
                     EventInfo(
@@ -540,7 +544,7 @@ def sweep(
         seed=seed,
         betas=beta_grid,
         rhos=rho_grid,
-        weights=sorted({float(w) for w in weights} | set(ALIGNMENT_CHAMBER_DEFAULT.values())),
+        weights=sorted({float(w) for w in weights}),
         kappas=kappas,
         chambers=chambers,
         notes=notes,

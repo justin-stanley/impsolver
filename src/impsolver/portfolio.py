@@ -939,6 +939,12 @@ def load(path: str | Path) -> Loaded:
             if pf.roster_changes:
                 # One P0 per roster epoch, computed once here and looked up by trial start.
                 later[c.id] = epoch_preps(pf, spath, f"candidate {c.id}")
+                # Report warnings that only appear under a later roster (for example a new seat
+                # whose bloc has no prior), with the date the roster takes effect.
+                for d, ep in zip(change_dates(pf), later[c.id], strict=True):
+                    for w in ep.warnings:
+                        if w not in prep.warnings:
+                            prep.warnings.append(f"roster from {d}: {w}")
                 p0_epochs[c.id] = [p] + [
                     _p_removal_of(ep, c, pf.draws, gate=False)[0] for ep in later[c.id]
                 ]
@@ -1052,10 +1058,13 @@ def tornadoes(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> dict[str, Tor
     order's schedule, without succession branches), so fatigue applies. A candidate left out is
     measured alone, without a fatigue bar.
     """
-    attempts = {s.id: s.attempt for s in schedule_order(ctx, order).slots}
+    slots = {s.id: s for s in schedule_order(ctx, order).slots}
+    attempts = {cid: s.attempt for cid, s in slots.items()}
     out: dict[str, Tornado] = {}
     for c in loaded.pf.candidates:
-        prep = loaded.preps.get(c.id)
+        # A case in the order is measured under the roster in force when its trial starts.
+        epoch = slots[c.id].epoch if c.id in slots else 0
+        prep = loaded.prep_at(c.id, epoch)
         if prep is None:
             continue
         art = c.article
@@ -1069,8 +1078,10 @@ def tornadoes(loaded: Loaded, ctx: Ctx, order: tuple[str, ...]) -> dict[str, Tor
             cid=c.id,
             label=prep.scenario.target.name,
             fatigue=fat,
-            base=loaded.p0[c.id],
+            base=loaded.p0_epochs[c.id][epoch] if c.id in loaded.p0_epochs else loaded.p0[c.id],
         )
+        if epoch > 0:
+            t.notes.append(f"roster from {ctx.dates[epoch - 1]} (in force at the trial's start)")
         if fat is None:
             t.notes.append("not in the recommended order; measured alone")
         out[c.id] = t
