@@ -61,9 +61,9 @@ impsolver portfolio examples/portfolio-example.yaml --html plan.html
 ```
 
 `plan.html` is one self-contained file: a timeline of House and Senate work, each case's odds at
-each gate, succession branches, the removals distribution, and why any case was left out. See the
-[example](examples/portfolio-example.html). Add `--format json` to any command for
-machine-readable output.
+each gate, succession branches, the removals distribution, why any case was left out, and a tornado
+chart of what moves each case's odds. See the [example](examples/portfolio-example.html). Add
+`--format json` to any command for machine-readable output.
 
 ## How it works
 
@@ -88,7 +88,9 @@ after a committee report.
 | `viability` | Your scenarios ranked by P(removal), flips needed and support gap |
 | `portfolio` | Order and dates for several cases: House capacity, 1 Senate trial at a time, deadlines, fatigue, succession |
 | `backtest`, `calibrate` | Checks against historical roll calls and the 2021 crossover votes |
+| `score` | Brier and log scores of crossing predictions over a parameter grid (report only) |
 | `roster`, `align` | Builds rosters and co-defection loadings from Voteview |
+| `compare-plans` | Two portfolios or two scenarios side by side, with a tornado chart per case (`--html` for a page) |
 | `validate`, `init`, `compare`, `schema` | Checks files (portfolios too), writes starter templates, compares rosters, writes JSON schemas |
 
 The [docs](https://justin-stanley.github.io/impsolver/) cover the methodology, worked examples,

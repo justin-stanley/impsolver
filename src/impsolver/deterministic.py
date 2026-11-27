@@ -21,6 +21,7 @@ from .results import (
     Verdict,
 )
 from .thresholds import has_quorum, membership_base, pro_wins, required_pro, tie_mode
+from .uncertainty import has_uncertainty
 
 
 def default_path(prep: Prepared) -> str:
@@ -72,13 +73,18 @@ def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicA
     gates: list[DeterministicGate] = []
     nonpro_by_gate: dict[str, list[BlocCount]] = {}
     stage_data: dict[str, tuple[list[Member], npt.NDArray[np.float64], npt.NDArray[np.bool_]]] = {}
+    uncertain = has_uncertainty(prep.scenario)
     for st in path.all_stages:
         body = prep.comp.bodies[st.chamber]
         members = body.roster
         p = prep.probs(st.chamber, st.id, article)
+        # Uncertain priors: a member counts as PRO only if the low bound clears the high cutoff,
+        # and as CON only if the high bound is under the low cutoff.
+        p_low = prep.probs(st.chamber, st.id, article, bound="low") if uncertain else p
+        p_high = prep.probs(st.chamber, st.id, article, bound="high") if uncertain else p
         present = prep.present_mask(st.chamber)
-        is_pro = present & (p >= hi)
-        is_con = present & (p <= lo)
+        is_pro = present & (p_low >= hi)
+        is_con = present & (p_high <= lo)
         is_unc = present & ~is_pro & ~is_con
         voting = int(present.sum())
         pro_min = int(is_pro.sum())
@@ -151,6 +157,10 @@ def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicA
 
 def evaluate(prep: Prepared, path_name: str | None = None) -> Evaluation:
     """Bound every gate of every article using the scenario cutoffs.
+
+    An uncertain prior widens the bounds: pro_min uses its low value (a range's ``low``, a Beta's
+    5th percentile) and pro_max its high value. Pivots list members by the point value (a
+    range's midpoint, a Beta's mean).
 
     Each article also carries ``pivots``: the present non-PRO members at its binding gate,
     highest supplied p first, enough to cover the shortfall at the minimum plus 5 (at most 25).

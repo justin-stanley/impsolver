@@ -29,6 +29,10 @@ between minor versions before 1.0.
 
 ::: impsolver.report.render
 
+## Validation
+
+::: impsolver.score.sweep
+
 ## Threshold arithmetic
 
 ::: impsolver.thresholds.pro_wins

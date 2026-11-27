@@ -195,6 +195,32 @@ class Shift(Strict):
     article: str | None = None
 
 
+class PriorRange(Strict):
+    """A probability known only to lie in [low, high]: uniform in the Monte Carlo outer loop."""
+
+    low: Prob
+    high: Prob
+
+    @model_validator(mode="after")
+    def _check(self) -> PriorRange:
+        if self.low > self.high:
+            raise ValueError(f"range needs low <= high, got low={self.low} high={self.high}")
+        return self
+
+
+BetaShape = Annotated[float, Field(gt=0.0)]
+
+
+class PriorBeta(Strict):
+    """A probability with a Beta(a, b) distribution, given as ``{beta: [a, b]}``."""
+
+    beta: Annotated[tuple[BetaShape, BetaShape], Field(strict=False)]
+
+
+# A party prior or override value: a number, a range {low, high} or a distribution {beta: [a, b]}.
+PriorValue = Prob | PriorRange | PriorBeta
+
+
 class DefectionPrior(Strict):
     beta: float = 1.0
     pseudo_votes: float = Field(default=20.0, gt=0)
@@ -210,8 +236,8 @@ class Scenario(Strict):
     articles: list[str] = ["I"]
     rules: str
     composition: str
-    party_priors: dict[str, dict[str, Prob]] = {}
-    overrides: dict[str, dict[str, Prob]] = {}
+    party_priors: dict[str, dict[str, PriorValue]] = {}
+    overrides: dict[str, dict[str, PriorValue]] = {}
     cutoffs: Annotated[tuple[float, float], Field(strict=False)] = (0.1, 0.9)
     rho: float = Field(default=0.6, ge=0.0, le=1.0)
     seed: int = 0
@@ -240,6 +266,9 @@ class Scenario(Strict):
     attendance: AttendanceMode = "fixed"
     absence_rate: Prob = 0.0
     defection_prior: DefectionPrior | None = None
+    # Outer Monte Carlo draws over uncertain priors (ranges and Beta distributions). 0 turns the
+    # outer loop off; simulate then uses each uncertain prior's midpoint (range) or mean (Beta).
+    uncertainty_draws: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _check(self) -> Scenario:
@@ -315,6 +344,10 @@ class Alignment(Strict):
     kappa: float
     min_shared: int
     bodies: dict[str, AlignmentBody]
+    # Recency weighting of pooled congresses: a roll call in congress c has weight
+    # 0.5 ** ((latest - c) / half_life). None (the default) weights every roll call equally and is
+    # left out of written files, so single-congress files keep their original form.
+    half_life: float | None = Field(default=None, gt=0)
 
 
 # ------------------------------------------------------------------------ fixtures
@@ -359,6 +392,10 @@ class CrossedMember(Strict):
 
 class CrossoverBody(Strict):
     crossed: list[CrossedMember]
+    # Members of the party in the history congress who cast no vote on the event (no longer
+    # seated, a non-voting delegate, or recorded Not Voting). Scoring leaves them out. Leave it
+    # out when it is not known; [] says that every member voted.
+    not_voting: list[CrossedMember] | None = None
 
 
 class CrossoverFixture(Strict):
@@ -414,6 +451,25 @@ class PortfolioCandidate(Strict):
         return self
 
 
+class RosterChange(Strict):
+    """A seat that changes hands on ``date``: ``vacate`` empties a seat, ``seat`` fills one.
+
+    Give both to replace a member. Changes apply to every scenario candidate whose Senate trial
+    starts on or after ``date``.
+    """
+
+    date: LooseDate
+    chamber: Chamber
+    vacate: str | None = None
+    seat: Member | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> RosterChange:
+        if self.vacate is None and self.seat is None:
+            raise ValueError("a roster change needs vacate, seat, or both")
+        return self
+
+
 class Portfolio(Strict):
     schema_version: Literal[1]
     start: LooseDate
@@ -428,6 +484,7 @@ class Portfolio(Strict):
     exact_limit: int = Field(default=10, ge=1)
     seed: int = 0
     calendar: Calendar = Calendar()
+    roster_changes: list[RosterChange] = []
     candidates: list[PortfolioCandidate]
 
     @model_validator(mode="after")

@@ -5,7 +5,8 @@ Detailed formulas and defaults behind `docs/technical-design.md`. Where the two 
 
 ## Alignment JSON
 Alignment{schema_version 1, encoding: Literal["unsigned_breaks"] (reject files without it), source,
-congresses[int], kappa, min_shared, bodies{name: AlignmentBody}}
+congresses[int], kappa, min_shared, bodies{name: AlignmentBody}, half_life: float>0|None}.
+half_life is omitted from the file when None (equal weight), so single-congress files are unchanged.
 AlignmentBody{k, n_contested, members[AlignedMember], bloc_mean_loadings{bloc:[k]},
 bloc_break_rate{bloc:float}}. Each vector has length k and norm^2<=1.
 AlignedMember{id, name, party, bloc, n_votes, breaks:int|None, loadings[k], n_missed:int|None,
@@ -28,14 +29,22 @@ max norm^2 0.999. Merge the two rows a party switcher gets.
 7. Loadings = top-k eigvecs * sqrt(eigval); sign so the largest-|.| entry is positive; rescale rows to
    norm^2<=0.999.
 8. Members with no history get the bloc mean loadings.
-CLI: python -m impsolver.alignment --votes --members (repeatable) --caucus 328=D --k --kappa --min-shared --out
+Pooling: pass the files of several congresses; roll calls are keyed (congress, rollnumber) and
+members are merged by Bioguide ID within a chamber (party and bloc from the latest congress).
+--half-life h gives a roll call in congress c the weight w=0.5**((latest-c)/h); default None = w=1.
+With weights: n=(present*w)@present.T, sx=(filled*w)@present.T, sxy=(filled*w)@filled.T; min_shared
+counts unweighted shared roll calls; shrinkage uses the weighted n; breaks, n_votes, n_missed,
+n_possible are weighted sums rounded to int, and bloc_break_rate is the weighted rate. The
+contested test is per roll call and unweighted.
+CLI: python -m impsolver.alignment --votes --members (repeatable) --caucus 328=D --half-life --k --kappa --min-shared --out
 
 ## Copula MC
 100k draws in 10k chunks, PCG64(seed). Reuse the same u across gates within a draw (scenario
 `gate_correlation` < 1 mixes a fresh draw into each later gate's member-level noise and factor
 weights; the bloc swing stays fixed). Marginals are
 preserved. Blocs are ordered by seat order. Outputs: P(pass|reached) per gate, P(complete), yes-count
-mean/p5/p50/p95, MC standard error, seed.
+mean/p5/p50/p95, MC standard error, seed. With `uncertainty_draws` N > 0, an outer loop samples
+each range/Beta prior once per draw (PCG64([seed, 0x0DD5])) and adds p_complete_interval (p5, p95).
 
 ## Defection prior
 DefectionPrior{beta=1, pseudo_votes=20, stages=["*"]}
@@ -46,23 +55,41 @@ Propensity(breaks, votes, bloc_rate, source, weight=1). fit_beta is a logistic f
 Calibrated: House 1.34±0.43, Senate 0.89±0.47. Fail loudly with no break counts or no member match.
 
 ## Calibrate
-Crossover fixture {schema_version, case, history_congress 116, party R, bodies.house/senate.crossed[{id,name,note}]}.
+Crossover fixture {schema_version, case, history_congress 116, party R, bodies.house/senate.crossed[{id,name,note}], optional not_voting[{id,name,note}]}.
+not_voting (2021): House 41 (116th R not Yea/Nay on roll call 17, incl. 4 Not Voting), Senate 8 (not seated 2021-02-13).
 House: C001109 K000378 U000031 H001056 N000189 K000386 G000588 R000597, plus Meijer and Valadao (id null).
 Senate: B001135 C001075 C001035 M001153 R000615 S001197 T000461.
 Report break rate vs party, mean pairwise alignment vs 5000 random same-party sets (permutation p),
 beta. min_votes 100. Expected: House 0.33 vs 0.20, p=0.014; Senate p=0.75.
+
+## Score (calibration sweep)
+`impsolver score [FIXTURES] --alignment A [--alignment A_kappa2 ...]`; default fixtures: every file in
+`data/fixtures/members/`. Event = fixture; chamber scored separately. Members: party, breaks known,
+n_votes >= min_votes (100), bloc has a break rate (per-member bloc rate), not on not_voting. An event
+that cannot be scored (no crossers or no non-crossers, members missing) goes to skipped. Base rate b = observed crossing share (or `--base-rate`).
+Marginal: p_i = sigmoid(logit b + beta*excess_i) (= priors.adjust for b < .5).
+Conditional: P(y_i | y_-i) under the copula with theta = (z, w) ~ N(0, I),
+q_i = Phi((Phi^-1(p_i) + sqrt(rho) z + sqrt(1-rho) a F_i.w) / (sqrt(1-rho) sqrt(1 - a^2 ||F_i||^2))).
+Importance sampling from N(mode, (1.5^2) Laplace cov) given all y, dividing out member i's own
+likelihood; common random numbers across the grid; min effective draws reported.
+Grid defaults: beta 0..3 (11 values), rho {0, .3, .6, .9}, weight {0, .5, 1}; defaults
+(beta 1, rho .6, chamber weight, kappa 50 or nearest) always added. kappa = one alignment file each.
+Scores: Brier and log loss (nats), lower is better, pooled over members. Best settings and LOEO
+choices skip grid points with min effective draws < 100 (unless all are). LOEO: pick the argmin
+log loss on the other events, score the held-out event, alongside the defaults' held-out score.
 
 ## Viability
 support_gap: bisect delta in [0,8], tol .01, CRN, 20k draws. Sort by p_complete desc, flips asc, gap asc.
 Labels: viable (p>=.5), reachable (gap<=2), out of reach.
 
 ## Voteview URLs (data/voteview/)
-https://voteview.com/static/data/out/votes/{H|S}{116|119}_votes.csv
-https://voteview.com/static/data/out/members/{H|S}{116|119}_members.csv
+https://voteview.com/static/data/out/votes/{H|S}{116|117|118|119}_votes.csv
+https://voteview.com/static/data/out/members/{H|S}{116|117|118|119}_members.csv
 
 ## Portfolio
 Portfolio{schema_version, start, deadline, house_concurrency=2, fatigue_delta=0, trial_carryover=false,
-p_floor=.05, top=3, draws=5000, beam=256, exact_limit=16, calendar, candidates}
+p_floor=.05, top=3, draws=5000, beam=256, exact_limit=16, calendar, roster_changes=[], candidates}
+RosterChange{date, chamber, vacate: member id|null, seat: Member|null (at least one)}
 Candidate{id, scenario|p (exactly one), article, house_days>=1, senate_days>=1, release, deadline,
 weight=1 (>0), after, excludes, senate_committee, committee_floor_days=2,
 succession[{on_removal_of, becomes|null}], variant_of}
@@ -81,7 +108,10 @@ Sensitivity: delta in (-.2,0,.2,.5), durations x0.75/x1.25. Regret = best value 
 rescheduled. FRAGILE if regret > max(.01, .05*E).
 Succession: branch at the trigger's trial (removed or not); the dependent becomes its variant or is
 cancelled. At most 3 triggers branch. Exhaustive up to 7 eligible candidates, otherwise re-score the
-top 2000 non-branching orders. Output a decision tree.
+top 2000 non-branching orders. After each verdict, each branch re-orders the cases whose House work
+has not started (every permutation when at most 6 remain); a case whose House work has started
+keeps its House start and stays in the plan (its Senate trial may move).
+Output a decision tree with each branch's order.
 Joint removals_dist: one shared party-swing stream across scenario candidates plus member noise.
 Fatigued P is matched by a uniform shift found by bisection with CRN. Resolve succession per draw.
 Fixed-p candidates are drawn independently (noted); Poisson-binomial if all are fixed.

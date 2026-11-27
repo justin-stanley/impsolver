@@ -21,6 +21,13 @@ With ``gate_correlation`` c < 1, each gate after the first in a chamber gets its
 component (z, w, e): x_g = sqrt(c) x_(g-1) + sqrt(1-c) x', with x' fresh standard normal. Each
 component stays standard normal, so every marginal is preserved, and u at adjacent gates has
 correlation c. c = 1 reuses one draw at every gate and consumes no extra random numbers.
+
+With ``uncertainty_draws`` N > 0 and at least one prior given as a range or a Beta, an outer loop
+draws N sets of prior values (one value per prior per set, shared by every member and stage that
+resolves to it) from PCG64([seed, 0x0DD5]). Each set runs the inner copula draws with the same
+seed (common random numbers), so the spread of P(complete) across sets reflects the priors only.
+P(complete) is the mean over sets (the pooled draws); the article also reports the 5th and 95th
+percentiles across sets.
 """
 
 from __future__ import annotations
@@ -37,9 +44,14 @@ from .paths import Path, path_for
 from .prepare import Prepared
 from .results import CountSummary, SimArticle, SimGate, Simulation
 from .thresholds import has_quorum, membership_base, pro_wins, tie_mode
+from .uncertainty import has_uncertainty, sample_scenario
 
 CHUNK = 10_000
 ATTENDANCE_STREAM = 0xA77E
+UNCERTAINTY_STREAM = 0x0DD5
+DEFAULT_DRAWS = 100_000
+# Inner draws per outer draw when the outer loop is on and ``draws`` is not given.
+DEFAULT_INNER_DRAWS = 2_000
 _ND = NormalDist()
 
 FloatArr = npt.NDArray[np.float64]
@@ -275,15 +287,8 @@ def summarize(x: npt.NDArray[np.int64]) -> CountSummary:
     return CountSummary(mean=float(x.mean()), p5=float(q[0]), p50=float(q[1]), p95=float(q[2]))
 
 
-def simulate_article(
-    prep: Prepared, article: str, path: Path, draws: int, seed: int, rho: float
-) -> SimArticle:
-    return summarize_raw(run_raw(prep, article, path, draws, seed, rho), article, path, draws)
-
-
-def summarize_raw(raw: RawSim, article: str, path: Path, draws: int) -> SimArticle:
-    """Per-gate pass rates and P(complete) from one simulation run."""
-    reached = np.ones(draws, dtype=bool)
+def _gates(raw: RawSim) -> list[SimGate]:
+    reached = np.ones(raw.pro.shape[1], dtype=bool)
     gates: list[SimGate] = []
     for k, st in enumerate(raw.stages):
         r = float(reached.mean())
@@ -294,43 +299,122 @@ def summarize_raw(raw: RawSim, article: str, path: Path, draws: int) -> SimArtic
             )
         )
         reached = reached & raw.passed[k]
+    return gates
+
+
+def simulate_article(
+    prep: Prepared, article: str, path: Path, draws: int, seed: int, rho: float
+) -> SimArticle:
+    return summarize_raw(run_raw(prep, article, path, draws, seed, rho), article, path, draws)
+
+
+def summarize_raw(raw: RawSim, article: str, path: Path, draws: int) -> SimArticle:
+    """Per-gate pass rates and P(complete) from one simulation run."""
     pc = float(raw.complete.mean())
     return SimArticle(
         article=article,
         path=path.name,
         p_complete=pc,
         mc_se=float(np.sqrt(pc * (1 - pc) / draws)),
-        gates=gates,
+        gates=_gates(raw),
+    )
+
+
+def sampled_preps(prep: Prepared, n: int, seed: int) -> list[Prepared]:
+    """``n`` copies of ``prep``, each with every uncertain prior replaced by one sampled value."""
+    rng = np.random.Generator(np.random.PCG64([seed, UNCERTAINTY_STREAM]))
+    return [prep.with_scenario(sample_scenario(prep.scenario, rng)) for _ in range(n)]
+
+
+def _spread(per: FloatArr, draws: int) -> tuple[float, float, tuple[float, float]]:
+    """Mean, standard error and (p5, p95) of per-outer-draw probabilities.
+
+    The standard error combines the spread of the mean across outer draws with the inner Monte
+    Carlo error, which common random numbers do not average away: sqrt(var_t / N + p(1-p) / draws).
+    """
+    pc = float(per.mean())
+    between = float(per.var(ddof=1)) / len(per) if len(per) > 1 else 0.0
+    lo, hi = np.percentile(per, [5, 95])
+    return pc, float(np.sqrt(between + pc * (1 - pc) / draws)), (float(lo), float(hi))
+
+
+def simulate_article_uncertain(
+    raws: list[RawSim], article: str, path: Path, draws: int
+) -> SimArticle:
+    """Pool the inner draws of every outer draw; report the spread across outer draws."""
+    pooled = RawSim(
+        raws[0].stages,
+        raws[0].n_required,
+        np.concatenate([r.pro for r in raws], axis=1),
+        np.concatenate([r.passed for r in raws], axis=1),
+        np.concatenate([r.present for r in raws], axis=1),
+    )
+    pc, se, interval = _spread(np.array([float(r.complete.mean()) for r in raws]), draws)
+    return SimArticle(
+        article=article,
+        path=path.name,
+        p_complete=pc,
+        mc_se=se,
+        gates=_gates(pooled),
+        p_complete_interval=interval,
     )
 
 
 def simulate(
     prep: Prepared,
-    draws: int = 100_000,
+    draws: int | None = None,
     rho: float | None = None,
     seed: int | None = None,
     path_name: str | None = None,
+    uncertainty_draws: int | None = None,
 ) -> Simulation:
     """Gaussian-copula Monte Carlo over the gates of the scenario's path.
 
     Args:
         prep: A prepared scenario.
-        draws: Number of simulated votes.
+        draws: Number of simulated votes (per outer draw when the outer loop is on). Defaults to
+            100,000, or 2,000 with the outer loop.
         rho: Bloc correlation; defaults to the scenario's ``rho``.
         seed: PCG64 seed; defaults to the scenario's ``seed``.
         path_name: ``"A"`` or ``"B"``.
+        uncertainty_draws: Outer draws over uncertain priors; defaults to the scenario's
+            ``uncertainty_draws``. Ignored (0) when no prior is a range or a Beta.
     """
     r = prep.scenario.rho if rho is None else rho
     s = prep.scenario.seed if seed is None else seed
+    n_outer = prep.scenario.uncertainty_draws if uncertainty_draws is None else uncertainty_draws
+    if n_outer < 0:
+        raise ValueError("uncertainty_draws must be >= 0")
+    if not has_uncertainty(prep.scenario):
+        n_outer = 0
+    n = draws if draws is not None else (DEFAULT_INNER_DRAWS if n_outer else DEFAULT_DRAWS)
     path = path_for(prep.rules, prep.scenario, path_name or default_path(prep))
+    arts = list(prep.scenario.articles)
+    p_any: float | None = None
+    any_interval: tuple[float, float] | None = None
+    if n_outer:
+        preps = sampled_preps(prep, n_outer, s)
+        raws = {a: [run_raw(p, a, path, n, s, r) for p in preps] for a in arts}
+        articles = [simulate_article_uncertain(raws[a], a, path, n) for a in arts]
+        if len(arts) > 1:
+            # Removal on any article, per outer draw: articles share each draw's priors and swings.
+            per_any = [
+                float(any_complete({a: raws[a][t] for a in arts}).mean()) for t in range(n_outer)
+            ]
+            p_any, _, any_interval = _spread(np.array(per_any), n)
+    else:
+        articles = [simulate_article(prep, a, path, n, s, r) for a in arts]
     return Simulation(
         target=prep.scenario.target.name,
-        draws=draws,
+        draws=n,
         rho=r,
         seed=s,
         aligned=prep.alignment is not None
         and any(chamber_weight(prep, ch) > 0 for ch in ("house", "senate")),
-        articles=[simulate_article(prep, a, path, draws, s, r) for a in prep.scenario.articles],
+        articles=articles,
+        uncertainty_draws=n_outer,
+        p_any_complete=p_any,
+        p_any_complete_interval=any_interval,
     )
 
 

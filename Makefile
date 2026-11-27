@@ -19,7 +19,7 @@ docs: demo
 	uv run mkdocs build --strict
 
 fetch:
-	scripts/fetch-voteview.sh 116 119
+	scripts/fetch-voteview.sh 116 117 118 119
 
 reproduce: fetch
 	uv run python scripts/reproduce.py

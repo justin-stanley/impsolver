@@ -40,6 +40,25 @@ def test_succession_tree_branches() -> None:
     assert "If removed" in html and "If not removed" in html
 
 
+def test_succession_tree_shows_branch_order() -> None:
+    succ = [{"on_removal_of": "T", "becomes": "V"}]
+    html, res = _html(
+        [
+            c("T", 0.5),
+            c("X", 0.7, succession=succ, release="2027-03-01"),
+            c("V", 0.2, h=30, variant_of="X"),
+            c("Y", 0.6, release="2027-03-01"),
+        ],
+        deadline="2027-04-01",
+        house_concurrency=1,
+    )
+    tree = res.decision_tree
+    assert tree is not None and tree.removed is not None and tree.removed.reordered
+    assert "order: " + " → ".join(tree.removed.order) + " (re-ordered after the verdict)" in html
+    assert tree.not_removed is not None
+    assert "order: " + " → ".join(tree.not_removed.order) + "</span>" in html
+
+
 def test_gate_paths_from_scenarios() -> None:
     loaded = load(REPO / "examples" / "portfolio-example.yaml")
     res = solve(loaded, joint=False)

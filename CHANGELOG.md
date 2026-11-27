@@ -18,8 +18,29 @@ All notable changes are listed here. The format follows
   supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 - `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
   `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
+- `impsolver score` scores per-member crossing predictions on the crossover fixtures (Brier and log
+  loss) over a grid of β, ρ, alignment weight and κ, with leave-one-event-out scores when there is
+  more than one event; it reports only, and no default changes.
+- Crossover fixtures take an optional `not_voting` list, and `impsolver score` leaves those members
+  out instead of scoring them as non-crossers (2021: 41 House and 8 Senate Republicans of the 116th).
+- `impsolver align` pools several congresses, optionally with a recency weight (`--half-life`, in
+  congresses; recorded as `half_life`), and `alignment/us-116-118.json` pools the 116th to 118th
+  Congresses (Voteview checksums added); `us-116.json`, `us-119.json` and default results are unchanged.
+- `party_priors` and `overrides` values may be a range `{low, high}` or `{beta: [a, b]}`;
+  `uncertainty_draws` (or `simulate --uncertainty-draws`) reports P(removal) with a 5-95% interval
+  over them, and `evaluate` widens its bounds to the range; number-valued results are unchanged.
+- Portfolio `roster_changes` (dated vacancies and new seats): P0 is computed per roster epoch and
+  each trial uses the roster in force on its first day; without changes results do not change.
+- The `portfolio --html` page has a tornado chart per scenario case (P with each bloc prior ±0.05,
+  rho ±0.2 and fatigue ±0.2, common random numbers; also `tornado` in the JSON), and
+  `impsolver compare-plans A.yaml B.yaml [--html OUT]` shows two portfolios or two scenarios side
+  by side; default results do not change.
 
 ### Changed
+- `portfolio` with succession rules: after each trigger's verdict, every branch re-orders the cases
+  not yet started (all orders when at most 6 remain); a case already started stays in the plan
+  with its House start. The decision tree shows each branch's order. Expected removals with succession can rise and the recommended
+  order can change; portfolios without succession rules are unchanged.
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per
   article, adds a case-level line to `path_checks`, and fails a fixture with no required-stage vote.
 - The ILP runs on PuLP 4 (`pulp[cbc]>=2.9,<5`; CBC now comes from the `cbcbox` wheel). Flip and

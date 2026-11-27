@@ -1,9 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Justin Stanley
 # SPDX-License-Identifier: MIT
+import random
 from typing import Any
 
 import pytest
 
+from impsolver import portfolio
 from impsolver.portfolio import Loaded, evaluate_branching, make_ctx, solve
 from tests.test_portfolio import c, pf
 
@@ -110,3 +112,171 @@ def test_sensitivity_uses_recommended_order() -> None:
     base = next(row for row in r.sensitivity if row.label == "fatigue delta +0.0")
     assert r.succession_order == ["T", "X"]
     assert base.base_rescheduled == pytest.approx(1.06) and base.regret == pytest.approx(0.0)
+
+
+def _squeeze(v_house: int) -> Any:
+    """One House lane: once T is removed, V (fresh House time) and Y cannot both fit."""
+    succ = [{"on_removal_of": "T", "becomes": "V"}]
+    return pf(
+        [
+            c("T", 0.5),
+            c("X", 0.7, succession=succ, release="2027-03-01"),
+            c("V", 0.2, h=v_house, variant_of="X"),
+            c("Y", 0.6, release="2027-03-01"),
+        ],
+        deadline="2027-04-01" if v_house == 30 else "2027-05-10",
+        house_concurrency=1,
+    )
+
+
+def test_removed_branch_reorders_when_that_beats_keeping_order() -> None:
+    ctx = _ctx(_squeeze(60))
+    kept, _ = evaluate_branching(ctx, ("T", "X", "Y"), adaptive=False)
+    value, tree = evaluate_branching(ctx, ("T", "X", "Y"))
+    # Not removed: X (0.7) and Y (0.6) both fit. Removed: V's long House phase leaves no room
+    # for Y, so keeping order gets V (0.2); trying Y first gets 0.6 and V no longer fits.
+    # Kept: 0.5 + 0.5 * 0.2 + 0.5 * 1.3 = 1.25. Re-ordered: 0.5 + 0.5 * 0.6 + 0.5 * 1.3 = 1.45.
+    assert kept == pytest.approx(1.25) and value == pytest.approx(1.45) and value > kept
+    assert tree.removed is not None and tree.not_removed is not None and tree.verdict is not None
+    assert tree.removed.order == ["Y", "V"] and tree.removed.reordered
+    assert tree.not_removed.order == ["X", "Y"] and not tree.not_removed.reordered
+    for line in tree.removed.schedule:  # re-planned work starts after the verdict
+        assert line.split("House ")[1][:10] > tree.verdict.isoformat()
+
+
+def test_adaptive_branches_change_the_recommended_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    ctx = _ctx(_squeeze(30))
+    r = solve(Loaded(ctx.pf, {}, ctx.p0), joint=False)
+    monkeypatch.setattr(portfolio, "ADAPTIVE_REORDER", 1)  # keep order in every branch
+    fixed = solve(Loaded(ctx.pf, {}, ctx.p0), joint=False)
+    assert fixed.succession_value == pytest.approx(1.10)
+    assert r.succession_value == pytest.approx(1.15)
+    assert r.succession_order == ["T", "X", "Y"] and fixed.succession_order == ["T", "Y"]
+    assert r.decision_tree is not None and r.decision_tree.removed is not None
+    assert r.decision_tree.removed.reordered
+
+
+def test_reordering_is_skipped_above_the_limit() -> None:
+    succ = [{"on_removal_of": "T", "becomes": None}]
+    later = [c(f"Y{i}", 0.1 * (i + 1), h=3, s=3, release="2027-06-01") for i in range(7)]
+    p = pf([c("T", 0.5, h=3, s=3), c("X", 0.3, h=3, s=3, succession=succ), *later])
+    ctx = _ctx(p)
+    order = ("T", "X", *[f"Y{i}" for i in range(7)])
+    value, tree = evaluate_branching(ctx, order)
+    assert value == pytest.approx(evaluate_branching(ctx, order, adaptive=False)[0])
+    assert tree.removed is not None and tree.not_removed is not None
+    assert tree.removed.order == [f"Y{i}" for i in range(7)] and not tree.removed.reordered
+    assert not tree.not_removed.reordered  # eight cases not started in this branch
+
+
+def test_adaptive_never_loses_and_keeps_started_work() -> None:
+    """Random small portfolios: re-ordering is never worse, and a re-ordered branch keeps every
+    House start that came on or before the verdict in the plan without branching."""
+    rng = random.Random(7)
+    reordered = 0
+    for _ in range(60):
+        succ = [{"on_removal_of": "T", "becomes": "V" if rng.random() < 0.6 else None}]
+        cands = [c("T", rng.uniform(0.2, 0.8), h=rng.randint(3, 30), s=rng.randint(3, 20))]
+        for i in range(rng.randint(3, 4)):
+            kw: dict[str, Any] = {"succession": succ} if i == 0 else {}
+            if i == 1 and rng.random() < 0.5:  # a second trigger: C1 changes if C0 is removed
+                kw["succession"] = [{"on_removal_of": "C0", "becomes": None}]
+            if rng.random() < 0.4:
+                kw["release"] = f"2027-0{rng.randint(1, 4)}-1{rng.randint(0, 9)}"
+            if i >= 1 and rng.random() < 0.4:  # cannot run alongside an earlier case
+                kw["excludes"] = [f"C{rng.randrange(i)}"]
+            cands.append(c(f"C{i}", rng.uniform(0.2, 0.8), rng.randint(3, 40), 10, **kw))
+        cands.append(c("V", rng.uniform(0.1, 0.9), rng.randint(3, 40), 10, variant_of="C0"))
+        p = pf(
+            cands,
+            deadline=f"2027-0{rng.randint(4, 9)}-15",
+            house_concurrency=rng.randint(1, 3),
+            fatigue_delta=rng.choice([0.0, 0.2]),
+        )
+        ctx = _ctx(p)
+        rest = [x.id for x in p.candidates if x.id not in ("T", "V")]
+        order = ("T", *rng.sample(rest, len(rest)))
+        value, tree = evaluate_branching(ctx, order)
+        assert value >= evaluate_branching(ctx, order, adaptive=False)[0] - 1e-12
+        if tree.at != "T" or tree.removed is None or tree.not_removed is None:
+            continue
+        assert tree.verdict is not None
+        verdict = tree.verdict.isoformat()
+        _, plain = evaluate_branching(ctx, order, adaptive=False)
+        assert plain.not_removed is not None
+        before = {
+            cid: start
+            for cid, start in _house_starts(plain.not_removed).items()
+            if start <= verdict
+        }
+        for branch in (tree.removed, tree.not_removed):
+            if not branch.reordered:
+                continue
+            reordered += 1
+            starts = _house_starts(branch)
+            for cid, start in starts.items():
+                assert before.get(cid) == start or start > verdict
+            for cid, start in before.items():  # nothing started before the verdict is dropped
+                assert starts.get(cid) == start
+    assert reordered > 0
+
+
+def test_reordering_never_drops_a_case_that_started() -> None:
+    """A free case that excludes a started one cannot be moved ahead of it to push it out."""
+    succ = [{"on_removal_of": "T", "becomes": None}]
+    cands = [
+        c("T", 0.5, h=10, s=20),
+        c("A", 0.3, h=5, s=5, release="2027-06-01"),
+        c("B", 0.1, h=10, s=5),
+        c("K", 0.9, h=5, s=5, excludes=["B"]),
+        c("X", 0.5, h=5, s=5, succession=succ),
+    ]
+    for lanes in (2, 3):
+        ctx = _ctx(pf(cands, house_concurrency=lanes))
+        for order in (
+            ("T", "A", "X", "B", "K"),
+            ("T", "X", "A", "B", "K"),
+            ("T", "A", "B", "K", "X"),
+        ):
+            plain, ptree = evaluate_branching(ctx, order, adaptive=False)
+            value, tree = evaluate_branching(ctx, order)
+            assert value >= plain - 1e-12
+            assert value == pytest.approx(plain)
+            assert tree.verdict is not None and ptree.not_removed is not None
+            verdict = tree.verdict.isoformat()
+            started = {k: v for k, v in _house_starts(ptree.not_removed).items() if v <= verdict}
+            assert "B" in started
+            for branch in (tree.removed, tree.not_removed):
+                assert branch is not None
+                got = _house_starts(branch)
+                assert all(got.get(k) == v for k, v in started.items())
+
+
+def test_cache_is_keyed_on_adaptive() -> None:
+    ctx = _ctx(_squeeze(60))
+    cache: dict[object, object] = {}
+    assert evaluate_branching(ctx, ("T", "X", "Y"), cache=cache)[0] == pytest.approx(1.45)
+    kept = evaluate_branching(ctx, ("T", "X", "Y"), adaptive=False, cache=cache)[0]
+    assert kept == pytest.approx(1.25)
+
+
+def _house_starts(node: Any) -> dict[str, str]:
+    """House start of every case in a branch, following its not-removed path."""
+    out: dict[str, str] = {}
+    while node is not None:
+        for line in node.schedule:
+            cid, rest = line.split(" ", 1)
+            out.setdefault(cid, rest.split("House ")[1][:10])
+        node = node.not_removed
+    return out
+
+
+def test_preview_counts_lanes_held_by_cancelled_work() -> None:
+    """The preview that fixes House starts places sunk work, as the real run does."""
+    ctx = _ctx(pf([c("S", 0.5, h=10, s=5), c("Y", 0.5, h=5, s=5)], house_concurrency=1))
+    st = portfolio.initial_state(ctx)
+    items = [portfolio._Item("S", sunk=True), portfolio._Item("Y")]
+    starts = portfolio._preview_starts(ctx, items, st, 0, [])
+    house = portfolio.place_house(ctx, "S", st, None)
+    assert house is not None and "S" not in starts
+    assert starts["Y"] > house[1]

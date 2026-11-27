@@ -47,6 +47,21 @@
           },
           "title": "Crossed",
           "type": "array"
+        },
+        "not_voting": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/CrossedMember"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Not Voting"
         }
       },
       "required": [

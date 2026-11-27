@@ -11,6 +11,7 @@ import numpy as np
 
 from .members import logit, sigmoid
 from .model import STAR, Alignment, Composition, DefectionPrior, Member, RuleSet, Scenario
+from .uncertainty import point
 
 EPS = 1e-6
 
@@ -91,7 +92,9 @@ def apply_defection_prior(
             for sid in stage_ids:
                 base = party.get(sid, party.get(STAR))
                 if base is not None:
-                    table[sid] = adjust(base, prop, prior.beta, prior.pseudo_votes)
+                    # An uncertain party prior enters at its mean; simulate's outer loop
+                    # re-applies the defection prior to each sampled value.
+                    table[sid] = adjust(point(base), prop, prior.beta, prior.pseudo_votes)
             if table:
                 matched += 1
                 members.append(m.model_copy(update={"p_pro": table, "p_source": "defection_rate"}))

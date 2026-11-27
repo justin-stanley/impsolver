@@ -64,6 +64,9 @@ p_pro resolves in this order: override, member stage value, member `*`, party st
 If none resolves, raise an error. A shift is p' = sigmoid(logit p + sum of deltas); 0 and 1 stay
 fixed. Deterministic classification: p >= hi gives PRO, p <= lo gives CON, otherwise UNCERTAIN.
 The verdict is PASS at pro_min, FAIL at pro_max, otherwise CONTESTED.
+A party prior or override may be a range `{low, high}` or `{beta: [a, b]}` (see
+`src/impsolver/uncertainty.py`): classification uses low (Beta 5th percentile) for PRO and high
+(95th percentile) for CON; everything else uses the mean (a range's midpoint).
 
 ## Flips
 - Greedy: cheapest members first, by cost 1-p.
@@ -89,6 +92,10 @@ in a draw with probability Member.p_absent, else the alignment file's n_missed/n
 `absence_rate` (default 0). One draw per chamber covers all its gates, from a separate stream
 PCG64([seed, 0xA77E]). Absent members leave votes cast, the 2/3-of-present denominator and quorum.
 Deterministic `evaluate` and `flips` keep fixed attendance.
+Uncertain priors (`uncertainty_draws` N > 0): N outer draws from PCG64([seed, 0x0DD5]) sample each
+range (uniform) or Beta prior once, shared by every member and stage resolving to it; each runs
+the inner draws (default 2,000) with the same seed. P(complete) is the mean over outer draws, with
+the 5th/95th percentiles across them and s.e. sqrt(var_t/N + p(1-p)/draws).
 
 ## Alignment, defection prior, calibration, viability, portfolio
 See `docs/design-reference.md` and the module docstrings in `src/impsolver/`.
@@ -113,10 +120,19 @@ These change behavior relative to the original design.
 - Succession is causal. Branches after a trigger differ only in work that starts after its verdict.
   A cancelled dependent whose House work had begun keeps its lane through its House phase, and a
   variant (for example a successor in the office) needs fresh House time from the day after the verdict.
+- Succession branches adapt. After a trigger's verdict, each branch re-orders the cases whose
+  House work has not started, over every permutation when at most 6 remain (`ADAPTIVE_REORDER`),
+  and keeps the original order on ties or above that limit. Work started before the verdict must
+  stay in any re-ordered branch with its House start. Expected removals with succession can only rise;
+  `succession_order` can change when a branch's best order differs from the order the branch would
+  have kept. Results without succession rules, and the shipped examples, do not change.
 - A portfolio candidate without `article` is removed if any article convicts: P0 is P(at least one
   article completes) from one simulation in which all articles share the party swings and member
   draws, and the joint removals distribution uses the same rule. Before, P0 was the first article's
   P(complete). Only scenarios with more than one article change.
+- `party_priors` and `overrides` values may be ranges or Beta distributions, and
+  `uncertainty_draws` (default 0, off) adds an outer Monte Carlo loop over them that reports a
+  5-95% interval for P(complete). Number-valued files and default results do not change.
 - Portfolio search: exact up to `exact_limit` = 10 eligible candidates, beam of 4096 above that.
 - `flips` uses the ILP by default (`--greedy` for the heuristic).
 - Unknown stage keys and shift articles are errors. Unknown member ids and blocs are warnings, and

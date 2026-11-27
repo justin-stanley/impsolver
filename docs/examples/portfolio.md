@@ -21,7 +21,9 @@ How to read it:
 
 The same result as a planning page, with a timeline, gate-by-gate odds, the members nearest each
 case's binding-gate threshold (by the supplied probabilities) and the removals distribution, is
-the [demo](../demo/index.html). Build your own with `impsolver portfolio FILE --html plan.html`.
+the [demo](../demo/index.html). Build your own with `impsolver portfolio FILE --html plan.html`. The page's tornado charts show
+how each scenario case's odds in the plan move when one bloc prior, `rho` or the fatigue delta
+moves one notch (see [the method](../methodology/portfolio.md#tornado-chart)).
 
 ## Comparing scenarios
 
@@ -29,3 +31,8 @@ the [demo](../demo/index.html). Build your own with `impsolver portfolio FILE --
 PRO that would bring P(removal) to the target:
 
 --8<-- "examples/generated/viability.md"
+
+`compare-plans` puts two scenarios (or two portfolios) side by side, with one-notch sensitivity
+for each. Add `--html compare.html` for a page with the same content and tornado charts:
+
+--8<-- "examples/generated/compare-plans.md"
