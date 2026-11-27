@@ -18,6 +18,9 @@ All notable changes are listed here. The format follows
 - The ILP runs on PuLP 4 (`pulp[cbc]>=2.9,<5`; CBC now comes from the `cbcbox` wheel). Flip and
   absence counts are unchanged; among near-tied solutions, the members or gates listed can differ
   by CBC build (#9).
+- `portfolio`: a candidate without `article` now counts removal on any article, P0 = P(at least one
+  article completes) from one simulation with shared draws across articles, also in the joint
+  removals distribution; default numbers change only for scenarios with more than one article.
 
 ### Fixed
 

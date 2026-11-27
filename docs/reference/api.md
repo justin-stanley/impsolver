@@ -17,6 +17,8 @@ between minor versions before 1.0.
 
 ::: impsolver.simulate.simulate
 
+::: impsolver.simulate.p_any_complete
+
 ::: impsolver.viability.assess
 
 ## Portfolio

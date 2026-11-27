@@ -331,3 +331,57 @@ def p_complete(
         extra,
     )
     return float(raw.complete.mean())
+
+
+def run_raw_articles(
+    prep: Prepared,
+    articles: list[str],
+    path: Path,
+    draws: int,
+    seed: int,
+    rho: float,
+    extra: float = 0.0,
+    shared: dict[tuple[str, str], FloatArr] | None = None,
+) -> dict[str, RawSim]:
+    """Run :func:`run_raw` for each article with common random numbers.
+
+    Every article uses the same seed and the same ``shared`` swings. The generator draws the bloc
+    swings, member noise and alignment factors in an order and with shapes that depend only on the
+    members, blocs and loadings, never on the article, so draw ``j`` sees the same z, e and w for
+    every article. Only the thresholds (and alignment signs) differ. Articles are therefore
+    correlated through the shared member draws, as they are when one chamber votes on several
+    articles against the same official.
+    """
+    return {a: run_raw(prep, a, path, draws, seed, rho, extra, shared) for a in articles}
+
+
+def any_complete(raws: dict[str, RawSim]) -> npt.NDArray[np.bool_]:
+    """Per-draw indicator that at least one article completes its path."""
+    res: npt.NDArray[np.bool_] = np.logical_or.reduce([r.complete for r in raws.values()])
+    return res
+
+
+def p_any_complete(
+    prep: Prepared,
+    articles: list[str] | None = None,
+    draws: int = 20_000,
+    seed: int | None = None,
+    extra: float = 0.0,
+    path_name: str | None = None,
+) -> float:
+    """P(at least one article completes), from one joint simulation over ``articles``.
+
+    ``articles`` defaults to all of the scenario's articles. With one article this equals
+    :func:`p_complete` for the same seed and draws.
+    """
+    path = path_for(prep.rules, prep.scenario, path_name or default_path(prep))
+    raws = run_raw_articles(
+        prep,
+        articles or list(prep.scenario.articles),
+        path,
+        draws,
+        prep.scenario.seed if seed is None else seed,
+        prep.scenario.rho,
+        extra,
+    )
+    return float(any_complete(raws).mean())
