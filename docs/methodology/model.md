@@ -168,11 +168,11 @@ a scenario can map it to a shift on the logit scale, per bloc:
 
 ```yaml
 alignment: ../alignment/us-119.json
-score_prior:
-  R: {slope: 0.5, intercept: 0.0}
+score_prior:            # placeholder bloc and numbers, not estimates
+  BLOC_A: {slope: 0.5, intercept: 0.0}
 ```
 
-For a member of bloc R with standardized score z, every stage's party prior p becomes
+For a member of bloc BLOC_A with standardized score z, every stage's party prior p becomes
 sigmoid(logit(p) + intercept + slope · z). It applies only to members who have a `score`, whose
 bloc is listed, who have no recorded vote in the scenario's alignment file for their chamber, and
 whose probability is not already set by the composition (`p_pro`, including a defection prior's

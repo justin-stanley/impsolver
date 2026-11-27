@@ -45,6 +45,13 @@ def test_standardizes_within_each_source(tmp_path: Path) -> None:
     assert [(s.source, s.n) for s in stats] == [("src1", 2), ("src2", 3)]
 
 
+def test_accepts_byte_order_mark(tmp_path: Path) -> None:
+    p = tmp_path / "bom.csv"
+    p.write_bytes(b"\xef\xbb\xbfid,score,source\nA,1,s\nB,3,s\n")
+    scores, _ = read_member_scores(p)
+    assert scores["B"].z == pytest.approx(1.0)
+
+
 @pytest.mark.parametrize(
     ("rows", "header", "msg"),
     [

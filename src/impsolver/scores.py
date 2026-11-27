@@ -45,7 +45,7 @@ def read_member_scores(path: Path) -> tuple[dict[str, MemberScore], list[SourceS
     so that the mean and spread describe the source's scale.
     """
     rows: dict[str, tuple[float, str]] = {}
-    with path.open(newline="", encoding="utf-8") as f:
+    with path.open(newline="", encoding="utf-8-sig") as f:  # tolerate a spreadsheet BOM
         reader = csv.DictReader(f)
         if tuple(reader.fieldnames or ()) != COLUMNS:
             raise ScoreError(f"{path}: header must be exactly {','.join(COLUMNS)}")
