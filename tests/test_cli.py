@@ -28,8 +28,10 @@ def test_evaluate_json(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_flips(capsys: pytest.CaptureFixture[str]) -> None:
-    rc, out, _ = run(capsys, "flips", SCEN, "--ilp", "--gate", "S2", "--constraint", "R<=25")
-    assert rc == 0 and "20 flips" in out
+    rc, out, _ = run(capsys, "flips", SCEN, "--gate", "S2", "--constraint", "R<=25")
+    assert rc == 0 and "(ilp)" in out and "20 flips" in out
+    rc, out, _ = run(capsys, "flips", SCEN, "--greedy", "--gate", "S2")
+    assert rc == 0 and "(greedy)" in out
 
 
 def test_simulate(capsys: pytest.CaptureFixture[str]) -> None:
@@ -101,3 +103,16 @@ def test_align(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
 def test_errors_exit_2(capsys: pytest.CaptureFixture[str]) -> None:
     rc, _, err = run(capsys, "evaluate", "missing.yaml")
     assert rc == 2 and err.startswith("error:")
+
+
+def test_validate_fails_on_warnings(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    scen = tmp_path / "s.yaml"
+    scen.write_text(
+        Path(SCEN)
+        .read_text()
+        .replace("../rules", str(REPO / "rules"))
+        .replace("../compositions", str(REPO / "compositions"))
+        + "overrides: {NOPE: {'*': 1.0}}\n"
+    )
+    rc, _, err = run(capsys, "validate", RULES, COMP, str(scen))
+    assert rc == 2 and "warning: override for NOPE" in err

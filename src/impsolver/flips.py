@@ -90,7 +90,7 @@ def find_flips(
     article: str | None = None,
     path_name: str | None = None,
     gate: str | None = None,
-    method: str = "greedy",
+    method: str = "ilp",
     constraints: list[str] | None = None,
     exclude: list[str] | None = None,
     allow_absence: bool = False,
@@ -104,9 +104,21 @@ def find_flips(
     caps = parse_constraints(constraints or [])
     excl = set(exclude or [])
     if allow_absence and method != "ilp":
-        raise FlipError("--allow-absence needs --ilp")
+        raise FlipError("--allow-absence needs the ILP (drop --greedy)")
     data = _chamber_data(prep, art, stages)
     gate_ids = [s.id for s in stages]
+    ids = {m.id for d in data for m in d.members}
+    all_ids = {m.id for b in prep.comp.bodies.values() for m in b.roster}
+    blocs = {m.bloc for d in data for m in d.members}
+    missing = sorted(excl - all_ids)
+    if missing:
+        raise FlipError(f"--exclude: unknown member id(s) {', '.join(missing)}")
+    absent = sorted(excl & (all_ids - ids))
+    if absent:
+        prep.warnings.append(f"--exclude: {', '.join(absent)} not voting in the gates solved")
+    bad_caps = sorted(set(caps) - blocs)
+    if bad_caps:
+        raise FlipError(f"constraint: unknown bloc(s) {', '.join(bad_caps)} in the gates solved")
 
     already = all(
         _wins(st, int(d.base[g].sum()), len(d.members), 0, d)

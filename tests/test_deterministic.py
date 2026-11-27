@@ -89,3 +89,22 @@ def test_binding_gate_is_first_unwinnable(rules: RuleSet) -> None:
     gates = {g.stage: g for g in a.gates}
     assert gates["H1"].short_at_min > gates["S2"].short_at_min
     assert a.ends_at == "S2" and a.binding_gate == "S2"
+
+
+def test_unknown_references(rules: RuleSet) -> None:
+    from impsolver.prepare import ScenarioError
+
+    comp = make_comp({"D": 220, "R": 215}, {"D": 55, "R": 45})
+    prep = make_prep(
+        rules,
+        comp,
+        overrides={"R-9999": {"*": 1.0}},
+        shifts=[{"label": "x", "bloc": "Rr", "delta": 5.0}],
+        party_priors={"D": {"*": 0.95}, "R": {"*": 0.05}, "Q": {"*": 1.0}},
+    )
+    assert len(prep.warnings) == 3
+    assert any("R-9999" in w for w in prep.warnings)
+    with pytest.raises(ScenarioError, match="unknown stage"):
+        make_prep(rules, comp, party_priors={"D": {"H9": 0.9}, "R": {"*": 0.05}})
+    with pytest.raises(ScenarioError, match="not in articles"):
+        make_prep(rules, comp, shifts=[{"label": "x", "bloc": "R", "delta": 1, "article": "II"}])

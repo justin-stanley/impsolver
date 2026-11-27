@@ -9,7 +9,8 @@ targets.
 - **evaluate**: bounds per gate from cutoff classification (PASS, FAIL or CONTESTED), the binding
   gate, and the coalition that controls it.
 - **flips**: the fewest members whose stance would have to change for the gates to pass
-  (greedy or exact ILP). Bloc caps and exclusions are supported. Absences can optionally be
+  (exact ILP by default, `--greedy` for a fast heuristic). Bloc caps and exclusions are supported;
+  unknown ids or blocs are rejected. Absences can optionally be
   modelled, and are reported as procedural sensitivity, not as a recommendation.
 - **simulate**: Gaussian-copula Monte Carlo with bloc swings, with optional co-defection
   loadings learned from Voteview.

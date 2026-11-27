@@ -37,7 +37,8 @@ from .model import (
 )
 from .paths import PathError
 from .portfolio import PortfolioError, run_portfolio
-from .prepare import prepare
+from .prepare import Prepared
+from .prepare import prepare as _prepare_raw
 from .priors import PriorError
 from .results import Evaluation, FlipResult, Simulation
 from .simulate import simulate
@@ -120,6 +121,14 @@ def render_simulation(s: Simulation) -> str:
 # ------------------------------------------------------------------- commands
 
 
+def prepare(path: str, composition: str | None = None) -> Prepared:
+    """Load a scenario and print its warnings (unknown ids or blocs) to stderr."""
+    prep = _prepare_raw(path, composition)
+    for w in prep.warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    return prep
+
+
 def cmd_validate(a: argparse.Namespace) -> int:
     report: dict[str, str] = {}
     rules = load_rules(a.rules)
@@ -131,8 +140,10 @@ def cmd_validate(a: argparse.Namespace) -> int:
         )
     if a.scenario:
         load_scenario(a.scenario)
-        prep = prepare(a.scenario)
+        prep = prepare(a.scenario, a.composition)
         evaluate(prep)  # resolves every probability
+        if prep.warnings:
+            raise CliError(f"{a.scenario}: {len(prep.warnings)} warning(s); see above")
         report[a.scenario] = "scenario ok"
     _emit(a, report, lambda: "\n".join(f"{k}: {v}" for k, v in report.items()))
     return 0
@@ -145,18 +156,22 @@ def cmd_evaluate(a: argparse.Namespace) -> int:
 
 
 def cmd_flips(a: argparse.Namespace) -> int:
+    prep = prepare(a.scenario)
+    seen = len(prep.warnings)
     r = find_flips(
-        prepare(a.scenario),
+        prep,
         article=a.article,
         path_name=a.path,
         gate=a.gate,
-        method="ilp" if a.ilp else "greedy",
+        method="greedy" if a.greedy else "ilp",
         constraints=a.constraint,
         exclude=a.exclude,
         allow_absence=a.allow_absence,
         absence_cost=a.absence_cost,
         per_gate_stance=a.per_gate_stance,
     )
+    for w in prep.warnings[seen:]:
+        print(f"warning: {w}", file=sys.stderr)
     _emit(a, r, lambda: render_flips(r))
     return 0
 
@@ -348,7 +363,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--gate")
     p.add_argument("--path")
     p.add_argument("--article")
-    p.add_argument("--ilp", action="store_true")
+    p.add_argument("--ilp", action="store_true", help="exact ILP (the default; kept for scripts)")
+    p.add_argument("--greedy", action="store_true", help="fast greedy heuristic instead of the ILP")
     p.add_argument("--constraint", action="append", default=[], metavar="BLOC<=N")
     p.add_argument("--exclude", action="append", default=[], metavar="ID")
     p.add_argument("--allow-absence", action="store_true")

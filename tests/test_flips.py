@@ -11,7 +11,7 @@ def prep(rules: RuleSet):  # type: ignore[no-untyped-def]
 
 
 def test_greedy_and_ilp_agree(prep) -> None:  # type: ignore[no-untyped-def]
-    g = find_flips(prep)
+    g = find_flips(prep, method="greedy")
     i = find_flips(prep, method="ilp")
     assert g.status == i.status == "OK"
     assert g.n_flips == i.n_flips == 12
@@ -26,7 +26,7 @@ def test_already_passing(rules: RuleSet) -> None:
 def test_constraints_tightest_wins_and_infeasible(prep) -> None:  # type: ignore[no-untyped-def]
     assert parse_constraints(["R<=10", "R<=5", "D<=3"]) == {"R": 5, "D": 3}
     assert find_flips(prep, method="ilp", constraints=["R<=11"]).status == "INFEASIBLE"
-    assert find_flips(prep, constraints=["R<=11"]).status == "INFEASIBLE"
+    assert find_flips(prep, method="greedy", constraints=["R<=11"]).status == "INFEASIBLE"
     with pytest.raises(FlipError):
         parse_constraints(["R<5"])
 
@@ -47,7 +47,7 @@ def test_absences_never_beat_flips(prep) -> None:  # type: ignore[no-untyped-def
 
 def test_absence_needs_ilp(prep) -> None:  # type: ignore[no-untyped-def]
     with pytest.raises(FlipError):
-        find_flips(prep, allow_absence=True)
+        find_flips(prep, method="greedy", allow_absence=True)
 
 
 def test_per_gate_stance(rules: RuleSet) -> None:
@@ -70,3 +70,31 @@ def test_single_gate(prep) -> None:  # type: ignore[no-untyped-def]
     assert r.status == "ALREADY_PASSING"
     with pytest.raises(FlipError):
         find_flips(prep, gate="Z9")
+
+
+def test_ilp_is_default_and_never_worse_than_greedy(rules: RuleSet) -> None:
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    for _ in range(10):
+        house = [
+            {
+                "id": f"H{i}",
+                "name": "x",
+                "party": "R",
+                "p_pro": {"H1": float(rng.uniform(0, 0.95)), "H2": float(rng.uniform(0, 0.95))},
+            }
+            for i in range(41)
+        ]
+        sen = [{"id": f"S{i}", "name": "x", "party": "R", "p_pro": {"*": 0.95}} for i in range(9)]
+        p = make_prep(rules, make_comp(house, sen))
+        d = find_flips(p)
+        assert d.method == "ilp"
+        assert d.n_flips <= find_flips(p, method="greedy").n_flips
+
+
+def test_unknown_exclude_and_bloc_rejected(prep) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(FlipError, match="unknown member"):
+        find_flips(prep, exclude=["NOPE"])
+    with pytest.raises(FlipError, match="unknown bloc"):
+        find_flips(prep, constraints=["Rr<=3"])

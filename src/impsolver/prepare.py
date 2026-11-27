@@ -10,8 +10,58 @@ import numpy.typing as npt
 
 from .loader import load_alignment, load_composition, load_rules, load_scenario, resolve
 from .members import Resolver
-from .model import Alignment, Chamber, Composition, Member, RuleSet, Scenario
+from .model import STAR, Alignment, Chamber, Composition, Member, RuleSet, Scenario
 from .priors import apply_defection_prior
+
+
+class ScenarioError(ValueError):
+    """A scenario refers to something that cannot exist under its rules."""
+
+
+def check_references(rules: RuleSet, comp: Composition, scenario: Scenario) -> list[str]:
+    """Raise on references that are wrong under any composition; return warnings for the rest.
+
+    Stage keys and shift articles are checked strictly. Member ids and blocs are only warned
+    about, because one scenario may be run against several compositions (``compare``).
+    """
+    stages = {s.id for s in rules.stages} | {STAR}
+    errors: list[str] = []
+
+    def stage_keys(where: str, table: dict[str, float]) -> None:
+        bad = sorted(set(table) - stages)
+        if bad:
+            errors.append(f"{where}: unknown stage key(s) {', '.join(bad)}")
+
+    for bloc, table in scenario.party_priors.items():
+        stage_keys(f"party_priors.{bloc}", table)
+    for mid, table in scenario.overrides.items():
+        stage_keys(f"overrides.{mid}", table)
+    for body in comp.bodies.values():
+        for m in body.roster:
+            stage_keys(f"member {m.id} p_pro", m.p_pro)
+    for sh in scenario.shifts:
+        if sh.stage is not None and sh.stage not in stages:
+            errors.append(f"shift {sh.label!r}: unknown stage {sh.stage}")
+        if sh.article is not None and sh.article not in scenario.articles:
+            errors.append(f"shift {sh.label!r}: article {sh.article} is not in articles")
+    if errors:
+        raise ScenarioError("; ".join(errors))
+    ids = {m.id for b in comp.bodies.values() for m in b.roster}
+    blocs = {m.bloc for b in comp.bodies.values() for m in b.roster}
+    warnings = [
+        f"override for {mid} matches no member of composition {comp.name}"
+        for mid in sorted(set(scenario.overrides) - ids)
+    ]
+    warnings += [
+        f"party_priors bloc {b} matches no member of composition {comp.name}"
+        for b in sorted(set(scenario.party_priors) - blocs)
+    ]
+    warnings += [
+        f"shift {sh.label!r} bloc {sh.bloc} matches no member of composition {comp.name}"
+        for sh in scenario.shifts
+        if sh.bloc != STAR and sh.bloc not in blocs
+    ]
+    return warnings
 
 
 @dataclass
@@ -21,6 +71,7 @@ class Prepared:
     scenario: Scenario
     alignment: Alignment | None
     source: str = "<memory>"
+    warnings: list[str] = field(default_factory=list)
     resolver: Resolver = field(init=False)
 
     def __post_init__(self) -> None:
@@ -41,7 +92,14 @@ class Prepared:
         return np.array([m.attendance == "present" for m in self.members(chamber)], dtype=bool)
 
     def with_composition(self, comp: Composition) -> Prepared:
-        return Prepared(self.rules, comp, self.scenario, self.alignment, self.source)
+        return Prepared(
+            self.rules,
+            comp,
+            self.scenario,
+            self.alignment,
+            self.source,
+            check_references(self.rules, comp, self.scenario),
+        )
 
 
 def prepare_objects(
@@ -51,11 +109,12 @@ def prepare_objects(
     alignment: Alignment | None = None,
     source: str = "<memory>",
 ) -> Prepared:
+    warnings = check_references(rules, comp, scenario)
     if scenario.defection_prior is not None:
         if alignment is None:
             raise ValueError("defection_prior needs an alignment")
         comp = apply_defection_prior(scenario.defection_prior, scenario, comp, rules, alignment)
-    return Prepared(rules, comp, scenario, alignment, source)
+    return Prepared(rules, comp, scenario, alignment, source, warnings)
 
 
 def prepare(path: str | Path, composition: str | Path | None = None) -> Prepared:
