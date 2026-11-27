@@ -159,19 +159,31 @@ def test_cbc_solver_selection(monkeypatch: pytest.MonkeyPatch) -> None:
 
     from impsolver import flips
 
-    # PuLP < 4 bundles CBC as PULP_CBC_CMD; prefer it when present.
-    monkeypatch.setattr(pulp, "PULP_CBC_CMD", lambda msg: ("bundled", msg), raising=False)
-    assert flips._cbc() == ("bundled", False)
-    monkeypatch.delattr(pulp, "PULP_CBC_CMD")
+    class FakeCbc:
+        found = True
 
-    class NoCbc:
         def __init__(self, **kw: object) -> None:
-            pass
+            self.kw = kw
 
         def available(self) -> bool:
-            return False
+            return self.found
 
-    monkeypatch.setattr(pulp, "COIN_CMD", NoCbc)
+    class Bundled(FakeCbc):
+        pass
+
+    # PuLP < 4 bundles CBC as PULP_CBC_CMD; prefer it when present.
+    monkeypatch.setattr(pulp, "PULP_CBC_CMD", Bundled, raising=False)
+    s = flips._cbc()
+    assert isinstance(s, Bundled) and s.kw == {"msg": False}
+    Bundled.found = False
+    with pytest.raises(FlipError, match="CBC solver"):
+        flips._cbc()
+    monkeypatch.delattr(pulp, "PULP_CBC_CMD")
+
+    monkeypatch.setattr(pulp, "COIN_CMD", FakeCbc)
+    s = flips._cbc()
+    assert type(s) is FakeCbc and s.kw == {"msg": False, "gapRel": 0.0}
+    FakeCbc.found = False
     with pytest.raises(FlipError, match=r"pulp\[cbc\]"):
         flips._cbc()
 

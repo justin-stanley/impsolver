@@ -55,8 +55,9 @@ The verdict is PASS at pro_min, FAIL at pro_max, otherwise CONTESTED.
   - 2/3: 3*sum x >= 2*sum(1-a).
   - Objective: 1e4 times the change count plus secondary costs; a flip beats an absence.
   - Solved with CBC (`COIN_CMD` on PuLP 4, the bundled `PULP_CBC_CMD` on PuLP 2.9). The counts are
-    exact. When several solutions have the same count and nearly the same secondary cost, which
-    members are listed, and at which gates under `--per-gate-stance`, can depend on the CBC build.
+    exact. When solutions have the same count and secondary costs within about `TIE_EPS` (1e-6),
+    which members are listed, and at which gates under `--per-gate-stance` (every gate flip costs
+    the same), can depend on the CBC build.
 - Constraints `BLOC<=N` and `--exclude`. Report INFEASIBLE. Absences are labelled
   "procedural sensitivity, not a recommendation".
 

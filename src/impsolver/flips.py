@@ -49,9 +49,10 @@ def _cbc() -> Any:
     """A silent CBC solver: the one bundled with PuLP < 4, else ``COIN_CMD`` (``pulp[cbc]``)."""
     bundled = getattr(pulp, "PULP_CBC_CMD", None)
     if bundled is not None:  # PuLP < 4
-        return bundled(msg=False)
-    coin: Any = pulp.COIN_CMD  # untyped in PuLP 4
-    solver = coin(msg=False, gapRel=0.0)
+        solver = bundled(msg=False)
+    else:
+        coin: Any = pulp.COIN_CMD  # untyped in PuLP 4
+        solver = coin(msg=False, gapRel=0.0)
     if not solver.available():
         raise FlipError(
             "the ILP needs the CBC solver: reinstall with `pip install 'pulp[cbc]'`, "
@@ -64,9 +65,10 @@ def _optimal(solved: Any) -> bool:
     """Whether ``LpProblem.solve`` returned a proven optimum.
 
     PuLP 4 returns an ``LpSolveStats``; older releases return the integer status (1 is optimal).
-    PuLP 4 also reports CBC's "Optimal (within gap tolerance)" as ``GapLimit``. impsolver runs CBC
-    with a zero relative gap and CBC's default absolute gap of 1e-12, far below ``TIE_EPS``, so
-    that answer is the same optimum.
+    PuLP 4 also reports CBC's "Optimal (within gap tolerance)" as ``GapLimit``, which PuLP 2.9
+    called optimal. impsolver runs CBC with a zero relative gap, so the change count
+    (``CHANGE_WEIGHT`` apart) is exact. Choices that differ only by ``TIE_EPS`` sit within CBC's
+    numerical tolerances and can differ between CBC builds.
     """
     if not hasattr(solved, "status"):  # PuLP < 4
         return int(solved) == 1

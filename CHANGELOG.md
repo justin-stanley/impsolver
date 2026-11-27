@@ -10,8 +10,8 @@ All notable changes are listed here. The format follows
 
 ### Changed
 - The ILP runs on PuLP 4 (`pulp[cbc]>=2.9,<5`; CBC now comes from the `cbcbox` wheel). Flip and
-  absence counts are unchanged; among equally good solutions, the members or gates listed can
-  differ by CBC build (#9).
+  absence counts are unchanged; among near-tied solutions, the members or gates listed can differ
+  by CBC build (#9).
 
 ### Fixed
 
