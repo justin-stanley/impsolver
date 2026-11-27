@@ -407,7 +407,12 @@ def _preview_starts(
     """House start dates if ``items`` ran with no further branching."""
     out: dict[str, dt.date] = {}
     for it in items:
-        if it.sunk or any(excluded_pair(ctx, it.cid, o) for o in done):
+        if it.sunk:  # a cancelled case's House work still holds its lane, as in the real run
+            house = place_house(ctx, it.cid, st, it.not_before)
+            if house is not None:
+                st = LaneState(house[2], st.senate_free, st.trial_end)
+            continue
+        if any(excluded_pair(ctx, it.cid, o) for o in done):
             continue
         got = place(ctx, it.cid, st, attempt, it.not_before)
         if got is None:
@@ -461,8 +466,9 @@ def evaluate_branching(
 
     With ``adaptive`` (the default), each branch also re-optimizes the order of the candidates
     whose House work has not started, over every permutation when at most ``ADAPTIVE_REORDER``
-    remain; work already started keeps its dates. ``cache`` may be shared between calls on the
-    same ``ctx`` (``best_with_succession`` does this).
+    remain; every case whose House work has started stays in the branch with its House start
+    (its Senate trial may move). ``cache`` may be shared between calls on the same ``ctx``
+    (``best_with_succession`` does this); its keys include ``adaptive``.
     """
     memo: dict[object, object] = {} if cache is None else cache
 
@@ -491,7 +497,16 @@ def evaluate_branching(
         """
         free = set(_free_slots(items))
         shape = tuple(None if i in free else x for i, x in enumerate(items))
-        key = ("reorder", shape, frozenset(items[i] for i in free), st, attempt, depth, tuple(done))
+        key = (
+            "reorder",
+            adaptive,
+            shape,
+            frozenset(items[i] for i in free),
+            st,
+            attempt,
+            depth,
+            tuple(done),
+        )
         if key not in memo:
             found: tuple[float, TreeNode] | None = None
             for cand in _reorderings(items):
@@ -507,7 +522,7 @@ def evaluate_branching(
     def run(
         items: list[_Item], st: LaneState, attempt: int, depth: int, done: list[str]
     ) -> tuple[float, TreeNode]:
-        key = ("run", tuple(items), st, attempt, depth, tuple(done))
+        key = ("run", adaptive, tuple(items), st, attempt, depth, tuple(done))
         if key in memo:
             hit = memo[key]
             if hit is None:
@@ -541,6 +556,8 @@ def evaluate_branching(
                     sched.append(f"{it.cid} House {h_start}..{h_end} (cancelled, time lost)")
                 continue
             if any(excluded_pair(ctx, it.cid, o) for o in done):
+                if it.pin is not None:  # started work cannot be dropped by a re-ordering
+                    raise _Infeasible
                 continue
             got = place(ctx, it.cid, st, attempt, it.not_before)
             if it.pin is not None and (got is None or got[0].house_start != it.pin):
