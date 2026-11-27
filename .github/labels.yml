@@ -1,13 +1,37 @@
 # Synced by .github/workflows/labels.yml
-- {name: bug, color: "d73a4a", description: Wrong results, crashes or misbehaviour}
-- {name: data, color: "0e8a16", description: Rosters, vacancies, caucuses or historical tallies}
-- {name: enhancement, color: "a2eeef", description: New capability or improvement}
-- {name: docs, color: "0075ca", description: Documentation and the docs site}
-- {name: question, color: "d876e3", description: How something works}
-- {name: needs-triage, color: "fbca04", description: Not yet reviewed by a maintainer}
-- {name: good first issue, color: "7057ff", description: Small, well-scoped, good for newcomers}
-- {name: help wanted, color: "008672", description: Maintainers would welcome a contribution}
-- {name: numerical-change, color: "b60205", description: Changes default numerical results}
-- {name: out-of-scope, color: "cfd3d7", description: Outside RESPONSIBLE_USE.md}
-- {name: dependencies, color: "0366d6", description: Dependency updates}
-- {name: ci, color: "5319e7", description: Continuous integration and release tooling}
+- name: "bug"
+  color: "d73a4a"
+  description: "Wrong results, crashes or misbehaviour"
+- name: "data"
+  color: "0e8a16"
+  description: "Rosters, vacancies, caucuses or historical tallies"
+- name: "enhancement"
+  color: "a2eeef"
+  description: "New capability or improvement"
+- name: "docs"
+  color: "0075ca"
+  description: "Documentation and the docs site"
+- name: "question"
+  color: "d876e3"
+  description: "How something works"
+- name: "needs-triage"
+  color: "fbca04"
+  description: "Not yet reviewed by a maintainer"
+- name: "good first issue"
+  color: "7057ff"
+  description: "Small, well-scoped, good for newcomers"
+- name: "help wanted"
+  color: "008672"
+  description: "Maintainers would welcome a contribution"
+- name: "numerical-change"
+  color: "b60205"
+  description: "Changes default numerical results"
+- name: "out-of-scope"
+  color: "cfd3d7"
+  description: "Outside RESPONSIBLE_USE.md"
+- name: "dependencies"
+  color: "0366d6"
+  description: "Dependency updates"
+- name: "ci"
+  color: "5319e7"
+  description: "Continuous integration and release tooling"
