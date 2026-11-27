@@ -50,6 +50,15 @@ from .prepare import prepare as _prepare_raw
 from .priors import PriorError
 from .report import render as render_report
 from .results import Evaluation, FlipResult, Simulation
+from .score import (
+    DEFAULT_BETAS,
+    DEFAULT_RHOS,
+    DEFAULT_WEIGHTS,
+    MIN_EFFECTIVE_DRAWS,
+    ScorePoint,
+    Sweep,
+    sweep,
+)
 from .simulate import simulate
 from .templates import DEFAULT_NAMES, TEMPLATES
 from .viability import Case, assess
@@ -390,6 +399,112 @@ def cmd_calibrate(a: argparse.Namespace) -> int:
     return 0
 
 
+def _floats(text: str) -> list[float]:
+    try:
+        return [float(v) for v in text.split(",") if v.strip()]
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"expected comma-separated numbers, got {text!r}") from e
+
+
+def _settings(q: ScorePoint) -> str:
+    parts = [f"beta {q.beta:g}"]
+    if q.rho is not None:
+        parts.append(f"rho {q.rho:g}")
+    if q.weight is not None:
+        parts.append(f"weight {q.weight:g}")
+        if q.weight > 0 and q.kappa is not None:
+            parts.append(f"kappa {q.kappa:g}")
+    return ", ".join(parts)
+
+
+def _low(q: ScorePoint) -> str:
+    if q.min_effective_draws is not None and q.min_effective_draws < MIN_EFFECTIVE_DRAWS:
+        return "  (low effective draws: Monte Carlo error)"
+    return ""
+
+
+def _scored(q: ScorePoint) -> str:
+    return f"Brier {q.brier:.4f}  log {q.log_loss:.4f}{_low(q)}"
+
+
+def render_sweep(s: Sweep, top: int) -> str:
+    base = "observed share per event" if s.base_rate is None else f"{s.base_rate:g}"
+    out = [
+        f"score: events {', '.join(s.events)}; base rate {base}; min votes {s.min_votes}",
+        "lower is better (Brier = mean squared error, log = mean log loss in nats)",
+    ]
+    out += [f"skipped: {x}" for x in s.skipped]
+    for c in s.chambers:
+        out.append(
+            f"\n{c.body}: {len(c.events)} event(s), {c.n_members} members, {c.n_crossed} crossed"
+        )
+        for e in c.events:
+            if e.n_not_voting is None:
+                out.append(
+                    f"  {e.case}: fixture lists no non-voters, so members who did not vote "
+                    "(absent or no longer seated) are scored as non-crossers"
+                )
+            elif e.n_not_voting:
+                out.append(f"  {e.case}: {e.n_not_voting} members left out as not voting")
+            if e.unmatched:
+                out.append(f"  {e.case} unmatched: {', '.join(e.unmatched)}")
+        out.append("  marginal P(cross), by beta:")
+        for q in c.marginal:
+            mark = "  <- default" if q.beta == c.default_marginal.beta else ""
+            out.append(f"    beta {q.beta:5.2f}  {_scored(q)}{mark}")
+        bm, bb = c.best_marginal, c.best_marginal_brier
+        out.append(f"  best by log: {_settings(bm)}; by Brier: {_settings(bb)}")
+        if c.best_conditional is not None and c.default_conditional is not None:
+            out.append(
+                f"  conditional P(cross | other members), top {top} of {len(c.conditional)}:"
+            )
+            for q in sorted(c.conditional, key=lambda q: (q.log_loss, q.beta))[:top]:
+                out.append(f"    {_settings(q):40s} {_scored(q)}")
+            out.append(
+                f"    default: {_settings(c.default_conditional)}: {_scored(c.default_conditional)}"
+            )
+            bcb = c.best_conditional_brier
+            assert bcb is not None
+            out.append(f"  best by Brier: {_settings(bcb)}{_low(bcb)}")
+            if c.min_effective_draws is not None:
+                skip = (
+                    f"; best settings skip points below {MIN_EFFECTIVE_DRAWS:g}"
+                    if c.min_effective_draws < MIN_EFFECTIVE_DRAWS
+                    else ""
+                )
+                out.append(
+                    f"  smallest effective draws: {c.min_effective_draws:.0f} of {s.draws}{skip}"
+                )
+        for label, held in (("marginal", c.loeo_marginal), ("conditional", c.loeo_conditional)):
+            for h in held:
+                out.append(
+                    f"  held out {h.event} ({label}): chose {_settings(h.chosen)}; "
+                    f"log {h.log_loss:.4f} vs default {h.default_log_loss:.4f}, "
+                    f"Brier {h.brier:.4f} vs default {h.default_brier:.4f}"
+                )
+    out += [f"note: {n}" for n in s.notes]
+    out.append("note: the sweep reports only; it does not change any default")
+    return "\n".join(out)
+
+
+def cmd_score(a: argparse.Namespace) -> int:
+    paths = a.fixtures or sorted((BUILTIN_FIXTURES / "members").glob("*.yaml"))
+    s = sweep(
+        [load_crossovers(p) for p in paths],
+        [load_alignment(p) for p in a.alignment],
+        betas=a.beta,
+        rhos=a.rho,
+        weights=a.weight,
+        base_rate=a.base_rate,
+        min_votes=a.min_votes,
+        draws=a.draws,
+        seed=a.seed,
+        conditional=not a.marginal_only,
+    )
+    _emit(a, s, lambda: render_sweep(s, a.top))
+    return 0
+
+
 SCHEMAS: dict[str, type[BaseModel]] = {
     "rules": RuleSet,
     "composition": Composition,
@@ -511,6 +626,49 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-votes", type=int, default=100)
     p.add_argument("--permutations", type=int, default=5000)
     p.add_argument("--seed", type=int, default=0)
+
+    p = add(
+        "score",
+        cmd_score,
+        help="score crossing predictions on crossover fixtures over a grid of settings",
+        description="Brier and log scores of per-member crossing predictions on crossover "
+        "fixtures, over a grid of beta (defection prior), rho and alignment weight, and one "
+        "kappa per alignment file. Reports the best settings and, with several events, "
+        "leave-one-event-out scores. It never changes defaults.",
+    )
+    p.add_argument(
+        "fixtures", nargs="*", help="crossover fixtures (default: every built-in fixture)"
+    )
+    p.add_argument(
+        "--alignment",
+        action="append",
+        required=True,
+        help="alignment file; repeat with files fitted at other kappa values "
+        "(impsolver align --kappa K)",
+    )
+    p.add_argument("--beta", type=_floats, default=list(DEFAULT_BETAS), metavar="B,B,...")
+    p.add_argument("--rho", type=_floats, default=list(DEFAULT_RHOS), metavar="R,R,...")
+    p.add_argument(
+        "--weight",
+        type=_floats,
+        default=list(DEFAULT_WEIGHTS),
+        metavar="W,W,...",
+        help="alignment weights to try",
+    )
+    p.add_argument(
+        "--base-rate",
+        type=float,
+        help="crossing base rate for every event (default: each event's observed share)",
+    )
+    p.add_argument("--min-votes", type=int, default=100)
+    p.add_argument("--draws", type=int, default=10_000, help="importance draws per event")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--top", type=int, default=5, help="conditional settings to list")
+    p.add_argument(
+        "--marginal-only",
+        action="store_true",
+        help="skip the conditional (rho, weight, kappa) grid",
+    )
 
     p = add("schema", cmd_schema, help="write JSON schemas")
     p.add_argument("--out", default="schemas")

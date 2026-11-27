@@ -359,6 +359,10 @@ class CrossedMember(Strict):
 
 class CrossoverBody(Strict):
     crossed: list[CrossedMember]
+    # Members of the party in the history congress who cast no vote on the event (no longer
+    # seated, a non-voting delegate, or recorded Not Voting). Scoring leaves them out. Leave it
+    # out when it is not known; [] says that every member voted.
+    not_voting: list[CrossedMember] | None = None
 
 
 class CrossoverFixture(Strict):

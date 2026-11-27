@@ -22,12 +22,85 @@
 In the House, the eight crossers were more aligned with each other than random same-party sets.
 In the Senate they were not, so Senate alignment is off by default.
 
+## Calibration sweep
+
+`impsolver score` turns the 2021 check into scores. For every member of the crossing party with
+at least 100 votes in the history congress who voted on the event, it predicts whether that member
+crossed and scores the predictions with the Brier score (mean squared error) and the log loss (mean −log
+probability of what happened, in nats). Lower is better for both. It scores two kinds of
+prediction:
+
+Who voted comes from the fixture's `not_voting` list: members of the party in the history
+congress who cast no vote on the event, because they had left, were non-voting delegates, or were
+recorded Not Voting. They are left out rather than counted as non-crossers, and the output says
+how many there are. For 2021 that is 41 of the 201 House Republicans with 100 or more votes in
+the 116th Congress (37 who were not on [roll call 17](https://clerk.house.gov/Votes/202117) at
+all, and 4 recorded Not Voting) and 8 of the 54 Senate Republicans, who were no longer senators
+on 13 February 2021 ([vote 59](https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00059.htm)).
+A fixture without the list scores every party member, and the output warns that absent members
+then count as non-crossers. `impsolver calibrate` does not use the list; its permutation test
+still draws from every party member of the history congress.
+
+- **Marginal**, P(cross), from the defection prior alone:
+  p = sigmoid(logit b + β · excess), where b is the event's observed crossing share. Only β
+  matters here, because correlation settings never change a member's own probability.
+- **Conditional**, P(cross | how every other member voted), from the simulation's copula with
+  bloc correlation ρ and alignment loadings scaled by the alignment weight. This is where ρ, the
+  alignment weight and κ (the shrinkage used to fit the loadings) can show up. It is computed by
+  importance sampling over the bloc swing and factor weights, and the output gives the smallest
+  effective number of draws so that noisy grid points can be spotted.
+
+The grid is β from 0 to 3, ρ in {0, 0.3, 0.6, 0.9} and weight in {0, 0.5, 1}, plus the defaults.
+Each alignment file is one κ; to sweep κ, refit with `impsolver align --kappa K` and pass each
+file with `--alignment`. With more than one crossover fixture, each event is held out in turn:
+the best settings on the others are scored on it, next to the defaults' score.
+
+The "smallest effective draws" line is the minimum over the whole grid. Below, it comes from
+corner settings (β ≥ 2, ρ = 0.9, weight 1); the best and default settings have about 1,000 or
+more of the 4,000 draws. Grid points with fewer than 100 effective draws are flagged, and they are
+never picked as best settings or as leave-one-event-out choices unless every point is below 100.
+
+--8<-- "examples/generated/score.md"
+
+Refitting the 116th Congress alignment at κ = 10 and κ = 200 (same Voteview files as
+`alignment/us-116.json`, `impsolver align ... --kappa 10`, then `impsolver score --alignment
+alignment/us-116.json --alignment us-116-k10.json --alignment us-116-k200.json`, 10,000 draws)
+changes little in the House: the best weighted setting at each κ is β = 1.25, ρ = 0, weight 0.5,
+with log loss 0.1691 (κ 10), 0.1690 (κ 50) and 0.1687 (κ 200), against 0.1642 with no alignment,
+and for ρ ≤ 0.6 and β ≤ 1.5 no setting moves by more than 0.005 across κ. In the Senate the best
+weighted setting at each κ is β = 0.75, ρ = 0, weight 0.5: 0.4069 (κ 10), 0.4072 (κ 50) and
+0.4015 (κ 200), still worse than no alignment (0.3846). With Senate weight 1 the effective draws
+are mostly below 100 and fall to single digits, because the Senate loadings are close to unit
+norm, so those scores are noisy. The refitted files are not committed.
+
+What the sweep suggests, read with care:
+
+- **β.** In the House, β = 1.25 scores slightly better than the default β = 1 (log loss 0.1642
+  vs 0.1654; Brier 0.0430 vs 0.0432), consistent with the logistic fit of 1.31 ± 0.43. In the
+  Senate the default β = 1 is best on the grid. Both beat β = 0 (House 0.1985, Senate 0.4265), so
+  break rates carry signal in both chambers.
+- **ρ, alignment weight and κ.** Within this single event, every setting with ρ > 0 or an
+  alignment weight above 0 scores worse than the marginal prediction, in both chambers. The
+  default House setting (β = 1, ρ = 0.6, weight 1) has log loss 0.183 against 0.164. Two cautions: with
+  one event, the bloc swing is a single draw that the other members' votes pin down, so ρ mostly
+  acts as a second spread parameter that trades off against β; and how much a party's crossing
+  share varies from one event to the next, which is what ρ is for, cannot be measured from one
+  event at all. The House permutation test above still finds the crossers more aligned than
+  random sets; the sweep says that this does not make the other crossers' votes help predict a
+  given member's.
+- **Defaults are unchanged.** The evidence is one event, 8 House and 7 Senate crossers, scored
+  in-sample with the observed crossing share as the base rate, and there are no
+  leave-one-event-out scores. That is too thin to move β from 1 to 1.25 or to lower ρ or the House
+  alignment weight. More crossover fixtures, from other events, are needed before any default
+  should change.
+
 ## What has not been checked
 
 - The probabilities themselves. They are inputs, and the tool cannot tell you whether they are
   right.
 - Out-of-sample performance. The calibration uses one event, 8 House members and 7 senators, and
-  the fit is in-sample.
+  the fit is in-sample. `impsolver score` reports leave-one-event-out scores once there is more
+  than one crossover fixture.
 - Whether breaking ranks on ordinary votes predicts crossing on impeachment. The defection prior
   assumes it does.
 - Turnout in trials before 1989. The sources give guilty and not-guilty counts only, so those

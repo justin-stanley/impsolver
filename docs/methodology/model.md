@@ -81,4 +81,5 @@ against the bloc's likely position. Senate loadings are off by default
 
 `defection_prior` shifts party-prior probabilities by each member's historical break rate, shrunk
 toward the bloc rate with `pseudo_votes`. Members who break more often move away from their
-party's lean. β = 1 by default.
+party's lean. β = 1 by default. `impsolver score` shows how β and the correlation settings score
+against the known crossover votes; see [validation](validation.md#calibration-sweep).

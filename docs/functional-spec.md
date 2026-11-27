@@ -29,6 +29,10 @@ works out what the rules require and how close each case is.
   Belknap trial (1876) and the Senate trials of Judges Swayne, Archbald, Ritter, Claiborne,
   Hastings, Nixon and Porteous.
 - **calibrate**: checks the learned alignment against the 2021 Republican crossover votes.
+- **score**: Brier and log scores of per-member crossing predictions on the crossover fixtures,
+  over a grid of β, ρ, alignment weight and κ (one alignment file per κ), with the best settings
+  and leave-one-event-out scores when there is more than one event. It only reports and never
+  changes defaults.
 - **roster** and **align**: build the composition and the alignment files from Voteview CSVs.
 
 ## Data

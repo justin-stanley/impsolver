@@ -88,6 +88,7 @@ after a committee report.
 | `viability` | Your scenarios ranked by P(removal), flips needed and support gap |
 | `portfolio` | Order and dates for several cases: House capacity, 1 Senate trial at a time, deadlines, fatigue, succession |
 | `backtest`, `calibrate` | Checks against historical roll calls and the 2021 crossover votes |
+| `score` | Brier and log scores of crossing predictions over a parameter grid (report only) |
 | `roster`, `align` | Builds rosters and co-defection loadings from Voteview |
 | `validate`, `init`, `compare`, `schema` | Checks files (portfolios too), writes starter templates, compares rosters, writes JSON schemas |
 

@@ -18,6 +18,11 @@ All notable changes are listed here. The format follows
   supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 - `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
   `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
+- `impsolver score` scores per-member crossing predictions on the crossover fixtures (Brier and log
+  loss) over a grid of β, ρ, alignment weight and κ, with leave-one-event-out scores when there is
+  more than one event; it reports only, and no default changes.
+- Crossover fixtures take an optional `not_voting` list, and `impsolver score` leaves those members
+  out instead of scoring them as non-crossers (2021: 41 House and 8 Senate Republicans of the 116th).
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per
