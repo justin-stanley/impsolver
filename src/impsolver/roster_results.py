@@ -335,10 +335,19 @@ def build_from_results(
                 c = cands[r.line]
                 if len(c) == 1 and len(claims[c[0].id]) == 1:
                     mid = c[0].id
+                    diff = []
+                    if c[0].party != r.party:
+                        diff.append(f"party {c[0].party} -> {r.party}")
+                    if chamber == "house" and c[0].district != r.district:
+                        diff.append(f"district {c[0].district} -> {r.district}")
+                    changed = f"; {', '.join(diff)}" if diff else ""
                     notes.append(
                         f"matched to {c[0].name} by name and state; results gave no bioguide id"
+                        + changed
                     )
-                    notes_out.append(f"name match: {r.name} ({seat}) -> {c[0].name} ({mid})")
+                    notes_out.append(
+                        f"name match: {r.name} ({seat}) -> {c[0].name} ({mid}){changed}"
+                    )
                 else:
                     if chamber == "house":
                         mid = f"new:{seat}"
@@ -405,6 +414,15 @@ def build_from_results(
                     district=r.district,
                     notes="; ".join(notes) or None,
                 )
+            )
+        other = sorted(
+            {m.party for m in out if m.party not in ("R", "D", "I") and m.caucus is None}
+        )
+        for party in other:
+            n = sum(m.party == party and m.caucus is None for m in out)
+            notes_out.append(
+                f"party {party} is not R, D or I: {n} member(s) form their own bloc "
+                f"(map it with --caucus {party}=BLOC or the caucus column if that is not meant)"
             )
         held: list[Member] = []
         if chamber == "senate" and senate_holdovers:

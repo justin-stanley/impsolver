@@ -114,7 +114,8 @@ senate,AA,,Sam One,R,,
 - `party` is a code of 1 to 4 letters (`R`, `D`, `I`, ...); `Republican`, `Democrat`,
   `Democratic` and `Independent` are also accepted. Any other text (a state party's full name,
   for example) is an error: write the code of the party bloc you mean, and use `caucus` if the
-  member caucuses with another party. `caucus` sets the member's bloc and beats
+  member caucuses with another party. A code other than `R`, `D` or `I` with no caucus is flagged in the
+  header, since it forms its own bloc. `caucus` sets the member's bloc and beats
   `--member-caucus`, which beats the caucus a returning member had in `--previous` (kept only
   when the party is unchanged, and flagged), which beats `--caucus PARTY=BLOC`. Write `none` to
   use the member's own party.
@@ -129,7 +130,8 @@ name: the same first name, a prefix of at least 3 letters (`Nic` and `Nicholas`)
 (`J. Smith` and `SMITH, John`) or a first name equal to another given name (`Robert Smith` and
 `SMITH, J. Robert`). Nicknames such as `Bob` for `Robert` do not match; such a member gets a
 placeholder, flagged with the previous member who shares the surname, so add the `bioguide_id`.
-The match is flagged in the member's `notes` and in the file header. A match is accepted only
+The match is flagged in the member's `notes` and in the file header, with any change of party
+or district. A match is accepted only
 when it is one to one, whatever the row order: if a row fits two previous members, or two rows
 fit one previous member, none of them is matched, and each gets a placeholder and a flag. Name
 matching stays within a chamber, so a House member elected to the Senate (or the reverse) needs

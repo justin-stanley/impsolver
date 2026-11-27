@@ -309,42 +309,59 @@ def prev_file(tmp_path: Path, house: list[str], senate: list[str] | None = None)
     return p
 
 
-SMITH = "{id: S000001, name: 'SMITH, Adam', party: D, state: AA, district: 3}"
+SIERRA = "{id: S000901, name: 'SIERRA, Adam', party: D, state: AA, district: 3}"
 
 
 @pytest.mark.parametrize("order", [1, -1])
 def test_name_match_does_not_depend_on_row_order(tmp_path: Path, order: int) -> None:
-    rows = ["house,AA,1,Zed Smith,R,,", "house,AA,3,Adam Smith,D,,"][::order]
-    prev = prev_file(tmp_path, [SMITH])
+    rows = ["house,AA,1,Zed Sierra,R,,", "house,AA,3,Adam Sierra,D,,"][::order]
+    prev = prev_file(tmp_path, [SIERRA])
     rep = build_from_results(write(tmp_path, *rows), SRC, "x", [prev], allow_missing=True)
     h = {m.id: m for m in rep.comp.bodies["house"].roster}
-    assert h["S000001"].name == "Adam Smith" and h["S000001"].district == 3
+    assert h["S000901"].name == "Adam Sierra" and h["S000901"].district == 3
     assert "new:AA-01" in h and "different given name" in (h["new:AA-01"].notes or "")
-    assert any("surname matches SMITH, Adam (S000001), given name does not" in x for x in rep.lines)
+    assert any(
+        "surname matches SIERRA, Adam (S000901), given name does not" in x for x in rep.lines
+    )
 
 
 def test_two_rows_competing_for_one_member_are_both_flagged(tmp_path: Path) -> None:
-    rows = ["house,AA,1,A. Smith,R,,", "house,AA,3,Adam Smith,D,,"]
-    prev = prev_file(tmp_path, [SMITH])
+    rows = ["house,AA,1,A. Sierra,R,,", "house,AA,3,Adam Sierra,D,,"]
+    prev = prev_file(tmp_path, [SIERRA])
     for rr in (rows, rows[::-1]):
         rep = build_from_results(write(tmp_path, *rr), SRC, "x", [prev], allow_missing=True)
         h = {m.id: m for m in rep.comp.bodies["house"].roster}
-        assert "S000001" not in h
+        assert "S000901" not in h
         assert "also matches" in (h["new:AA-01"].notes or "")
-        assert "also matches A. Smith (line" in (h["new:AA-03"].notes or "")
+        assert "also matches A. Sierra (line" in (h["new:AA-03"].notes or "")
         assert sum("also matched by" in x for x in rep.lines) == 2
+
+
+def test_name_match_reports_party_and_district_changes(tmp_path: Path) -> None:
+    prev = prev_file(tmp_path, [SIERRA])
+    rep = build_from_results(
+        write(tmp_path, "house,AA,1,A. Sierra,R,,", "house,AA,2,Di Dee,DFL,,"),
+        SRC,
+        "x",
+        [prev],
+        allow_missing=True,
+    )
+    h = {m.id: m for m in rep.comp.bodies["house"].roster}
+    assert "party D -> R, district 3 -> 1" in (h["S000901"].notes or "")
+    assert any(x.endswith("(S000901); party D -> R, district 3 -> 1") for x in rep.lines)
+    assert any("party DFL is not R, D or I: 1 member(s)" in x for x in rep.lines)
 
 
 def test_two_compatible_previous_members_stay_ambiguous(tmp_path: Path) -> None:
     prev = prev_file(
         tmp_path,
-        [SMITH, "{id: S000002, name: 'SMITH, Adam B.', party: D, state: AA, district: 4}"],
+        [SIERRA, "{id: S000902, name: 'SIERRA, Adam B.', party: D, state: AA, district: 4}"],
     )
     rep = build_from_results(
-        write(tmp_path, "house,AA,3,Adam Smith,D,,"), SRC, "x", [prev], allow_missing=True
+        write(tmp_path, "house,AA,3,Adam Sierra,D,,"), SRC, "x", [prev], allow_missing=True
     )
     h = {m.id: m for m in rep.comp.bodies["house"].roster}
-    assert "ambiguous name match (SMITH, Adam (S000001), SMITH, Adam B." in (
+    assert "ambiguous name match (SIERRA, Adam (S000901), SIERRA, Adam B." in (
         h["new:AA-03"].notes or ""
     )
 
@@ -357,7 +374,7 @@ def test_given_name_rules() -> None:
     assert not same_given("Jim van Bravo", "VAN BRAVO, Bob J., Jr.")  # middle initial only
     assert not same_given("Chris Charlie", "CHARLIE, Carol")
     assert same_given("Bob van Bravo Jr.", "VAN BRAVO, Bob J., Jr.")
-    assert not same_given("Smith", "SMITH, Adam") and given_names("Ann Q. Smith") == ["ann", "q"]
+    assert not same_given("Sierra", "SIERRA, Adam") and given_names("Ann Q. Smith") == ["ann", "q"]
 
 
 def test_returning_member_keeps_previous_caucus_unless_party_changes(tmp_path: Path) -> None:
@@ -402,9 +419,9 @@ def test_returning_member_keeps_previous_caucus_unless_party_changes(tmp_path: P
 
 
 def test_chamber_changer_without_id_is_new(tmp_path: Path) -> None:
-    prev = prev_file(tmp_path, [SMITH])
+    prev = prev_file(tmp_path, [SIERRA])
     rep = build_from_results(
-        write(tmp_path, "senate,AA,,Adam Smith,D,,"), SRC, "x", [prev], allow_missing=True
+        write(tmp_path, "senate,AA,,Adam Sierra,D,,"), SRC, "x", [prev], allow_missing=True
     )
     assert rep.comp.bodies["senate"].roster[0].id == "new:AA-S1"
 
@@ -423,7 +440,7 @@ def test_district_and_party_checks(tmp_path: Path, rows: list[str], match: str) 
 
 
 def test_checks_against_previous_districts(tmp_path: Path) -> None:
-    prev = prev_file(tmp_path, [SMITH])
+    prev = prev_file(tmp_path, [SIERRA])
     with pytest.raises(ValueError, match="marked at-large but --previous lists districts up to 3"):
         build_from_results(
             write(tmp_path, "house,AA,00,A B,R,,"), SRC, "x", [prev], allow_missing=True
