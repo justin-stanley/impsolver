@@ -105,21 +105,37 @@ senate,AA,,Sam One,R,,
 
 - `chamber` is `house` or `senate`, and `state` is the 2-letter postal code. Rows for
   non-voting delegates (DC and the territories) are skipped.
-- `district` is the House district number. `AL`, `0` and `1` all mean an at-large seat and are
-  stored as district 1, as in the Voteview roster. Leave it blank for the Senate.
+- `district` is the House district number. `AL`, `0` and `00` mark an at-large seat, stored as
+  district 1 as in the Voteview roster; the command fails when a state marked at-large also has
+  numbered districts, in the CSV or in `--previous`. A district above the highest one the
+  `--previous` roster lists for that state is flagged in the header. Without `--previous` the
+  district numbers are not checked against apportionment. Leave it blank for the Senate.
 - A row with a blank `name` is a vacant seat (for example a race not yet decided or certified).
-- `party` is a letter (`R`, `D`, `I`, ...); `Republican`, `Democrat`, `Democratic` and
-  `Independent` are also accepted. `caucus` sets the member's bloc and beats `--member-caucus`,
-  which beats `--caucus PARTY=BLOC`. Write `none` to use the member's own party.
+- `party` is a code of 1 to 4 letters (`R`, `D`, `I`, ...); `Republican`, `Democrat`,
+  `Democratic` and `Independent` are also accepted. Any other text (a state party's full name,
+  for example) is an error: write the code of the party bloc you mean, and use `caucus` if the
+  member caucuses with another party. `caucus` sets the member's bloc and beats
+  `--member-caucus`, which beats the caucus a returning member had in `--previous` (kept only
+  when the party is unchanged, and flagged), which beats `--caucus PARTY=BLOC`. Write `none` to
+  use the member's own party.
 - `bioguide_id` is the member's Biographical Directory ID
   (<https://bioguide.congress.gov/>). A member without one gets a placeholder id, `new:CA-06` in
   the House or `new:CA-S1` in the Senate, until an ID is assigned.
 
 With `--previous COMPOSITION` (for example `compositions/us-119.yaml`), a row with a Bioguide ID
 keeps that ID and is flagged when it is not in the previous roster. A row without one is matched
-to a previous member of the same chamber and state with the same surname. The match is flagged
-in the member's `notes` and in the file header. If two previous members share that surname, the
-member is not matched; it gets a placeholder and a flag. Previous senators whose seats were not
+to a previous member of the same chamber and state with the same surname and a compatible given
+name: the same first name, a prefix of at least 3 letters (`Nic` and `Nicholas`), a lone initial
+(`J. Smith` and `SMITH, John`) or a first name equal to another given name (`Robert Smith` and
+`SMITH, J. Robert`). Nicknames such as `Bob` for `Robert` do not match; such a member gets a
+placeholder, flagged with the previous member who shares the surname, so add the `bioguide_id`.
+The match is flagged in the member's `notes` and in the file header. A match is accepted only
+when it is one to one, whatever the row order: if a row fits two previous members, or two rows
+fit one previous member, none of them is matched, and each gets a placeholder and a flag. Name
+matching stays within a chamber, so a House member elected to the Senate (or the reverse) needs
+`bioguide_id` in the CSV; without it they get a new placeholder such as `new:CA-S1`. `--previous`
+must list named members with states; a roster written with `party_shorthand` is refused.
+Previous senators whose seats were not
 up can be carried over with `--senate-holdovers`. A state keeps as many holdovers as it has seats
 not listed in the results. A composition does not record Senate classes, so when a state has
 more candidates than open seats (any state where the senator whose seat was up retired, resigned
@@ -143,8 +159,7 @@ impsolver roster --from-results results-120.csv \
 Primary sources for the rows:
 
 - The Clerk of the House publishes the official vote counts for each federal election in its
-  election statistics (<https://history.house.gov/Institution/Election-Statistics/Election-Statistics/>),
-  usually some months after the election.
+  election statistics (<https://history.house.gov/Institution/Election-Statistics/Election-Statistics/>).
 - The Clerk's member data and official list of members
   (<https://clerk.house.gov/Members>) and the Senate's list of senators
   (<https://www.senate.gov/senators/>) show who was sworn in.

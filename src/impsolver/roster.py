@@ -192,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
     vv.add_argument("--members", action="append", default=[], type=Path)
     vv.add_argument("--votes", action="append", default=[], type=Path)
     vv.add_argument("--keep", action="append", default=[], help="never mark ID as a vacancy")
-    vv.add_argument("--vacancy-gap", type=int, default=50)
+    vv.add_argument("--vacancy-gap", type=int, default=None, help="default 50")
     rs = ap.add_argument_group("from certified results")
     rs.add_argument(
         "--from-results",
@@ -264,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
                 parse_caucus(a.caucus),
                 parse_mapping(a.member_caucus),
                 a.keep,
-                a.vacancy_gap,
+                50 if a.vacancy_gap is None else a.vacancy_gap,
                 a.as_of,
                 a.name or "us-119",
                 a.vacate,
@@ -286,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
 def _from_results(a: argparse.Namespace) -> RosterReport:
     from .roster_results import build_from_results
 
-    if a.members or a.votes or a.keep or a.vacancy_gap != 50:
+    if a.members or a.votes or a.keep or a.vacancy_gap is not None:
         raise ValueError("--members, --votes, --keep and --vacancy-gap are for the Voteview mode")
     if not a.source:
         raise ValueError("--from-results needs --source (who certified the results)")

@@ -5,8 +5,10 @@
 The CSV has the columns ``chamber,state,district,name,party`` and, optionally, ``bioguide_id``
 and ``caucus``. Each row is one seat. A row with a blank name is a vacant seat. Returning members
 keep their Bioguide ID; when the results omit it, a member of ``--previous`` with the same
-chamber, state and surname is matched and flagged. Members without an ID get a placeholder such
-as ``new:CA-06`` (House) or ``new:CA-S1`` (Senate) until the Clerk assigns one.
+chamber, state, surname and a compatible given name is matched and flagged. A match is accepted
+only when it is one to one: a row with several candidates, or a previous member who is the
+candidate of several rows, is never matched. Members without an ID get a placeholder such as
+``new:CA-06`` (House) or ``new:CA-S1`` (Senate) until the Clerk assigns one.
 """
 
 from __future__ import annotations
@@ -26,7 +28,8 @@ REQUIRED = ("chamber", "state", "district", "name", "party")
 OPTIONAL = ("bioguide_id", "caucus")
 BIOGUIDE = re.compile(r"[A-Z]\d{6}")
 STATE = re.compile(r"[A-Z]{2}")
-AT_LARGE = {"AL", "0", "1", "00", "01"}
+AT_LARGE = {"AL", "0", "00"}
+PARTY_CODE = re.compile(r"[A-Z]{1,4}")
 SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
 PARTY_WORDS = {
     "republican": "R",
@@ -46,6 +49,7 @@ class Row:
     party: str
     bioguide: str
     caucus: str
+    at_large: bool = False
 
 
 def _norm(text: str) -> list[str]:
@@ -94,9 +98,51 @@ def same_surname(results_name: str, prev_name: str) -> bool:
     return len(toks) > len(prev) and toks[-len(prev) :] == prev
 
 
-def _party(text: str) -> str:
+def given_names(name: str, n_surname: int = 1) -> list[str]:
+    """Given-name tokens: after the first comma ("LAST, First"), else before the surname."""
+    name = _drop_suffix(name)
+    if "," in name:
+        return _norm(name.split(",", 1)[1])
+    toks = _norm(name)
+    return toks[:-n_surname]
+
+
+def _given_ok(a: str, b: str, initials: bool) -> bool:
+    """Equal, a prefix of 3+ letters (Nick / Nickolas) or, if allowed, a lone initial."""
+    if a == b:
+        return True
+    short, long_ = sorted((a, b), key=len)
+    return long_.startswith(short) and (len(short) >= 3 or (initials and len(short) == 1))
+
+
+def same_given(results_name: str, prev_name: str) -> bool:
+    """True when the given names are compatible.
+
+    The first given names may match as equal, as a 3-letter prefix or as a lone initial
+    (``"J. Smith"`` and ``"SMITH, John"``). A first name may also equal another given name of
+    the other side (``"Robert Smith"`` and ``"SMITH, J. Robert"``), but not by initial alone.
+    """
+    pa = given_names(prev_name)
+    ra = given_names(results_name, max(len(surname(prev_name)), 1))
+    if not ra or not pa:
+        return False
+    if _given_ok(ra[0], pa[0], initials=True):
+        return True
+    return any(_given_ok(ra[0], t, False) for t in pa) or any(
+        _given_ok(pa[0], t, False) for t in ra
+    )
+
+
+def _party(text: str, where: str) -> str:
     t = text.strip()
-    return PARTY_WORDS.get(t.lower(), t)
+    if t.lower() in PARTY_WORDS:
+        return PARTY_WORDS[t.lower()]
+    if t and not PARTY_CODE.fullmatch(t.upper()):
+        raise ValueError(
+            f"{where}: party {t!r} is not a code such as R, D or I (or Republican, Democrat, "
+            "Democratic, Independent); write the code and set the caucus column if needed"
+        )
+    return t.upper()
 
 
 def read_results(path: Path) -> tuple[list[Row], list[str]]:
@@ -129,6 +175,10 @@ def read_results(path: Path) -> tuple[list[Row], list[str]]:
             if chamber == "house":
                 if d in AT_LARGE:
                     district = 1
+                elif d.isdigit() and int(d) == 0:
+                    raise ValueError(
+                        f"{where}: write an at-large district as AL, 0 or 00, got {d!r}"
+                    )
                 elif d.isdigit():
                     district = int(d)
                 else:
@@ -147,10 +197,22 @@ def read_results(path: Path) -> tuple[list[Row], list[str]]:
                     state,
                     district,
                     r["name"],
-                    _party(r["party"]),
+                    _party(r["party"], where),
                     bio,
                     r.get("caucus", ""),
+                    chamber == "house" and d in AT_LARGE,
                 )
+            )
+    by_state: dict[str, list[Row]] = defaultdict(list)
+    for row in rows:
+        if row.chamber == "house":
+            by_state[row.state].append(row)
+    for st, group in by_state.items():
+        al = [x for x in group if x.at_large]
+        if al and any(x.district != 1 for x in group):
+            raise ValueError(
+                f"{path.name} line {al[0].line}: {st} is marked at-large but also has "
+                "numbered districts; write the district number"
             )
     return rows, skipped
 
@@ -203,6 +265,11 @@ def build_from_results(
         prev_names.append(f"{p.name} ({comp.name}, as of {comp.as_of.isoformat()})")
         for ch, body in comp.bodies.items():
             for m in body.roster:
+                if not STATE.fullmatch(m.state):
+                    raise ValueError(
+                        f"--previous {p.name}: member {m.id} has no state; --previous needs a "
+                        "roster of named members with states (not party_shorthand)"
+                    )
                 prev.setdefault(m.id, m)
                 prev_chamber.setdefault(m.id, ch)
     unknown = sorted(vacate_set - set(prev))
@@ -214,6 +281,18 @@ def build_from_results(
     if prev_names:
         lines.append("Returning members matched against " + "; ".join(prev_names) + ".")
     lines += [f"skipped: {s}" for s in skipped]
+
+    prev_districts: dict[str, int] = {}
+    for i, m in prev.items():
+        if prev_chamber[i] == "house" and m.district is not None:
+            prev_districts[m.state] = max(prev_districts.get(m.state, 0), m.district)
+    for r in rows:
+        top = prev_districts.get(r.state)
+        if r.at_large and top is not None and top > 1:
+            raise ValueError(
+                f"{results.name} line {r.line}: {r.state} is marked at-large but --previous lists "
+                f"districts up to {top}; write the district number"
+            )
 
     used_ids: set[str] = set()
     reserved = {r.bioguide for r in rows if r.bioguide}
@@ -234,6 +313,14 @@ def build_from_results(
         notes_out: list[str] = []
         new_ct: dict[str, int] = defaultdict(int)
         vacant_rows = [r for r in crow if not r.name]
+        cands, near, claims = _candidates(crow, prev, prev_chamber, chamber, reserved)
+        for r in crow:
+            top = prev_districts.get(r.state)
+            if chamber == "house" and top is not None and (r.district or 0) > top:
+                notes_out.append(
+                    f"check district: {_seat(chamber, r.state, r.district)} (line {r.line}) is "
+                    f"above the highest {r.state} district in --previous ({top})"
+                )
         for r in crow:
             if not r.name:
                 continue
@@ -245,21 +332,13 @@ def build_from_results(
                     notes.append("bioguide id not in the previous composition")
                     notes_out.append(f"new member: {r.name} ({mid}, {seat}) not in --previous")
             else:
-                cands = [
-                    m
-                    for m in prev.values()
-                    if prev_chamber[m.id] == chamber
-                    and m.state == r.state
-                    and m.id not in used_ids
-                    and m.id not in reserved
-                    and same_surname(r.name, m.name)
-                ]
-                if len(cands) == 1:
-                    mid = cands[0].id
+                c = cands[r.line]
+                if len(c) == 1 and len(claims[c[0].id]) == 1:
+                    mid = c[0].id
                     notes.append(
-                        f"matched to {cands[0].name} by name and state; results gave no bioguide id"
+                        f"matched to {c[0].name} by name and state; results gave no bioguide id"
                     )
-                    notes_out.append(f"name match: {r.name} ({seat}) -> {cands[0].name} ({mid})")
+                    notes_out.append(f"name match: {r.name} ({seat}) -> {c[0].name} ({mid})")
                 else:
                     if chamber == "house":
                         mid = f"new:{seat}"
@@ -267,22 +346,55 @@ def build_from_results(
                         new_ct[r.state] += 1
                         mid = f"new:{r.state}-S{new_ct[r.state]}"
                     notes.append("new member; placeholder id until a bioguide id is assigned")
-                    if cands:
-                        both = ", ".join(f"{m.name} ({m.id})" for m in cands)
+                    if len(c) > 1:
+                        both = ", ".join(f"{m.name} ({m.id})" for m in c)
                         notes.append(f"ambiguous name match ({both}); add bioguide_id")
                         notes_out.append(f"ambiguous name match: {r.name} ({seat}) -> {both}")
+                    elif c:
+                        rivals = ", ".join(
+                            f"{x.name} (line {x.line})" for x in claims[c[0].id] if x is not r
+                        )
+                        what = f"{c[0].name} ({c[0].id})"
+                        notes.append(
+                            f"ambiguous name match ({what} also matches {rivals}); add bioguide_id"
+                        )
+                        notes_out.append(
+                            f"ambiguous name match: {r.name} ({seat}) -> {what}, "
+                            f"also matched by {rivals}"
+                        )
+                    elif near[r.line]:
+                        who = ", ".join(f"{m.name} ({m.id})" for m in near[r.line])
+                        notes.append(
+                            f"same surname and state as {who} but a different given name; "
+                            "not matched (add bioguide_id if it is the same person)"
+                        )
+                        notes_out.append(
+                            f"new member: {r.name} ({mid}); surname matches {who}, given name "
+                            "does not"
+                        )
                     else:
                         notes_out.append(f"new member: {r.name} ({mid})")
             if mid in used_ids:
                 raise ValueError(f"{results.name} line {r.line}: id {mid} appears twice")
             used_ids.add(mid)
+            pm = prev.get(mid)
             if r.caucus:
                 cau: str | None = None if r.caucus.lower() == "none" else r.caucus
+            elif mid not in member_caucus and pm and pm.caucus and pm.party == r.party:
+                cau = pm.caucus
+                notes.append(f"caucus {cau} kept from the previous composition")
+                notes_out.append(f"caucus kept from --previous: {r.name} ({mid}) -> {cau}")
             else:
                 cau, note = resolve_caucus(mid, r.party, member_caucus, caucus)
                 if note:
                     notes.append(note)
                     notes_out.append(f"caucus from party mapping: {r.name} ({mid})")
+                if mid not in member_caucus and pm and pm.caucus:
+                    notes.append(
+                        f"previous caucus {pm.caucus} not kept: party changed from {pm.party} "
+                        f"to {r.party}"
+                    )
+                    notes_out.append(f"party changed: {r.name} ({mid}) {pm.party} -> {r.party}")
             out.append(
                 Member(
                     id=mid,
@@ -343,6 +455,35 @@ def build_from_results(
         raise ValueError(f"--member-caucus ids not found among seat holders: {', '.join(unknown)}")
     comp = Composition(schema_version=1, name=name, as_of=as_of or dt.date.today(), bodies=bodies)  # type: ignore[arg-type]
     return RosterReport(comp, lines)
+
+
+def _candidates(
+    crow: list[Row],
+    prev: dict[str, Member],
+    prev_chamber: dict[str, str],
+    chamber: str,
+    reserved: set[str],
+) -> tuple[dict[int, list[Member]], dict[int, list[Member]], dict[str, list[Row]]]:
+    """All name-match candidate pairs for the rows without a bioguide id, before any is assigned.
+
+    Returns, by results line, the previous members with the same chamber, state, surname and a
+    compatible given name (``cands``) and those with only the surname (``near``), and, by
+    previous id, the rows that name that member as a candidate (``claims``). A pair is accepted
+    only when both sides have exactly one candidate, so the outcome does not depend on row order.
+    """
+    pool = [m for i, m in prev.items() if prev_chamber[i] == chamber and i not in reserved]
+    cands: dict[int, list[Member]] = {}
+    near: dict[int, list[Member]] = {}
+    claims: dict[str, list[Row]] = defaultdict(list)
+    for r in crow:
+        if not r.name or r.bioguide:
+            continue
+        same = [m for m in pool if m.state == r.state and same_surname(r.name, m.name)]
+        cands[r.line] = [m for m in same if same_given(r.name, m.name)]
+        near[r.line] = [m for m in same if m not in cands[r.line]]
+        for m in cands[r.line]:
+            claims[m.id].append(r)
+    return cands, near, claims
 
 
 def _holdovers(

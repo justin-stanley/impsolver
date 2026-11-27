@@ -19,7 +19,13 @@ from impsolver.loader import load_composition
 from impsolver.model import Member
 from impsolver.roster import dump_composition
 from impsolver.roster import main as roster_main
-from impsolver.roster_results import build_from_results, same_surname, surname
+from impsolver.roster_results import (
+    build_from_results,
+    given_names,
+    same_given,
+    same_surname,
+    surname,
+)
 
 DATA = Path(__file__).parent / "data"
 RESULTS = DATA / "results-synthetic.csv"
@@ -66,7 +72,7 @@ def test_matching_placeholders_and_vacancies() -> None:
     # returning by name + state, flagged
     assert house["B000002"].party == "D"  # "Democratic" -> D
     assert "by name and state" in (house["B000002"].notes or "")
-    # two previous CHARLIEs in AA: never guess
+    # "C. Charlie" fits both CHARLIE, Carol and CHARLIE, Chris: never guess
     assert "C000003" not in house and "D000004" not in house
     assert "ambiguous" in (house["new:AA-03"].notes or "")
     # caucus column beats --caucus I=D
@@ -288,3 +294,167 @@ def test_holdover_caucus_precedence() -> None:
     assert got["S000012"].caucus == "X"  # no previous caucus: party mapping applies
     assert got["S000013"].caucus is None  # --member-caucus beats the previous caucus
     assert same_surname("Ann Smith", "Ann Smith") and surname("Ann Q. Smith") == ["smith"]
+
+
+def prev_file(tmp_path: Path, house: list[str], senate: list[str] | None = None) -> Path:
+    """A small synthetic --previous roster (state AA) with the given member flow maps."""
+    senate = senate or []
+    p = tmp_path / "prev.yaml"
+    body = "schema_version: 1\nname: p\nas_of: '2026-01-03'\nbodies:\n"
+    for ch, ms, seats in (("house", house, 435), ("senate", senate, 100)):
+        body += f"  {ch}:\n    seats: {seats}\n    vacancies: {seats - len(ms)}\n    members:"
+        body += "".join(f"\n    - {m}" for m in ms) if ms else " []"
+        body += "\n"
+    p.write_text(body)
+    return p
+
+
+SMITH = "{id: S000001, name: 'SMITH, Adam', party: D, state: AA, district: 3}"
+
+
+@pytest.mark.parametrize("order", [1, -1])
+def test_name_match_does_not_depend_on_row_order(tmp_path: Path, order: int) -> None:
+    rows = ["house,AA,1,Zed Smith,R,,", "house,AA,3,Adam Smith,D,,"][::order]
+    prev = prev_file(tmp_path, [SMITH])
+    rep = build_from_results(write(tmp_path, *rows), SRC, "x", [prev], allow_missing=True)
+    h = {m.id: m for m in rep.comp.bodies["house"].roster}
+    assert h["S000001"].name == "Adam Smith" and h["S000001"].district == 3
+    assert "new:AA-01" in h and "different given name" in (h["new:AA-01"].notes or "")
+    assert any("surname matches SMITH, Adam (S000001), given name does not" in x for x in rep.lines)
+
+
+def test_two_rows_competing_for_one_member_are_both_flagged(tmp_path: Path) -> None:
+    rows = ["house,AA,1,A. Smith,R,,", "house,AA,3,Adam Smith,D,,"]
+    prev = prev_file(tmp_path, [SMITH])
+    for rr in (rows, rows[::-1]):
+        rep = build_from_results(write(tmp_path, *rr), SRC, "x", [prev], allow_missing=True)
+        h = {m.id: m for m in rep.comp.bodies["house"].roster}
+        assert "S000001" not in h
+        assert "also matches" in (h["new:AA-01"].notes or "")
+        assert "also matches A. Smith (line" in (h["new:AA-03"].notes or "")
+        assert sum("also matched by" in x for x in rep.lines) == 2
+
+
+def test_two_compatible_previous_members_stay_ambiguous(tmp_path: Path) -> None:
+    prev = prev_file(
+        tmp_path,
+        [SMITH, "{id: S000002, name: 'SMITH, Adam B.', party: D, state: AA, district: 4}"],
+    )
+    rep = build_from_results(
+        write(tmp_path, "house,AA,3,Adam Smith,D,,"), SRC, "x", [prev], allow_missing=True
+    )
+    h = {m.id: m for m in rep.comp.bodies["house"].roster}
+    assert "ambiguous name match (SMITH, Adam (S000001), SMITH, Adam B." in (
+        h["new:AA-03"].notes or ""
+    )
+
+
+def test_given_name_rules() -> None:
+    assert same_given("Nick Begich III", "BEGICH, Nicholas J., III") is False  # nickname: no
+    assert same_given("Nic Begich", "BEGICH, Nicholas")  # 3-letter prefix
+    assert same_given("J. Smith", "SMITH, John") and same_given("John Smith", "SMITH, J.")
+    assert same_given("Robert Smith", "SMITH, J. Robert")
+    assert not same_given("Jim van Bravo", "VAN BRAVO, Bob J., Jr.")  # middle initial only
+    assert not same_given("Chris Charlie", "CHARLIE, Carol")
+    assert same_given("Bob van Bravo Jr.", "VAN BRAVO, Bob J., Jr.")
+    assert not same_given("Smith", "SMITH, Adam") and given_names("Ann Q. Smith") == ["ann", "q"]
+
+
+def test_returning_member_keeps_previous_caucus_unless_party_changes(tmp_path: Path) -> None:
+    prev = prev_file(
+        tmp_path,
+        [],
+        ["{id: S000013, name: 'THREE, Ted', party: I, caucus: D, state: AA}"],
+    )
+    rep = build_from_results(
+        write(tmp_path, "senate,AA,,Ted Three,I,S000013,"),
+        SRC,
+        "x",
+        [prev],
+        caucus={"I": "R"},
+        allow_missing=True,
+    )
+    m = rep.comp.bodies["senate"].roster[0]
+    assert m.caucus == "D" and "caucus D kept from the previous" in (m.notes or "")
+    assert any("caucus kept from --previous: Ted Three (S000013) -> D" in x for x in rep.lines)
+    # matched by name (no id) keeps it too
+    rep = build_from_results(
+        write(tmp_path, "senate,AA,,Ted Three,I,,"), SRC, "x", [prev], allow_missing=True
+    )
+    assert rep.comp.bodies["senate"].roster[0].caucus == "D"
+    # party changed: the previous caucus is not carried over
+    rep = build_from_results(
+        write(tmp_path, "senate,AA,,Ted Three,R,S000013,"), SRC, "x", [prev], allow_missing=True
+    )
+    m = rep.comp.bodies["senate"].roster[0]
+    assert m.caucus is None and "party changed from I to R" in (m.notes or "")
+    assert any("party changed: Ted Three (S000013) I -> R" in x for x in rep.lines)
+    # --member-caucus still wins
+    rep = build_from_results(
+        write(tmp_path, "senate,AA,,Ted Three,I,S000013,"),
+        SRC,
+        "x",
+        [prev],
+        member_caucus={"S000013": "none"},
+        allow_missing=True,
+    )
+    assert rep.comp.bodies["senate"].roster[0].caucus is None
+
+
+def test_chamber_changer_without_id_is_new(tmp_path: Path) -> None:
+    prev = prev_file(tmp_path, [SMITH])
+    rep = build_from_results(
+        write(tmp_path, "senate,AA,,Adam Smith,D,,"), SRC, "x", [prev], allow_missing=True
+    )
+    assert rep.comp.bodies["senate"].roster[0].id == "new:AA-S1"
+
+
+@pytest.mark.parametrize(
+    ("rows", "match"),
+    [
+        (["house,AA,0,A,R,,", "house,AA,2,B,R,,"], "marked at-large but also has numbered"),
+        (["house,AA,000,A,R,,"], "write an at-large district as AL"),
+        (["house,AA,1,A,Democratic-Farmer-Labor,,"], "is not a code such as R"),
+    ],
+)
+def test_district_and_party_checks(tmp_path: Path, rows: list[str], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        build_from_results(write(tmp_path, *rows), SRC, "x", allow_missing=True)
+
+
+def test_checks_against_previous_districts(tmp_path: Path) -> None:
+    prev = prev_file(tmp_path, [SMITH])
+    with pytest.raises(ValueError, match="marked at-large but --previous lists districts up to 3"):
+        build_from_results(
+            write(tmp_path, "house,AA,00,A B,R,,"), SRC, "x", [prev], allow_missing=True
+        )
+    rep = build_from_results(
+        write(tmp_path, "house,AA,99,A B,r,,"), SRC, "x", [prev], allow_missing=True
+    )
+    assert rep.comp.bodies["house"].roster[0].party == "R"
+    assert any(
+        "check district: AA-99 (line 2) is above the highest AA district" in x for x in rep.lines
+    )
+
+
+def test_previous_must_name_members(tmp_path: Path) -> None:
+    p = tmp_path / "short.yaml"
+    p.write_text(
+        "schema_version: 1\nname: s\nas_of: '2026-01-03'\nbodies:\n"
+        "  house: {seats: 435, party_shorthand: {R: 220, D: 215}}\n"
+        "  senate: {seats: 100, party_shorthand: {R: 50, D: 50}}\n"
+    )
+    with pytest.raises(ValueError, match="member R-001 has no state"):
+        build_from_results(RESULTS, SRC, "x", [p], allow_missing=True)
+
+
+def test_cli_in_process(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    base = ["--from-results", str(RESULTS), "--source", SRC, "--name", "t", "--allow-missing"]
+    assert roster_main([*base, "--vacancy-gap", "50"]) == 2
+    assert "--vacancy-gap are for the Voteview mode" in capsys.readouterr().err
+    assert roster_main(base) == 0
+    io = capsys.readouterr()
+    assert io.out.startswith("# Generated by impsolver roster.") and "house:" in io.err
+    out = tmp_path / "c.yaml"
+    assert roster_main([*base, "--out", str(out)]) == 0
+    assert load_composition(out).name == "t"

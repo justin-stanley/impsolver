@@ -13,7 +13,7 @@ bodies:
     - {id: A000001, name: 'ALPHA, Alice', party: R, state: AA, district: 1}
     - {id: B000002, name: 'VAN BRAVO, Bob J., Jr.', party: D, state: AA, district: 2}
     - {id: C000003, name: 'CHARLIE, Carol', party: R, state: AA, district: 3}
-    - {id: D000004, name: 'CHARLIE, Dan', party: D, state: AA, district: 4}
+    - {id: D000004, name: 'CHARLIE, Chris', party: D, state: AA, district: 4}
   senate:
     seats: 100
     vacancies: 96
