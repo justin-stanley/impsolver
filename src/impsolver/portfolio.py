@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel
 
+from . import contract
 from .deterministic import default_path, evaluate_article
 from .loader import load_portfolio, resolve
 from .members import logit, sigmoid
@@ -208,6 +209,19 @@ class Slot(BaseModel):
     weight: float
     attempt: int
     epoch: int = 0  # roster epoch of the trial's first day (0 = the scenario's own roster)
+    # Report contract (filled by ``contract.annotate`` on reported plans; None elsewhere).
+    house_lane: int | None = None  # 1-based
+    house_days: int | None = None  # House session days from house_start to house_end
+    house_start_reason: contract.HouseReason | None = None
+    house_start_after: str | None = None  # the case that freed the lane, or the dependency
+    ready: dt.date | None = None  # first day the Senate could take the case up
+    committee_start: dt.date | None = None
+    committee_end: dt.date | None = None
+    trial_start_reason: contract.TrialReason | None = None
+    trial_start_after: str | None = None  # the case whose trial held the floor
+    wait_trial_days: int | None = None  # trial days spent waiting for the floor
+    trial_days: int | None = None  # trial days from trial_start to trial_end
+    slack_days: int | None = None  # trial days from the verdict to the case's deadline
 
 
 @dataclass
@@ -819,12 +833,15 @@ class Dropped(BaseModel):
     id: str
     reason: str
     detail: str
+    # The numbers behind the reason (see ``contract.drop_numbers``); keys depend on ``reason``.
+    numbers: dict[str, float | str | list[str] | None] = {}
 
 
 class PlanOut(BaseModel):
     order: list[str]
     expected_removals: float
     slots: list[Slot]
+    budget: list[contract.BudgetRow] = []
 
 
 class SensRow(BaseModel):
@@ -833,6 +850,8 @@ class SensRow(BaseModel):
     base_rescheduled: float
     regret: float
     fragile: bool
+    # The recommended order re-scheduled under this row's setting (without succession branches).
+    slots: list[Slot] = []
 
 
 class RemovalsDist(BaseModel):
@@ -864,6 +883,11 @@ class PortfolioResult(BaseModel):
     pivots: dict[str, DeterministicArticle] = {}
     labels: dict[str, str] = {}
     tornado: dict[str, Tornado] = {}
+    # Report contract, version 2 (see ``contract.extend``). Version 1 reports lack these.
+    schema_version: int = 1
+    meta: contract.ReportMeta | None = None
+    inputs: Portfolio | None = None
+    gates: dict[str, contract.CaseGates] = {}
 
 
 # ------------------------------------------------------------------- top level
@@ -878,6 +902,7 @@ class Loaded:
     # With roster changes: P0 for each epoch (index 0 = ``p0``) and the preps of epochs 1 and on.
     p0_epochs: dict[str, list[float]] = field(default_factory=dict)
     epoch_preps: dict[str, list[Prepared]] = field(default_factory=dict)
+    source: str | None = None  # the portfolio file, when loaded from one
 
     def prep_at(self, cid: str, epoch: int) -> Prepared | None:
         if epoch > 0 and cid in self.epoch_preps:
@@ -951,7 +976,7 @@ def load(path: str | Path) -> Loaded:
         else:
             assert c.p is not None
             p0[c.id] = c.p
-    return Loaded(pf, preps, p0, gates, p0_epochs, later)
+    return Loaded(pf, preps, p0, gates, p0_epochs, later, str(path))
 
 
 def make_ctx(
@@ -1107,7 +1132,13 @@ def solve(
         if p.order in seen or not p.order:
             continue
         seen.add(p.order)
-        tops.append(PlanOut(order=list(p.order), expected_removals=p.value, slots=list(p.slots)))
+        tops.append(
+            PlanOut(
+                order=list(p.order),
+                expected_removals=p.value,
+                slots=[s.model_copy() for s in p.slots],
+            )
+        )
         if len(tops) >= pf.top:
             break
     sens = sensitivity(pf, p0, order, exhaustive, p0e)
@@ -1131,6 +1162,7 @@ def solve(
         res.removals_dist = removals_dist(loaded, ctx, order)
     if sensitivities:
         res.tornado = tornadoes(loaded, ctx, order)
+    contract.extend(res, loaded, ctx, order, exhaustive)
     return res
 
 
@@ -1152,6 +1184,8 @@ def sensitivity(
         _, best, _ = _best_value(ctx, exhaustive)
         base_v = _order_value(ctx, base)
         regret = max(0.0, best - base_v)
+        slots = [s.model_copy() for s in schedule_order(ctx, base).slots]
+        contract.annotate(ctx, slots)
         rows.append(
             SensRow(
                 label=label,
@@ -1159,6 +1193,7 @@ def sensitivity(
                 base_rescheduled=base_v,
                 regret=regret,
                 fragile=regret > max(0.01, 0.05 * best),
+                slots=slots,
             )
         )
     return rows

@@ -7,6 +7,13 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- The portfolio JSON report is now complete enough to draw the planning page from it alone
+  (`schema_version: 2`, schema in `schemas/report.schema.json`). New fields, all additive: `meta`
+  and `inputs`; on each slot its House lane, the rule that set each date, committee dates, waiting
+  and slack in session days; a session-day `budget` per plan; `numbers` behind each dropped
+  candidate's reason; the re-scheduled `slots` on each sensitivity row; and `gates`, with each
+  gate's rule in words, tally by bloc and every member's supplied probability and classification.
+  No result changes.
 - Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
   Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
 - Optional random attendance in the Monte Carlo (`attendance: random`, `absence_rate`, member

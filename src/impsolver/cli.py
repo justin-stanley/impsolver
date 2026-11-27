@@ -44,7 +44,7 @@ from .model import (
     Scenario,
 )
 from .paths import PathError, path_for
-from .portfolio import PortfolioError, change_dates, epoch_preps
+from .portfolio import PortfolioError, PortfolioResult, change_dates, epoch_preps
 from .portfolio import load as load_portfolio_inputs
 from .portfolio import solve as solve_portfolio
 from .prepare import Prepared
@@ -593,6 +593,7 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "fixture": Fixture,
     "crossovers": CrossoverFixture,
     "portfolio": Portfolio,
+    "report": PortfolioResult,
 }
 
 
