@@ -66,3 +66,23 @@ bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed)
 
 ## Alignment, defection prior, calibration, viability, portfolio
 These follow the spec relayed in parts 2 and 3; see the module docstrings in `src/impsolver/`.
+
+## Changes after the 2026-11-27 audit
+These change behavior relative to the recovered spec.
+- `alignment_chamber_weight` (default `{house: 1, senate: 0}`) multiplies `alignment_weight` for each
+  chamber. The Senate defaults to 0 because the 2021 calibration found no Senate co-defection
+  signal (permutation p = 0.75). Set it to 1 to restore the spec's behavior.
+- `national_swing` (default false) draws one party swing per bloc for both chambers instead of one
+  per chamber.
+- `senate_tie_break` (`none` | `pro` | `con`, default `none`) says how an exact tie on a Senate
+  majority vote (S1, S3) is resolved. With `none`, a tie defeats the motion, as in the spec. Whether
+  and how a presiding officer may break such a tie in an impeachment trial is not settled here, so
+  the tool takes it as the user's stated assumption. The setting is applied in the deterministic
+  bounds, the Monte Carlo and the ILP.
+- Succession is causal. Branches after a trigger differ only in work that starts after its verdict.
+  A cancelled dependent whose House work had begun keeps its lane through its House phase, and a
+  variant (for example a successor in the office) needs fresh House time from the day after the verdict.
+- Portfolio search: exact up to `exact_limit` = 10 eligible candidates, beam of 4096 above that.
+- `flips` uses the ILP by default (`--greedy` for the heuristic).
+- Unknown stage keys and shift articles are errors. Unknown member ids and blocs are warnings, and
+  `validate` exits 2 on any warning.

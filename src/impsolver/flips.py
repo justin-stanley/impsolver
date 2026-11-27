@@ -14,7 +14,7 @@ from .model import Chamber, Member, Stage
 from .paths import path_for
 from .prepare import Prepared
 from .results import FlipMember, FlipResult
-from .thresholds import has_quorum, membership_base, pro_wins
+from .thresholds import has_quorum, membership_base, pro_wins, tie_mode
 
 ABSENCE_NOTE = "absences are procedural sensitivity, not a recommendation"
 CHANGE_WEIGHT = 10_000.0
@@ -49,6 +49,7 @@ class _ChamberData:
     base: npt.NDArray[np.bool_]  # [gate, member], baseline PRO
     seats: int
     vacancies: int
+    tie: str = "none"
 
 
 def _chamber_data(prep: Prepared, article: str, stages: list[Stage]) -> list[_ChamberData]:
@@ -62,7 +63,18 @@ def _chamber_data(prep: Prepared, article: str, stages: list[Stage]) -> list[_Ch
         mask = prep.present_mask(chamber)
         members = [m for m, k in zip(body.roster, mask, strict=True) if k]
         p = np.vstack([prep.probs(chamber, s.id, article)[mask] for s in sts])
-        out.append(_ChamberData(chamber, sts, members, p, p >= hi, body.seats, body.vacancies))
+        out.append(
+            _ChamberData(
+                chamber,
+                sts,
+                members,
+                p,
+                p >= hi,
+                body.seats,
+                body.vacancies,
+                prep.scenario.senate_tie_break,
+            )
+        )
     return out
 
 
@@ -71,7 +83,7 @@ def _wins(st: Stage, pro: int, voting: int, absent_extra: int, d: _ChamberData) 
     n = voting - absent_extra
     sworn = d.seats - d.vacancies
     return bool(has_quorum(n, sworn)) and bool(
-        pro_wins(st.rule, st.pass_direction, pro, n - pro, 0, base)
+        pro_wins(st.rule, st.pass_direction, pro, n - pro, 0, base, tie_mode(st, d.tie))  # type: ignore[arg-type]
     )
 
 
@@ -267,7 +279,9 @@ def _ilp(
             voting = n_m - n_absent
             rule = st.rule
             if rule.kind == "majority_of_votes_cast":
-                prob += 2 * pro - voting >= (1 if st.pass_direction == "pass" else 0)
+                tie = tie_mode(st, d.tie)  # type: ignore[arg-type]
+                tie_to_pro = (st.pass_direction == "fail") if tie == "none" else (tie == "pro")
+                prob += 2 * pro - voting >= (0 if tie_to_pro else 1)
             elif st.pass_direction != "pass":
                 raise FlipError(f"ILP does not support fail-direction fraction gate {st.id}")
             elif rule.kind == "fraction_of_present":

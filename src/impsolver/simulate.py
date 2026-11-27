@@ -23,7 +23,7 @@ from .model import Alignment, Chamber, Member, Stage
 from .paths import Path, path_for
 from .prepare import Prepared
 from .results import CountSummary, SimArticle, SimGate, Simulation
-from .thresholds import has_quorum, membership_base, pro_wins
+from .thresholds import has_quorum, membership_base, pro_wins, tie_mode
 
 CHUNK = 10_000
 _ND = NormalDist()
@@ -69,6 +69,12 @@ def bloc_signs(p: FloatArr, bloc_idx: npt.NDArray[np.int64], n_blocs: int) -> Fl
             lean = float(free.mean())
             s[g, cols] = 1.0 if lean > 0.5 else (-1.0 if lean < 0.5 else 0.0)
     return s
+
+
+def chamber_weight(prep: Prepared, chamber: str) -> float:
+    sc = prep.scenario
+    w: float = sc.alignment_chamber_weight.get(chamber, 1.0)  # type: ignore[call-overload]
+    return sc.alignment_weight * w
 
 
 @dataclass
@@ -124,7 +130,7 @@ def chamber_models(
         p = np.vstack([prep.probs(chamber, s.id, article, extra)[mask] for s in sts])
         blocs = bloc_order(members)
         idx = np.array([blocs.index(m.bloc) for m in members], dtype=np.int64)
-        F = loadings_for(prep.alignment, chamber, members, prep.scenario.alignment_weight)
+        F = loadings_for(prep.alignment, chamber, members, chamber_weight(prep, chamber))
         signs = bloc_signs(p, idx, len(blocs)) if F is not None else None
         out[chamber] = ChamberModel(
             chamber,
@@ -176,18 +182,22 @@ def run_raw(
     done = 0
     while done < draws:
         m = min(CHUNK, draws - done)
+        national: dict[str, FloatArr] = {}
         for ch, cm in models.items():
             z = None
-            if shared is not None:
-                blocs = bloc_order(cm.members)
-                z = np.column_stack(
-                    [
-                        shared[(ch, b)][done : done + m]
-                        if (ch, b) in shared
-                        else rng.standard_normal(m)
-                        for b in blocs
-                    ]
-                )
+            if shared is not None or prep.scenario.national_swing:
+                cols = []
+                for b in bloc_order(cm.members):
+                    key = ("house", b) if prep.scenario.national_swing else (ch, b)
+                    if shared is not None and key in shared:
+                        cols.append(shared[key][done : done + m])
+                    elif prep.scenario.national_swing:
+                        if b not in national:
+                            national[b] = rng.standard_normal(m)
+                        cols.append(national[b])
+                    else:
+                        cols.append(rng.standard_normal(m))
+                z = np.column_stack(cols)
             gate_pro = cm.draw_pro(rng, m, rho, z).sum(axis=2)
             n = len(cm.members)
             quorum = bool(has_quorum(n, cm.seats - cm.vacancies))
@@ -202,6 +212,7 @@ def run_raw(
                     n - gate_pro[g],
                     np.zeros(m, dtype=np.int64),
                     base,
+                    tie_mode(st, prep.scenario.senate_tie_break),
                 )
                 passed[k, done : done + m] = wins & quorum
         done += m
@@ -253,7 +264,8 @@ def simulate(
         draws=draws,
         rho=r,
         seed=s,
-        aligned=prep.alignment is not None and prep.scenario.alignment_weight > 0,
+        aligned=prep.alignment is not None
+        and any(chamber_weight(prep, ch) > 0 for ch in ("house", "senate")),
         articles=[simulate_article(prep, a, path, draws, s, r) for a in prep.scenario.articles],
     )
 

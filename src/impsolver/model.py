@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Chamber = Literal["house", "senate"]
 Direction = Literal["pass", "fail"]
+TieBreak = Literal["none", "pro", "con"]
 RuleKind = Literal["majority_of_votes_cast", "fraction_of_present", "fraction_of_membership"]
 Prob = Annotated[float, Field(ge=0.0, le=1.0)]
 LooseDate = Annotated[dt.date, Field(strict=False)]
@@ -210,6 +211,18 @@ class Scenario(Strict):
     committee_reports: bool = False
     alignment: str | None = None
     alignment_weight: float = Field(default=1.0, ge=0.0, le=1.0)
+    # Per-chamber multiplier on alignment_weight. The Senate defaults to 0: the 2021 calibration
+    # found no Senate co-defection signal (permutation p = 0.75). Set it to 1 to opt in.
+    alignment_chamber_weight: dict[Chamber, Annotated[float, Field(ge=0.0, le=1.0)]] = {
+        "house": 1.0,
+        "senate": 0.0,
+    }
+    # Draw one party swing per bloc shared by both chambers, instead of one per chamber.
+    national_swing: bool = False
+    # How an exact tie on a Senate majority vote (S1, S3) is resolved. "none" keeps the plain
+    # rule (a tie defeats the motion). Whether and how a presiding officer may break such a tie in
+    # an impeachment trial is not settled, so this is the user's assumption to state.
+    senate_tie_break: TieBreak = "none"
     defection_prior: DefectionPrior | None = None
 
     @model_validator(mode="after")

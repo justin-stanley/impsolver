@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from .model import Direction, ThresholdRule
+from .model import Direction, Stage, ThresholdRule, TieBreak
 
 
 def ceil_div(a: int, b: int) -> int:
@@ -41,11 +41,27 @@ def pro_wins[IntLike: (int, npt.NDArray[np.int64])](
     con: IntLike,
     present: IntLike,
     base: int,
+    tie: TieBreak = "none",
 ) -> IntLike:
+    """True where PRO wins. ``tie`` overrides how an exact tie on a majority vote goes."""
     if direction == "pass":
-        return motion_carries(rule, pro, con, present, base)
-    carried = motion_carries(rule, con, pro, present, base)
-    return ~carried if isinstance(carried, np.ndarray) else (not carried)
+        out = motion_carries(rule, pro, con, present, base)
+    else:
+        carried = motion_carries(rule, con, pro, present, base)
+        out = ~carried if isinstance(carried, np.ndarray) else (not carried)
+    if tie == "none" or rule.kind != "majority_of_votes_cast":
+        return out
+    winner = tie == "pro"
+    if isinstance(out, np.ndarray):
+        return np.where(pro == con, winner, out)
+    return winner if pro == con else out
+
+
+def tie_mode(stage: Stage, senate_tie_break: TieBreak) -> TieBreak:
+    """The scenario's tie-break applies only to majority votes in the Senate."""
+    if stage.chamber == "senate" and stage.rule.kind == "majority_of_votes_cast":
+        return senate_tie_break
+    return "none"
 
 
 def membership_base(rule: ThresholdRule, seats: int, vacancies: int) -> int:
@@ -58,22 +74,23 @@ def required_pro(
     voting: int,
     present: int = 0,
     base: int = 0,
+    tie: TieBreak = "none",
 ) -> int:
     """Minimal PRO count among ``voting`` yea/nay voters for PRO to win.
 
     ``present`` members answer present and do not vote yea or nay. The result may exceed
     ``voting`` when the gate cannot be won with this attendance.
     """
-    if direction == "pass":
+    if direction == "pass" and tie == "none":
         if rule.kind == "majority_of_votes_cast":
             return voting // 2 + 1
         if rule.kind == "fraction_of_present":
             counted = present if rule.present_in_denominator else 0
             return ceil_div(rule.p * (voting + counted), rule.q)
         return ceil_div(rule.p * base, rule.q)
-    # fail direction: PRO wins iff the motion (yea = CON) does not carry. Search is cheap.
+    # Fail direction or a tie rule: search, which is cheap.
     for pro in range(voting + 1):
-        if pro_wins(rule, direction, pro, voting - pro, present, base):
+        if pro_wins(rule, direction, pro, voting - pro, present, base, tie):
             return pro
     return voting + 1
 

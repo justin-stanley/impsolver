@@ -9,7 +9,7 @@ import numpy as np
 from .paths import Path, path_for
 from .prepare import Prepared
 from .results import BlocCount, DeterministicArticle, DeterministicGate, Evaluation, Verdict
-from .thresholds import has_quorum, membership_base, pro_wins, required_pro
+from .thresholds import has_quorum, membership_base, pro_wins, required_pro, tie_mode
 
 
 def default_path(prep: Prepared) -> str:
@@ -39,13 +39,14 @@ def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicA
         pro_min = int(is_pro.sum())
         pro_max = pro_min + int(is_unc.sum())
         base = membership_base(st.rule, body.seats, body.vacancies)
-        need = required_pro(st.rule, st.pass_direction, voting, 0, base)
+        tie = tie_mode(st, prep.scenario.senate_tie_break)
+        need = required_pro(st.rule, st.pass_direction, voting, 0, base, tie)
         verdict: Verdict
         if not has_quorum(voting, body.sworn):
             verdict = "NO_QUORUM"
-        elif pro_wins(st.rule, st.pass_direction, pro_min, voting - pro_min, 0, base):
+        elif pro_wins(st.rule, st.pass_direction, pro_min, voting - pro_min, 0, base, tie):
             verdict = "PASS"
-        elif not pro_wins(st.rule, st.pass_direction, pro_max, voting - pro_max, 0, base):
+        elif not pro_wins(st.rule, st.pass_direction, pro_max, voting - pro_max, 0, base, tie):
             verdict = "FAIL"
         else:
             verdict = "CONTESTED"
