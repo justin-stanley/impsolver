@@ -36,7 +36,7 @@ def sha256(path: Path) -> str:
 
 def check_manifest() -> list[str]:
     problems = []
-    for line in MANIFEST.read_text().splitlines():
+    for line in MANIFEST.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         digest, name = line.split()
@@ -80,7 +80,10 @@ def close(a: object, b: object, tol: float = 1e-6) -> bool:
 
 def same(built: Path, committed: Path) -> bool:
     if built.suffix == ".json":
-        return close(json.loads(built.read_text()), json.loads(committed.read_text()))
+        return close(
+            json.loads(built.read_text(encoding="utf-8")),
+            json.loads(committed.read_text(encoding="utf-8")),
+        )
     return built.read_bytes() == committed.read_bytes()
 
 

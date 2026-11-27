@@ -28,6 +28,8 @@ jobs:
   test:
     needs: lint
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"  # tests read and write fixture text without naming an encoding
     strategy:
       fail-fast: false
       matrix:

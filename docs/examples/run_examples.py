@@ -76,7 +76,11 @@ def main_() -> int:
     os.chdir(ROOT)
     os.environ["COLUMNS"] = "100"  # argparse wraps help to the terminal width
     files = render()
-    stale = [n for n, t in files.items() if not (OUT / n).exists() or (OUT / n).read_text() != t]
+    stale = [
+        n
+        for n, t in files.items()
+        if not (OUT / n).exists() or (OUT / n).read_text(encoding="utf-8") != t
+    ]
     if a.check:
         if stale:
             print("stale generated docs: " + ", ".join(stale), file=sys.stderr)
@@ -86,7 +90,7 @@ def main_() -> int:
         return 0
     OUT.mkdir(parents=True, exist_ok=True)
     for n, t in files.items():
-        (OUT / n).write_text(t)
+        (OUT / n).write_text(t, encoding="utf-8")
     print(f"wrote {len(files)} files to {OUT.relative_to(ROOT)}")
     return 0
 
