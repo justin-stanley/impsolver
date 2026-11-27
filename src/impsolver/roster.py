@@ -24,6 +24,7 @@ from .alignment import (
     voteview_source,
 )
 from .model import Body, Composition, Member
+from .scores import attach_scores, read_member_scores
 
 SEATS = {"house": 435, "senate": 100}
 TERRITORIES = {"DC", "PR", "GU", "VI", "AS", "MP", "USA"}
@@ -86,6 +87,7 @@ def build_roster(
     name: str = "us-119",
     vacate: list[str] | None = None,
     accessed: dt.date | None = None,
+    member_scores: Path | None = None,
 ) -> RosterReport:
     caucus = caucus or {}
     member_caucus = member_caucus or {}
@@ -164,6 +166,9 @@ def build_roster(
     if unknown:
         raise ValueError(f"ids not found among current seat holders: {', '.join(unknown)}")
     comp = Composition(schema_version=1, name=name, as_of=as_of or dt.date.today(), bodies=bodies)  # type: ignore[arg-type]
+    if member_scores is not None:
+        scores, stats = read_member_scores(member_scores)
+        lines[1:1] = attach_scores(comp, scores, stats)
     return RosterReport(comp, lines)
 
 
@@ -236,6 +241,14 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="date the source files were downloaded (for the citation; default today)",
     )
+    ap.add_argument(
+        "--member-scores",
+        type=Path,
+        default=None,
+        metavar="FILE.csv",
+        help="user-supplied scores (columns id,score,source) for a scenario's score_prior; "
+        "standardized within each source",
+    )
     ap.add_argument("--as-of", type=dt.date.fromisoformat, default=None)
     ap.add_argument("--name", default=None, help="composition name (default us-119 from Voteview)")
     ap.add_argument("--out", type=Path)
@@ -243,6 +256,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if a.from_results is not None:
             rep = _from_results(a)
+            if a.member_scores is not None:
+                scores, stats = read_member_scores(a.member_scores)
+                rep.lines[1:1] = attach_scores(rep.comp, scores, stats)
         else:
             if not a.members or not a.votes:
                 raise ValueError("give --members and --votes, or --from-results")
@@ -269,6 +285,7 @@ def main(argv: list[str] | None = None) -> int:
                 a.name or "us-119",
                 a.vacate,
                 a.accessed,
+                a.member_scores,
             )
     except (OSError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)

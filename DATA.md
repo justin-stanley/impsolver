@@ -170,6 +170,28 @@ Primary sources for the rows:
 Once the new Congress has voted, rebuild the roster from Voteview with the commands above and
 check the two against each other; `impsolver compare --composition A --composition B SCENARIO`
 evaluates one scenario against both.
+## Member scores (user-supplied)
+
+impsolver does not ship, download or redistribute any third-party member scores. Their licensing
+has not been checked, so none are in this repository. `impsolver roster --member-scores FILE.csv`
+is a hook for scores you supply yourself, for example ideology scores of state legislators for
+members who have no congressional voting record yet. A scenario's `score_prior` turns them into a
+shift of the party prior (see "Score prior" in the model methodology, `docs/methodology/model.md`).
+
+If you use this hook:
+
+- Take the scores from a source whose license you have checked allows your use, and follow its
+  citation request.
+- Put the citation (author, title, version, URL, access date) in the `source` column. `roster`
+  copies each source into the composition's header comment and each scored member's
+  `score_source`, so the citation travels with the file.
+- Do not commit the score file or a composition built from it to this repository unless the
+  source's license allows redistribution and the source is added to this page.
+
+The file has three columns, `id,score,source`. `id` is the member's Bioguide ID. Scores are
+standardized within each `source` (mean 0, population standard deviation 1 over the rows of that
+source), so include the source's whole reference set, not only the members you want to score;
+rows that match no current seat holder are used for the standardization and otherwise ignored.
 
 ## Historical roll calls
 

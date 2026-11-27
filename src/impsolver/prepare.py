@@ -21,7 +21,7 @@ from .loader import (
 )
 from .members import Resolver
 from .model import STAR, Alignment, Chamber, Composition, Member, RuleSet, Scenario
-from .priors import apply_defection_prior
+from .priors import apply_defection_prior, apply_score_prior
 from .uncertainty import Bound, bound_scenario, has_uncertainty
 
 
@@ -74,6 +74,11 @@ def check_references(rules: RuleSet, comp: Composition, scenario: Scenario) -> l
     ]
     if scenario.attendance == "fixed" and scenario.absence_rate > 0:
         warnings.append("absence_rate has no effect unless attendance is random")
+    scored_blocs = {m.bloc for b in comp.bodies.values() for m in b.roster if m.score is not None}
+    warnings += [
+        f"score_prior bloc {b} matches no scored member of composition {comp.name}"
+        for b in sorted(set(scenario.score_prior) - scored_blocs)
+    ]
     if scenario.uncertainty_draws > 0 and not has_uncertainty(scenario):
         warnings.append("uncertainty_draws has no effect: no prior is a range or a beta")
     return warnings
@@ -138,11 +143,7 @@ class Prepared:
         The defection prior, if any, is applied again from the original composition.
         """
         base = self.input_comp if self.input_comp is not None else self.comp
-        comp = base
-        if scenario.defection_prior is not None and self.alignment is not None:
-            comp = apply_defection_prior(
-                scenario.defection_prior, scenario, base, self.rules, self.alignment
-            )
+        comp, _ = apply_member_priors(scenario, base, self.rules, self.alignment)
         return Prepared(
             self.rules, comp, scenario, self.alignment, self.source, list(self.warnings), base
         )
@@ -172,6 +173,20 @@ class Prepared:
         )
 
 
+def apply_member_priors(
+    scenario: Scenario, comp: Composition, rules: RuleSet, alignment: Alignment | None
+) -> tuple[Composition, int]:
+    """Apply the defection prior, then the score prior; return the composition and the number
+    of members the score prior moved."""
+    if alignment is None:
+        return comp, 0
+    if scenario.defection_prior is not None:
+        comp = apply_defection_prior(scenario.defection_prior, scenario, comp, rules, alignment)
+    if scenario.score_prior:
+        return apply_score_prior(scenario, comp, rules, alignment)
+    return comp, 0
+
+
 def prepare_objects(
     rules: RuleSet,
     comp: Composition,
@@ -181,10 +196,16 @@ def prepare_objects(
 ) -> Prepared:
     warnings = check_references(rules, comp, scenario)
     input_comp = comp
-    if scenario.defection_prior is not None:
-        if alignment is None:
-            raise ValueError("defection_prior needs an alignment")
-        comp = apply_defection_prior(scenario.defection_prior, scenario, comp, rules, alignment)
+    if scenario.defection_prior is not None and alignment is None:
+        raise ValueError("defection_prior needs an alignment")
+    if scenario.score_prior and alignment is None:
+        raise ValueError("score_prior needs an alignment")
+    comp, scored = apply_member_priors(scenario, comp, rules, alignment)
+    if scenario.score_prior and scored == 0:
+        warnings.append(
+            "score_prior moved no member: none has a score, a score_prior bloc and no "
+            "congressional history in the alignment file"
+        )
     prep = Prepared(rules, comp, scenario, alignment, source, warnings, input_comp)
     if scenario.attendance == "random":
         if not any(prep.absence_rates(ch).any() for ch in comp.bodies):

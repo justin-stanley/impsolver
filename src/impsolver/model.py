@@ -119,6 +119,11 @@ class Member(Strict):
     p_pro: dict[str, Prob] = {}
     p_source: str | None = None
     ideology: float | None = None
+    # A standardized external score (z-score within its source), written by ``roster
+    # --member-scores``. Used only by a scenario's ``score_prior``, for members without
+    # congressional history in the scenario's alignment file.
+    score: float | None = None
+    score_source: str | None = None
     attendance: Literal["present", "absent"] = "present"
     # Chance of missing a vote in a draw when the scenario sets ``attendance: random``.
     p_absent: Prob | None = None
@@ -234,6 +239,13 @@ class DefectionPrior(Strict):
     stages: list[str] = [STAR]
 
 
+class ScorePrior(Strict):
+    """Logit shift ``intercept + slope * score`` for a bloc's members without history."""
+
+    slope: float
+    intercept: float = 0.0
+
+
 ALIGNMENT_CHAMBER_DEFAULT: dict[Chamber, float] = {"house": 1.0, "senate": 0.0}
 
 
@@ -273,6 +285,9 @@ class Scenario(Strict):
     attendance: AttendanceMode = "fixed"
     absence_rate: Prob = 0.0
     defection_prior: DefectionPrior | None = None
+    # Per bloc: move the party prior of members who have a ``score`` but no congressional history
+    # (not in the alignment file) by ``intercept + slope * score`` on the logit scale.
+    score_prior: dict[str, ScorePrior] = {}
     # Outer Monte Carlo draws over uncertain priors (ranges and Beta distributions). 0 turns the
     # outer loop off; simulate then uses each uncertain prior's midpoint (range) or mean (Beta).
     uncertainty_draws: int = Field(default=0, ge=0)
@@ -291,6 +306,10 @@ class Scenario(Strict):
         }
         if self.defection_prior is not None and self.alignment is None:
             raise ValueError("defection_prior needs an alignment file with break counts")
+        if self.score_prior and self.alignment is None:
+            raise ValueError(
+                "score_prior needs an alignment file (it decides who has congressional history)"
+            )
         return self
 
 

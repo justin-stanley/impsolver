@@ -18,6 +18,13 @@ the scenarios it references). See [Getting started](../getting-started.md#start-
 | Historical fixture | `schemas/fixture.schema.json` | `src/impsolver/data/fixtures/trump-2021.yaml` |
 | Crossover fixture | `schemas/crossovers.schema.json` | `src/impsolver/data/fixtures/members/trump-2021-crossovers.yaml` |
 
+A composition member may carry `score` (a standardized external score) and `score_source` (its
+citation). `impsolver roster --member-scores FILE.csv` writes both from a CSV with the columns
+`id,score,source` that you supply; scores are standardized within each source. impsolver ships no
+such file; see [data sources](../data.md#member-scores-user-supplied). A scenario's `score_prior`
+(`{BLOC: {slope, intercept}}`, intercept default 0) uses them; see the
+[model](../methodology/model.md#score-prior).
+
 Paths inside a scenario or portfolio are relative to that file. A scenario's `rules` may instead
 name a built-in rule set (`us-federal`).
 
