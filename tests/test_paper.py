@@ -116,6 +116,31 @@ def test_bib_entries_have_a_title_and_a_source() -> None:
         assert re.search(r"^\s*(doi|howpublished|publisher)\s*=", entry, flags=re.M), key
 
 
+# Tallies quoted in the Validation section: (fixture, stage, article, tally as printed)
+TALLIES = [
+    ("ritter-1936", "S2", "VII", "56-28"),
+    ("claiborne-1986", "S2", "III", "46-17-35"),
+    ("johnson-1868", "S2", "XI", "35-19"),
+    ("archbald-1913", "S3", "judgment", "39-35"),
+    ("porteous-2010", "S3", "judgment", "94-2"),
+    ("ritter-1936", "S3", "judgment", "0-76"),
+    ("mayorkas-2024", "H2", "I", "214-216"),
+    ("mayorkas-2024", "H2", "I", "214-213"),
+    ("mayorkas-2024", "S1", "I", "51-48-1"),
+    ("mayorkas-2024", "S1", "II", "51-49"),
+]
+
+
+@pytest.mark.parametrize(("case", "stage", "article", "tally"), TALLIES)
+def test_quoted_tallies_match_the_backtest(case: str, stage: str, article: str, tally: str) -> None:
+    rows = (GENERATED / "backtest.md").read_text(encoding="utf-8").splitlines()
+    assert any(
+        ln.split()[:6] == ["OK", case, stage, "art", article, tally] for ln in rows if ln.strip()
+    ), (case, stage, article, tally)
+    paper = paper_text().replace("–", "-")
+    assert re.search(rf"\b{re.escape(tally)}\b", paper), tally
+
+
 def test_appendix_commands_parse() -> None:
     appendix = body().split("# Appendix", 1)[1]
     block = appendix.split("```bash", 1)[1].split("```", 1)[0]

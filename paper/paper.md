@@ -177,20 +177,23 @@ Alcee Hastings and Walter Nixon (1989) and Thomas Porteous (2010). Each fixture 
 cites the House Clerk or senate.gov roll-call pages it was checked against, or, for trials with no
 Senate roll-call page, the senate.gov case pages and the House precedents published on
 govinfo.gov [@senateimpeachmentlist; @clerk2021; @senate2021; @hinds; @cannon; @deschler]. The
-fixtures exercise the edge cases of the rules: Ritter's article VII passed at exactly 56 of 84
-present, the minimum two-thirds; Claiborne's article III (46–17 with 35 senators voting
-"present") failed by 20 because "present" counts in the denominator; Johnson's article XI
-(35–19) failed by one vote; and disqualification votes passed for Archbald (39–35) and Porteous
-(94–2) and failed for Ritter (0–76). The 2024 House votes on Mayorkas (214–216, then 214–213) and
-the Senate's sustained points of order (51–48–1 and 51–49) test the majority and fail-direction
-rules. The backtest checks the rules engine only; it does not test any probability.
+fixtures exercise the edge cases of the rules. Ritter's article VII passed 56–28, exactly
+two-thirds of the 84 present [@deschler]. Claiborne's article III, at 46–17–35 (guilty, not
+guilty, "present"), failed by 20 because "present" counts in the denominator [@senateclaiborne].
+Johnson's article XI (35–19) failed by one vote [@senatejohnson]. Disqualification votes passed
+for Archbald (39–35) [@cannon] and Porteous (94–2) [@senate2010] and failed for Ritter (0–76)
+[@deschler]. The 2024 House votes on Mayorkas (214–216 [@clerk2024a], then 214–213
+[@clerk2024b]) and the Senate's sustained points of order (51–48–1 [@senate2024a] and 51–49
+[@senate2024b]) test the majority and fail-direction rules. The backtest checks the rules engine
+only; it does not test any probability.
 
 ## Calibration
 
-The co-defection model is checked on one event: the members of the 116th Congress's Republican
-conference who voted to impeach in the House (roll call 17 of 2021, 232–197 [@clerk2021]) or to
-convict in the Senate (vote 59 of the 117th Congress, 57–43 [@senate2021]). Only 116th Congress
-roll calls are used to fit the alignment, so the votes being predicted are not in the history.
+The co-defection model is checked on one event: the Republicans who voted to impeach in the House
+in 2021 (roll call 17, 232–197 [@clerk2021]) or to convict in the Senate (vote 59 of the 117th
+Congress, 57–43 [@senate2021]). Members are matched to their 116th Congress records, and only
+116th Congress roll calls are used to fit the alignment, so the votes being predicted are not in
+the history.
 `impsolver calibrate` reports, per chamber, the crossers' break rate against their party's, their
 mean pairwise alignment against 2,000 random same-party sets (a permutation p-value), and a
 logistic fit of $\beta$:
@@ -255,7 +258,7 @@ builds on NumPy [@harris2020numpy], PuLP [@pulp] and the COIN-OR CBC solver [@cb
 # Appendix: commands behind the numbers
 
 Every number in this paper was produced by impsolver at the commit this paper was written against
-(the `roadmap/v0.2` integration branch), run from the repository root with the committed data
+(commit `7847138` on the `roadmap/v0.2` integration branch), run from the repository root with the committed data
 files. The same commands generate the worked examples in `docs/examples/generated/`, which
 `python docs/examples/run_examples.py --check` keeps up to date, and `tests/test_paper.py` checks
 that the numbers quoted here still appear in their output.
