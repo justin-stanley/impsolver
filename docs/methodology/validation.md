@@ -30,7 +30,7 @@ In the Senate they were not, so Senate alignment is off by default.
   the fit is in-sample.
 - Whether breaking ranks on ordinary votes predicts crossing on impeachment. The defection prior
   assumes it does.
-- Turnout in trials before 1986. The sources give guilty and not-guilty counts only, so those
+- Turnout in trials before 1989. The sources give guilty and not-guilty counts only, so those
   fixtures derive `not_voting` from the seated membership the senate.gov party-division table shows
   for that session. It affects only the quorum check. The pre-1990 House votes are left out
   (except Ritter's and Johnson's resolutions), because their full tallies or vacancies could not be
