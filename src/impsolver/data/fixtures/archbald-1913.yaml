@@ -1,0 +1,37 @@
+# Senate trial of Judge Robert W. Archbald (Commerce Court). Convicted on articles I, III, IV, V
+# and XIII; removed and disqualified, the disqualification half of the divided order carrying
+# 39-35. Tallies are from Cannon's Precedents vol. 6 sec. 512, citing the Senate Journal (62nd
+# Cong., 3rd sess., p. 326) and Record p. 1438. Several senators were excused from voting, so
+# turnout differs by article. not_voting is derived, not recorded: it assumes 95 of 96 seats
+# filled, as the senate.gov party-division table shows for the 3rd session of the 62nd Congress
+# before 1913-01-20. It affects only the quorum check.
+schema_version: 1
+case: archbald-1913
+target: {name: Robert W. Archbald, office: judge}
+date: 1913-01-13
+path: B
+sources:
+  - https://www.govinfo.gov/content/pkg/GPO-HPREC-CANNONS-V6/html/GPO-HPREC-CANNONS-V6-53.htm
+  - https://www.senate.gov/about/powers-procedures/impeachment/impeachment-list.htm
+  - https://www.senate.gov/about/parties-leadership/party-division.htm
+verified: 2026-11-27
+bodies:
+  senate: {seats: 96, vacancies: 1}
+votes:
+  - {stage: S2, article: I, yea: 68, nay: 5, not_voting: 22, expected: PASS}
+  - {stage: S2, article: II, yea: 46, nay: 25, not_voting: 24, expected: FAIL, expected_short: 2}
+  - {stage: S2, article: III, yea: 60, nay: 11, not_voting: 24, expected: PASS}
+  - {stage: S2, article: IV, yea: 52, nay: 20, not_voting: 23, expected: PASS}
+  - {stage: S2, article: V, yea: 66, nay: 6, not_voting: 23, expected: PASS}
+  - {stage: S2, article: VI, yea: 24, nay: 45, not_voting: 26, expected: FAIL, expected_short: 22}
+  - {stage: S2, article: VII, yea: 29, nay: 36, not_voting: 30, expected: FAIL, expected_short: 15}
+  - {stage: S2, article: VIII, yea: 22, nay: 42, not_voting: 31, expected: FAIL, expected_short: 21}
+  - {stage: S2, article: IX, yea: 23, nay: 39, not_voting: 33, expected: FAIL, expected_short: 19}
+  - {stage: S2, article: X, yea: 1, nay: 65, not_voting: 29, expected: FAIL, expected_short: 43}
+  - {stage: S2, article: XI, yea: 11, nay: 51, not_voting: 33, expected: FAIL, expected_short: 31}
+  - {stage: S2, article: XII, yea: 19, nay: 46, not_voting: 30, expected: FAIL, expected_short: 25}
+  - {stage: S2, article: XIII, yea: 42, nay: 20, not_voting: 33, expected: PASS,
+     note: "42 of 62 is just over two-thirds"}
+  - {stage: S3, article: judgment, yea: 39, nay: 35, not_voting: 21, expected: PASS,
+     note: "disqualification half of the divided judgment order"}
+expected_complete: true

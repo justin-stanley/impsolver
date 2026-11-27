@@ -96,7 +96,7 @@ majority of sworn members) is required at every gate.
 | `simulate` | Gaussian-copula Monte Carlo with bloc swings and, optionally, co-defection loadings learned from roll calls. |
 | `viability` | Ranks the scenarios you supply by P(removal), flips needed and the uniform shift in support that would make each viable. |
 | `portfolio` | Orders and schedules several cases with House concurrency, one Senate trial at a time, calendars, deadlines, fatigue and succession, then reports sensitivity and the joint distribution of removals. |
-| `backtest` | Replays the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas votes against the rules. |
+| `backtest` | Replays 13 past cases against the rules: the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas votes, Belknap (1876) and seven trials of federal judges. |
 | `calibrate` | Tests whether learned alignment picks out members who actually crossed party lines. |
 | `roster`, `align` | Build a composition and alignment loadings from Voteview data. |
 | `validate`, `compare`, `schema` | Check files, compare compositions, write JSON schemas. |

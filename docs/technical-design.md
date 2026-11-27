@@ -41,6 +41,22 @@ S2 and ends at the first failed gate. S3 applies only when S2 passes.
 - Trump 2021: H2 232-197 PASS; S2 57-43 FAIL, 10 short.
 - Mayorkas 2024: H2 214-216 FAIL, then 214-213 PASS; S1 51-48-1 and 51-49, point of order
   sustained, path ends.
+- Belknap 1876: S2 35-25, 36-25 (x3), 37-25 FAIL, each 5 short.
+- Swayne 1905: twelve S2 votes FAIL; the closest, 35-47, is 20 short.
+- Archbald 1913: S2 PASS on I, III, IV, V and XIII (42-20, just over two-thirds), FAIL on the other
+  eight; S3 39-35 PASS.
+- Ritter 1936: S2 FAIL on I-VI (55-29 is 1 short), PASS on VII at exactly 56 of 84; S3 0-76 FAIL.
+- Claiborne 1986: S2 PASS on I, II and IV; III 46-17 with 35 present FAIL, 20 short of 66.
+- Hastings 1989: S2 PASS on I-V and VII-IX; VI 48-47, XVI 0-95 and XVII 60-35 FAIL.
+- Nixon 1989: S1 34-63 (dismissal rejected); S2 89-8 and 78-19 PASS, 57-40 FAIL, 8 short.
+- Porteous 2010: H2 412-0, 410-0, 416-0, 423-0; S2 96-0, 69-27, 88-8, 90-6 PASS; S3 94-2 PASS.
+
+Each article walks the path's required stages and ends at its first failed gate. Conviction on
+any one article removes the official, so `expected_complete` is a case-level outcome: the case
+completes when at least one article passes S2. A case that did not complete ends at the furthest
+stage any article reached, and `expected_ends_at` names that stage. Votes on optional stages (S3)
+are checked but do not change where a case ends; an S3 vote taken on the judgment as a whole uses
+the label `judgment` rather than an article number.
 
 ## Scenario resolution
 p_pro resolves in this order: override, member stage value, member `*`, party stage, party `*`.

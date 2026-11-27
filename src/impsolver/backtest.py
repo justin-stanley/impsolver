@@ -45,25 +45,45 @@ def check_fixture(fx: Fixture, rules: RuleSet) -> tuple[list[BacktestCheck], lis
         )
         last[(v.article, v.stage)] = g.outcome  # a later vote supersedes an earlier one
     path = build_path(rules, fx.path)
+    required = [st.id for st in path.stages]
     notes: list[str] = []
-    all_ok = all(c.ok for c in checks)
+    ends: dict[str, str | None] = {}
     for article in dict.fromkeys(v.article for v in fx.votes):
+        if not any((article, sid) in last for sid in required):
+            continue  # only optional-stage votes (S3) under this label: not an article outcome
         ends_at: str | None = None
-        for st in path.stages:
-            outcome = last.get((article, st.id))
+        for sid in required:
+            outcome = last.get((article, sid))
             if outcome is not None and outcome != "PASS":
-                ends_at = st.id
+                ends_at = sid
                 break
-        complete = ends_at is None
-        ok = complete == fx.expected_complete and (
-            fx.expected_ends_at is None or ends_at == fx.expected_ends_at
-        )
-        all_ok &= ok
+        if ends_at is None and last.get((article, required[-1])) != "PASS":
+            ends_at = required[-1]  # never reached the terminal vote, so it cannot have completed
+        ends[article] = ends_at
+    # Conviction on any one article removes the official, so completion is a case-level outcome.
+    # A case that did not complete ended at the furthest stage any article reached.
+    complete = any(e is None for e in ends.values())
+    case_ends: str | None = None
+    if not complete and ends:
+        case_ends = max(ends.values(), key=lambda s: required.index(s or required[-1]))
+    case_ok = complete == fx.expected_complete and (
+        fx.expected_ends_at is None or case_ends == fx.expected_ends_at
+    )
+    all_ok = all(c.ok for c in checks) and case_ok
+    for article, ends_at in ends.items():
         notes.append(
             f"{fx.case} article {article}: path {fx.path} "
-            + ("completed" if complete else f"ended at {ends_at}")
-            + ("" if ok else f" (expected ends_at={fx.expected_ends_at})")
+            + ("completed" if ends_at is None else f"ended at {ends_at}")
         )
+    notes.append(
+        f"{fx.case}: "
+        + ("completed" if complete else f"ended at {case_ends}")
+        + (
+            ""
+            if case_ok
+            else f" (expected complete={fx.expected_complete}, ends_at={fx.expected_ends_at})"
+        )
+    )
     return checks, notes, all_ok
 
 
