@@ -2,8 +2,15 @@
 
 ## Install
 
-impsolver needs Python 3.12 or newer. The ILP solver (CBC) ships with PuLP, so nothing else is
-required, and everything runs offline.
+impsolver needs Python 3.12 or newer. The ILP solver (CBC) comes with it through PuLP's `cbc`
+extra, so nothing else is required, and everything runs offline.
+
+!!! note "Where CBC comes from"
+    PuLP 4 no longer bundles CBC. impsolver depends on `pulp[cbc]`, which installs the
+    [cbcbox](https://pypi.org/project/cbcbox/) wheel (macOS 15+, Linux x86_64 and aarch64,
+    Windows x64). On another platform, put a `cbc` executable on `PATH`, or use
+    `impsolver flips --greedy`. Without CBC, the ILP stops with an error saying so. PuLP 2.9,
+    which still bundles CBC, also works.
 
 ```bash
 pip install "git+https://github.com/justin-stanley/impsolver@v0.1.0"

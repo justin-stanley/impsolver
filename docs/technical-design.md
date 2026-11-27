@@ -3,9 +3,9 @@
 The tool is neutral: the user supplies the candidates, and the tool never nominates targets.
 
 ## Stack
-Python 3.12, pydantic v2 (strict, extra=forbid), ruamel.yaml (safe), numpy, PuLP<3 (CBC),
-pytest + hypothesis, ruff, mypy strict, uv. The CLI uses argparse (`impsolver = impsolver.cli:main`)
-and runs fully offline.
+Python 3.12, pydantic v2 (strict, extra=forbid), ruamel.yaml (safe), numpy, PuLP 4 (CBC from
+`pulp[cbc]`; PuLP 2.9 also works), pytest + hypothesis, ruff, mypy strict, uv. The CLI uses
+argparse (`impsolver = impsolver.cli:main`) and runs fully offline.
 
 ## Gate math
 - Stances: PRO / CON / PRESENT / ABSENT. With `pass_direction: pass`, yea = PRO; with `fail`, nay = PRO.
@@ -54,6 +54,9 @@ The verdict is PASS at pro_min, FAIL at pro_max, otherwise CONTESTED.
   - Majority: sum x - sum(1-x-a-present) >= 1 (>= 0 in the fail direction).
   - 2/3: 3*sum x >= 2*sum(1-a).
   - Objective: 1e4 times the change count plus secondary costs; a flip beats an absence.
+  - Solved with CBC (`COIN_CMD` on PuLP 4, the bundled `PULP_CBC_CMD` on PuLP 2.9). The counts are
+    exact. When several solutions have the same count and nearly the same secondary cost, which
+    members are listed, and at which gates under `--per-gate-stance`, can depend on the CBC build.
 - Constraints `BLOC<=N` and `--exclude`. Report INFEASIBLE. Absences are labelled
   "procedural sensitivity, not a recommendation".
 
