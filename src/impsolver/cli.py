@@ -55,7 +55,6 @@ from .templates import DEFAULT_NAMES, TEMPLATES
 from .viability import Case, assess
 
 PIVOT_HEADING = "members nearest the threshold (by the supplied probabilities)"
-NEUTRALITY = "impsolver evaluates only the targets you supply; it does not nominate targets."
 
 
 class CliError(Exception):
@@ -291,7 +290,7 @@ def cmd_viability(a: argparse.Namespace) -> int:
     rows = assess(cases, target_p=a.target_p, max_gap=a.max_gap, draws=a.draws)
 
     def text() -> str:
-        out = [NEUTRALITY]
+        out: list[str] = []
         for r in rows:
             gap = "n/a" if r.support_gap is None else f"{r.support_gap:.2f}"
             out.append(
@@ -332,7 +331,7 @@ def cmd_portfolio(a: argparse.Namespace) -> int:
         print(f"wrote {a.html}", file=sys.stderr)
 
     def text() -> str:
-        out = [NEUTRALITY]
+        out: list[str] = []
         for i, p in enumerate(r.plans, 1):
             out.append(
                 f"\nPlan {i}: E[removals]={p.expected_removals:.3f}  order {' > '.join(p.order)}"
@@ -419,8 +418,8 @@ def cmd_schema(a: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="impsolver",
-        description="Neutral vote-math solver for "
-        "impeachment (House) and conviction (Senate). " + NEUTRALITY,
+        description="Counts the votes needed to impeach and remove a U.S. official, "
+        "and estimates the odds of getting them.",
     )
     ap.add_argument("--format", choices=["text", "json"], default="text")
     sub = ap.add_subparsers(dest="command", required=True)

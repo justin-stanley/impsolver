@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "impsolver"
 version = "0.1.0"
-description = "Neutral vote math for U.S. impeachment (House) and conviction (Senate)"
+description = "Counts the votes needed to impeach and remove a U.S. official, and estimates the odds of getting them."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

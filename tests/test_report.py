@@ -21,7 +21,7 @@ def _html(cands, **kw):  # type: ignore[no-untyped-def]
 
 def test_self_contained_and_neutral() -> None:
     html, res = _html([c("a", 0.6), c("b", 0.4)])
-    assert "does not nominate targets" in html
+    assert "<title>Impeachment plan</title>" in html
     assert not re.search(r"""(src|href)=["']?https?://""", html)
     for s in res.plans[0].slots:
         assert s.id in html

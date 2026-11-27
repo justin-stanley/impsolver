@@ -1,6 +1,6 @@
 # impsolver: technical design
 
-The tool is neutral: the user supplies the candidates, and the tool never nominates targets.
+The user supplies every case and every probability; the tool computes what the rules require.
 
 ## Stack
 Python 3.12, pydantic v2 (strict, extra=forbid), ruamel.yaml (safe), numpy, PuLP 4 (CBC from

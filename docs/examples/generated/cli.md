@@ -3,8 +3,8 @@ usage: impsolver [-h] [--format {text,json}]
                  {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
                  ...
 
-Neutral vote-math solver for impeachment (House) and conviction (Senate). impsolver evaluates only
-the targets you supply; it does not nominate targets.
+Counts the votes needed to impeach and remove a U.S. official, and estimates the odds of getting
+them.
 
 positional arguments:
   {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}

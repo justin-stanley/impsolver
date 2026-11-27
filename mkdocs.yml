@@ -1,5 +1,5 @@
 site_name: impsolver
-site_description: Neutral vote math for U.S. impeachment (House) and conviction (Senate)
+site_description: Counts the votes needed to impeach and remove a U.S. official, and estimates the odds of getting them.
 site_url: https://justin-stanley.github.io/impsolver/
 repo_url: https://github.com/justin-stanley/impsolver
 repo_name: justin-stanley/impsolver
