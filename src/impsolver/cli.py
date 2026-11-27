@@ -42,7 +42,7 @@ from .model import (
     Scenario,
 )
 from .paths import PathError, path_for
-from .portfolio import PortfolioError
+from .portfolio import PortfolioError, epoch_preps
 from .portfolio import load as load_portfolio_inputs
 from .portfolio import solve as solve_portfolio
 from .prepare import Prepared
@@ -171,6 +171,8 @@ def _validate_portfolio(path: str) -> tuple[str, list[str]]:
                 )
             path_for(prep.rules, prep.scenario, default_path(prep))
             evaluate(prep)  # resolves every probability
+            for ep in epoch_preps(pf, resolve(c.scenario, path), f"candidate {c.id}"):
+                evaluate(ep)  # each roster epoch, so a new seat without a prior fails here
         except ERRORS as e:
             msg = str(e) if not isinstance(e, KeyError) else f"unknown key {e}"
             raise CliError(f"{path}: candidate {c.id}: {msg}") from e
@@ -341,6 +343,7 @@ def cmd_portfolio(a: argparse.Namespace) -> int:
                 out.append(
                     f"  {s.id:16} House {s.house_start}..{s.house_end}  "
                     f"trial {s.trial_start}..{s.trial_end}  p0={s.p0:.3f} p={s.p:.3f}"
+                    + (f"  roster from {r.epochs[s.epoch - 1]}" if s.epoch else "")
                 )
         for d in r.dropped:
             out.append(f"dropped {d.id}: {d.reason} ({d.detail})")

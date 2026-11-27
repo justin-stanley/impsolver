@@ -35,6 +35,61 @@ another is at least as valuable and frees the House and Senate no later. A plan 
 when even an optimistic bound cannot reach the current top plans. Up to 10 eligible cases the
 search is exact; above that a beam keeps the 4,096 best partial plans.
 
+## Seat changes
+
+A portfolio can list dated changes to who holds a seat, such as a resignation, a death, or a
+successor sworn in:
+
+```yaml
+roster_changes:
+  - {date: 2027-03-01, chamber: senate, vacate: SEN-B-07}       # seat falls vacant
+  - date: 2027-04-15
+    chamber: senate
+    seat: {id: SEN-NEW-1, name: Placeholder successor, party: B}  # fills a vacancy
+  - {date: 2027-05-01, chamber: house, vacate: REP-A-12,           # one member replaces another
+     seat: {id: REP-NEW-1, name: Placeholder member, party: A}}
+```
+
+`vacate` names a member of the scenario's composition and adds one vacancy; `seat` is a full
+member entry (the same fields as in a composition) and fills one vacancy. Give both to replace a
+member. Changes are cumulative: each one applies to every scenario case whose Senate trial starts
+on or after its date, and changes on the same date apply in the order listed. Cases with a fixed
+`p` are not affected.
+
+The distinct dates split the window into roster epochs. Epoch 0 is the scenario's own
+composition; epoch *k* starts on the *k*-th date. P₀ is simulated once per case and epoch, with
+the same seed, and a case scheduled with its trial starting on day *t* uses the P₀ of the epoch in
+force on *t*. Fatigue then applies as usual. Some consequences:
+
+- **The whole case uses one roster**, the one in force on the trial's first day, House votes
+  included. A House change dated between a case's House vote and its trial is therefore counted
+  for that case even though the House had already voted. This keeps one P₀ per slot; put House
+  changes on or before the start of the House phase they should affect.
+- **P depends on the schedule.** The same case can be worth more or less depending on where it
+  sits in the order, and the search may delay a case behind another one so its trial starts after
+  a helpful vacancy (the solver never adds idle days: a case still starts as early as its lanes
+  allow).
+- **A new member needs a probability.** The scenario's `party_priors` for their bloc apply, or
+  give `p_pro` on the seat entry. An alignment file has no record of a new member, so they get
+  their bloc's mean loadings and a `defection_prior` leaves their prior unadjusted. `impsolver validate --portfolio` resolves every epoch, so an unknown
+  `vacate` id, a seat with no vacancy left, or a new member with no prior fails there.
+- `LOW_P` uses the highest P₀ over all epochs: a case is dropped only if no roster gives it a
+  chance of at least `p_floor`.
+- The gate-path and pivot panels describe epoch 0. The plan tables show each slot's own P₀ and
+  note the roster date it used; the joint removals distribution simulates each trial against its
+  own epoch's roster.
+
+Pruning has to allow for epochs. Without roster changes, a partial plan that frees the House and
+Senate no later than another, with at least the same value, is at least as good for every
+continuation. With roster changes that is no longer true: freeing the Senate earlier can put the
+next trial before a vacancy that would have helped it. The search therefore prunes such a plan
+only when it leads by a margin: for each case not yet scheduled, the largest gap between its best
+and worst fatigued P over the epochs that a later trial can still reach, times its weight. Once
+the Senate frees up on or after the last change date, the margin is zero and pruning is as
+before. The optimistic bound uses each case's best P₀ over all epochs. With no `roster_changes`
+the search and its results are unchanged. The exact search can be slower when the epochs differ a
+lot.
+
 ## Succession
 
 A case can depend on another: if official T is removed, official X's case changes or is

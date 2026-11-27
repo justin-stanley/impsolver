@@ -414,6 +414,25 @@ class PortfolioCandidate(Strict):
         return self
 
 
+class RosterChange(Strict):
+    """A seat that changes hands on ``date``: ``vacate`` empties a seat, ``seat`` fills one.
+
+    Give both to replace a member. Changes apply to every scenario candidate whose Senate trial
+    starts on or after ``date``.
+    """
+
+    date: LooseDate
+    chamber: Chamber
+    vacate: str | None = None
+    seat: Member | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> RosterChange:
+        if self.vacate is None and self.seat is None:
+            raise ValueError("a roster change needs vacate, seat, or both")
+        return self
+
+
 class Portfolio(Strict):
     schema_version: Literal[1]
     start: LooseDate
@@ -428,6 +447,7 @@ class Portfolio(Strict):
     exact_limit: int = Field(default=10, ge=1)
     seed: int = 0
     calendar: Calendar = Calendar()
+    roster_changes: list[RosterChange] = []
     candidates: list[PortfolioCandidate]
 
     @model_validator(mode="after")

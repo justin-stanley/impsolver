@@ -81,6 +81,128 @@
       "title": "ChamberCalendar",
       "type": "object"
     },
+    "Member": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "party": {
+          "title": "Party",
+          "type": "string"
+        },
+        "caucus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Caucus"
+        },
+        "state": {
+          "default": "??",
+          "title": "State",
+          "type": "string"
+        },
+        "district": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "District"
+        },
+        "p_pro": {
+          "additionalProperties": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "default": {},
+          "title": "P Pro",
+          "type": "object"
+        },
+        "p_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P Source"
+        },
+        "ideology": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ideology"
+        },
+        "attendance": {
+          "default": "present",
+          "enum": [
+            "present",
+            "absent"
+          ],
+          "title": "Attendance",
+          "type": "string"
+        },
+        "p_absent": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P Absent"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "party"
+      ],
+      "title": "Member",
+      "type": "object"
+    },
     "PortfolioCandidate": {
       "additionalProperties": false,
       "properties": {
@@ -224,6 +346,54 @@
       "title": "PortfolioCandidate",
       "type": "object"
     },
+    "RosterChange": {
+      "additionalProperties": false,
+      "description": "A seat that changes hands on ``date``: ``vacate`` empties a seat, ``seat`` fills one.\n\nGive both to replace a member. Changes apply to every scenario candidate whose Senate trial\nstarts on or after ``date``.",
+      "properties": {
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "chamber": {
+          "enum": [
+            "house",
+            "senate"
+          ],
+          "title": "Chamber",
+          "type": "string"
+        },
+        "vacate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vacate"
+        },
+        "seat": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Member"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "date",
+        "chamber"
+      ],
+      "title": "RosterChange",
+      "type": "object"
+    },
     "Succession": {
       "additionalProperties": false,
       "properties": {
@@ -345,6 +515,14 @@
         },
         "trial_saturdays": true
       }
+    },
+    "roster_changes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RosterChange"
+      },
+      "title": "Roster Changes",
+      "type": "array"
     },
     "candidates": {
       "items": {

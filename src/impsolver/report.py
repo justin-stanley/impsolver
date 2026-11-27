@@ -217,7 +217,9 @@ def timeline_svg(pf: Portfolio, slots: Iterable[Slot], res: PortfolioResult) -> 
 def slot_table(slots: Iterable[Slot], res: PortfolioResult) -> str:
     rows = "".join(
         f"<tr><td>{e(_label(res, s.id))}</td><td>{s.house_start} to {s.house_end}</td>"
-        f"<td>{s.trial_start} to {s.trial_end}</td><td class=num>{_pct(s.p0)}</td>"
+        f"<td>{s.trial_start} to {s.trial_end}</td><td class=num>{_pct(s.p0)}"
+        + (f"<br>(roster from {res.epochs[s.epoch - 1]})" if s.epoch else "")
+        + "</td>"
         f"<td class=num>{_pct(s.p)}</td><td class=num>{s.weight:g}</td></tr>"
         for s in slots
     )

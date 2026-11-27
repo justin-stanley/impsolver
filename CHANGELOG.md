@@ -18,6 +18,8 @@ All notable changes are listed here. The format follows
   supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 - `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
   `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
+- Portfolio `roster_changes` (dated vacancies and new seats): P0 is computed per roster epoch and
+  each trial uses the roster in force on its first day; without changes results do not change.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per
