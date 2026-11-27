@@ -1,7 +1,8 @@
 # Validation and limits
 
-The [methodology paper draft](https://github.com/justin-stanley/impsolver/blob/main/paper/paper.md)
-summarises the methods and the validation below in JOSS format.
+The methodology paper draft, `paper/paper.md` in the repository, summarises the methods and the
+validation below in JOSS format. It is a draft and is not yet on the main branch, so it is not
+linked from here.
 
 ## What has been checked
 

@@ -11,6 +11,9 @@ tags:
 authors:
   - name: Justin Stanley
     # TODO before submission: add the author's ORCID (orcid: 0000-...) and confirm the affiliation.
+    # TODO before submission: the body runs to over 2,500 words; JOSS asks for 250-1000 and
+    # discourages detailed results, so trim it and move the calibration table and score grid to
+    # the documentation.
     affiliation: 1
 affiliations:
   - name: "Affiliation to be confirmed by the author"
@@ -104,9 +107,11 @@ $$u_i = \sqrt{\rho}\, z_b + \sqrt{1-\rho}\, e_i, \qquad \text{PRO} \iff u_i < \P
 where $z_b$ is a bloc-wide swing, $e_i$ is individual noise and both are standard normal. Each
 member's marginal probability is preserved exactly; $\rho$ (default 0.6) sets how strongly a bloc
 moves together. By default one draw covers every gate in a chamber, so a member who is unusually
-favourable at H1 is also favourable at H2. A scenario option `gate_correlation` $c$ mixes in a
-fresh standard normal at each later gate, component by component
-($x_g = \sqrt{c}\,x_{g-1} + \sqrt{1-c}\,x'$), which keeps the marginals. House and Senate swings
+favourable at H1 is also favourable at H2. A scenario option `gate_correlation` $c$ loosens this
+link: at each later gate the member-level parts of the draw (the individual noise $e_i$ and, with
+an alignment file, the factor weights $w$ below) become $x_g = \sqrt{c}\,x_{g-1} + \sqrt{1-c}\,x'$
+with $x'$ a fresh standard normal, which keeps the marginals. The bloc swing $z_b$ stays fixed
+across the gates of a chamber, so a shared party mood stays fully shared. House and Senate swings
 are independent unless `national_swing` is set, and attendance is fixed by the roster unless a
 scenario sets `attendance: random`, which drops each member independently at a missed-vote rate
 taken from the roster, from the alignment file's Voteview counts or from a scenario default.
@@ -122,17 +127,22 @@ of its bloc-pair cell with weight $n/(n+\kappa)$ ($\kappa = 50$ by default), pro
 to a valid correlation matrix by clipping negative eigenvalues, and keeps the top $k = 5$
 eigenvectors as loadings $F_i$ with $\lVert F_i\rVert^2 < 1$. In the simulation,
 
-$$u_{ig} = \sqrt{\rho}\, z_b + \sqrt{1-\rho}\,\big(s_{ig}\, F_i \cdot w + \sqrt{1 - \lVert F_i\rVert^2}\, e_i\big),$$
+$$u_{ig} = \sqrt{\rho}\, z_b + \sqrt{1-\rho}\,\big(s_{ig}\, F_i \cdot w + \sqrt{1 - s_{ig}^2\lVert F_i\rVert^2}\, e_i\big),$$
 
-where $w$ is a standard normal factor draw and $s_{ig} = \pm 1$ follows the sign of the bloc's lean
-at gate $g$, so that "breaking" always means voting against the bloc's likely position. Senate
+where $w$ is a standard normal factor draw and $s_{ig}$ follows the sign of the bloc's lean at
+gate $g$ (the mean probability of its members who are not fixed at 0 or 1): $+1$ above 0.5, $-1$
+below, so that "breaking" always means voting against the bloc's likely position, and $0$ when
+the lean is exactly 0.5, in which case the factors drop out and the member's noise is purely
+individual. Senate
 loadings are off by default because the Senate showed no signal in calibration (see Validation).
 
 A separate `defection_prior` shifts each member's party-prior probability by their historical
 break rate $r_i$, shrunk toward the bloc rate $r_b$ with 20 pseudo-votes:
-$p_i = \sigma\big(\operatorname{logit} p_{\text{party}} \pm \beta\,[\operatorname{logit} r_i - \operatorname{logit} r_b]\big)$,
-with the sign chosen so that members who break more often move away from their party's lean and
-$\beta = 1$ by default.
+$p_i = \sigma\big(\operatorname{logit} p_{\text{party}} \pm \beta\, v_i\,[\operatorname{logit} r_i - \operatorname{logit} r_b]\big)$,
+with the sign chosen so that members who break more often move away from their party's lean,
+$\beta = 1$ by default and $v_i$ a per-member weight, which the code carries but which is 1 for
+every member whose break rate comes from an alignment file. A party prior of exactly 0, 0.5 or 1
+is left unchanged.
 
 ## Scheduler with causal succession
 
@@ -219,12 +229,17 @@ improve on this: the default House setting ($\beta = 1$, $\rho = 0.6$, alignment
 0.1828 against the marginal 0.1654. The five best grid points in each chamber all have
 $\rho = 0$, and the best House point with a positive alignment weight (0.1691) still scores worse
 than the best marginal prediction. With a single event, the bloc swing is pinned down by the other members'
-votes, so $\rho$ cannot be measured from it, and the defaults were not changed.
+votes, so $\rho$ cannot be measured from it, and the defaults were not changed. These
+conditional scores are also imprecise: they are importance-sampled, and at the weakest member and
+grid point only 7 of the 4,000 draws are effective in the House and 1 of 4,000 in the Senate. The
+reported best settings skip grid points with fewer than 100 effective draws, but the comparison
+with the marginal prediction should be read as indicative, not as a measured difference.
 
 ## Limits
 
 The validation is thin. The probability model is calibrated on one event, 8 House members and
-7 senators, scored in-sample with the observed crossing share as the base rate. The backtest
+7 senators, scored in-sample with the observed crossing share as the base rate, and the
+conditional scores rest on few effective importance draws. The backtest
 validates the rules, not the probabilities, which remain the user's inputs. Results depend on
 modelling choices that the tool exposes but cannot settle: the bloc correlation $\rho$, whether
 swings are shared across chambers and across gates, the Senate alignment weight, attendance, and
@@ -258,7 +273,7 @@ builds on NumPy [@harris2020numpy], PuLP [@pulp] and the COIN-OR CBC solver [@cb
 # Appendix: commands behind the numbers
 
 Every number in this paper was produced by impsolver at the commit this paper was written against
-(commit `7847138` on the `roadmap/v0.2` integration branch), run from the repository root with the committed data
+(commit `f960492` on the `roadmap/v0.2` integration branch), run from the repository root with the committed data
 files. The same commands generate the worked examples in `docs/examples/generated/`, which
 `python docs/examples/run_examples.py --check` keeps up to date, and `tests/test_paper.py` checks
 that the numbers quoted here still appear in their output.

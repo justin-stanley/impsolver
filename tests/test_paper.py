@@ -185,11 +185,48 @@ def test_appendix_names_the_generating_commands() -> None:
         assert "uv run " + first[2:] in appendix, first
 
 
+FIXTURES = ROOT / "src" / "impsolver" / "data" / "fixtures"
+# A probability written as P(...), P=..., a percentage, a decimal in [0, 1] or "probability of".
+PROBABILITY = re.compile(
+    r"\bP\s*[(=]"  # P(...) or P=...
+    r"|\d+(?:\.\d+)?\s*(?:%|\\%|percent)"  # a percentage
+    r"|(?<![\w.])[01]?\.\d+"  # a decimal such as 0.4 or .35
+    r"|probabilit\w* of"
+)
+
+
+def real_surnames() -> set[str]:
+    """Surnames of every real official in the backtest fixtures."""
+    names = set()
+    for path in FIXTURES.glob("*.yaml"):
+        data = YAML(typ="safe").load(path.read_text(encoding="utf-8"))
+        words = [w for w in str(data["target"]["name"]).split() if w not in {"Jr.", "Sr."}]
+        names.add(words[-1])
+    return names
+
+
+def paragraphs_with_probabilities_for(text: str, names: set[str]) -> list[str]:
+    return [
+        para
+        for para in text.split("\n\n")
+        if any(re.search(rf"\b{re.escape(n)}\b", para) for n in names) and PROBABILITY.search(para)
+    ]
+
+
+def test_probability_check_catches_violations() -> None:
+    names = {"Doe"}
+    assert paragraphs_with_probabilities_for("Doe has P(removal) = 0.4.", names)
+    assert paragraphs_with_probabilities_for("Doe is 40% likely to be removed.", names)
+    assert paragraphs_with_probabilities_for("Doe: a probability of conviction.", names)
+    assert paragraphs_with_probabilities_for("Doe at .35 to convict.", names)
+    assert not paragraphs_with_probabilities_for("Doe was acquitted 35-19.", names)
+    assert not paragraphs_with_probabilities_for("Roe at 0.4.\n\nDoe was acquitted.", names)
+
+
 def test_no_invented_probabilities_for_real_people() -> None:
     text = paper_text()
     # The only probabilities in the paper belong to placeholder cases or calibration scores.
     assert "Official A" in text and "placeholder" in text
-    for name in ("Trump", "Mayorkas", "Clinton", "Johnson"):
-        for para in text.split("\n\n"):
-            if name in para:
-                assert "P(" not in para and "probability of removal" not in para, name
+    names = real_surnames()
+    assert {"Trump", "Mayorkas", "Clinton", "Johnson", "Belknap", "Porteous"} <= names
+    assert paragraphs_with_probabilities_for(text, names) == []
