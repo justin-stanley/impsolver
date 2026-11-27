@@ -47,6 +47,16 @@ class DeterministicGate(BaseModel):
     uncertain_by_bloc: list[BlocCount]
 
 
+class PivotMember(BaseModel):
+    """A non-PRO member at the binding gate, listed by the supplied probability of PRO."""
+
+    id: str
+    name: str
+    bloc: str
+    p: float
+    source: str
+
+
 class DeterministicArticle(BaseModel):
     article: str
     path: str
@@ -55,6 +65,7 @@ class DeterministicArticle(BaseModel):
     binding_gate: str
     controlling_coalition: list[BlocCount]
     gates: list[DeterministicGate]
+    pivots: list[PivotMember] = []
 
 
 class Evaluation(BaseModel):

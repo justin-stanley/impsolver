@@ -7,6 +7,8 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- `evaluate` lists, per article, the members nearest the threshold at the binding gate (by the
+  supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 
 ### Changed
 

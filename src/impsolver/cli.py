@@ -51,6 +51,7 @@ from .results import Evaluation, FlipResult, Simulation
 from .simulate import simulate
 from .viability import Case, assess
 
+PIVOT_HEADING = "members nearest the threshold (by the supplied probabilities)"
 NEUTRALITY = "impsolver evaluates only the targets you supply; it does not nominate targets."
 
 
@@ -89,6 +90,12 @@ def render_evaluation(e: Evaluation) -> str:
                 "  controlling coalition at binding gate (non-PRO members): "
                 + ", ".join(f"{b.bloc} {b.count}" for b in a.controlling_coalition)
             )
+        if a.pivots:
+            short = next(g.short_at_min for g in a.gates if g.stage == a.binding_gate)
+            out.append(f"  {PIVOT_HEADING} at {a.binding_gate}, short {short} at the minimum:")
+            out += [
+                f"    {m.id:12} {m.bloc:4} p={m.p:.3f} {m.source:14} {m.name}" for m in a.pivots
+            ]
     return "\n".join(out)
 
 

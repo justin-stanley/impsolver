@@ -7,10 +7,19 @@ from __future__ import annotations
 from collections import Counter
 
 import numpy as np
+import numpy.typing as npt
 
+from .model import Member
 from .paths import Path, path_for
 from .prepare import Prepared
-from .results import BlocCount, DeterministicArticle, DeterministicGate, Evaluation, Verdict
+from .results import (
+    BlocCount,
+    DeterministicArticle,
+    DeterministicGate,
+    Evaluation,
+    PivotMember,
+    Verdict,
+)
 from .thresholds import has_quorum, membership_base, pro_wins, required_pro, tie_mode
 
 
@@ -25,10 +34,44 @@ def _counts(blocs: list[str]) -> list[BlocCount]:
     ]
 
 
+PIVOT_EXTRA = 5
+PIVOT_CAP = 25
+
+
+def pivot_list(
+    prep: Prepared,
+    stage: str,
+    members: list[Member],
+    p: npt.NDArray[np.float64],
+    nonpro: npt.NDArray[np.bool_],
+    short: int,
+) -> list[PivotMember]:
+    """Present non-PRO members at ``stage``, highest supplied p first (ties by id).
+
+    The list covers ``short + PIVOT_EXTRA`` members, capped at ``PIVOT_CAP``. It describes the
+    members nearest the threshold under the user's probabilities; it does not suggest anyone.
+    """
+    n = min(short + PIVOT_EXTRA, PIVOT_CAP)
+    cands = sorted(
+        (i for i, x in enumerate(nonpro) if x), key=lambda i: (-float(p[i]), members[i].id)
+    )[:n]
+    return [
+        PivotMember(
+            id=members[i].id,
+            name=members[i].name,
+            bloc=members[i].bloc,
+            p=float(p[i]),
+            source=prep.resolver.base(members[i], stage)[1],
+        )
+        for i in cands
+    ]
+
+
 def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicArticle:
     lo, hi = prep.scenario.cutoffs
     gates: list[DeterministicGate] = []
     nonpro_by_gate: dict[str, list[BlocCount]] = {}
+    stage_data: dict[str, tuple[list[Member], npt.NDArray[np.float64], npt.NDArray[np.bool_]]] = {}
     for st in path.all_stages:
         body = prep.comp.bodies[st.chamber]
         members = body.roster
@@ -78,6 +121,7 @@ def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicA
         nonpro_by_gate[st.id] = _counts(
             [m.bloc for m, x in zip(members, present & ~is_pro, strict=True) if x]
         )
+        stage_data[st.id] = (members, p, present & ~is_pro)
     required_ids = {s.id for s in path.stages}
     req = [g for g in gates if g.stage in required_ids]
     ends_at = next((g.stage for g in req if g.verdict in ("FAIL", "NO_QUORUM")), None)
@@ -101,6 +145,7 @@ def evaluate_article(prep: Prepared, article: str, path: Path) -> DeterministicA
         binding_gate=binding.stage,
         controlling_coalition=nonpro_by_gate[binding.stage],
         gates=gates,
+        pivots=pivot_list(prep, binding.stage, *stage_data[binding.stage], binding.short_at_min),
     )
 
 

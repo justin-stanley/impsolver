@@ -20,13 +20,13 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel
 
-from .deterministic import default_path
+from .deterministic import default_path, evaluate_article
 from .loader import load_portfolio, resolve
 from .members import logit, sigmoid
 from .model import ChamberCalendar, Portfolio, PortfolioCandidate
 from .paths import path_for
 from .prepare import Prepared, prepare
-from .results import SimArticle
+from .results import DeterministicArticle, SimArticle
 from .simulate import p_complete, run_raw, simulate_article
 
 FAR = dt.date(9999, 12, 31)
@@ -564,6 +564,7 @@ class PortfolioResult(BaseModel):
     exhaustive: bool
     p0: dict[str, float]
     gate_paths: dict[str, SimArticle] = {}
+    pivots: dict[str, DeterministicArticle] = {}
     labels: dict[str, str] = {}
 
 
@@ -576,6 +577,20 @@ class Loaded:
     preps: dict[str, Prepared]
     p0: dict[str, float]
     gates: dict[str, SimArticle] = field(default_factory=dict)
+
+
+def deterministic_articles(loaded: Loaded) -> dict[str, DeterministicArticle]:
+    """Deterministic bounds (with the binding-gate pivot list) for each scenario candidate."""
+    out: dict[str, DeterministicArticle] = {}
+    for c in loaded.pf.candidates:
+        prep = loaded.preps.get(c.id)
+        if prep is None:
+            continue
+        art = c.article or prep.scenario.articles[0]
+        out[c.id] = evaluate_article(
+            prep, art, path_for(prep.rules, prep.scenario, default_path(prep))
+        )
+    return out
 
 
 def load(path: str | Path) -> Loaded:
@@ -702,6 +717,7 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
         exhaustive=exhaustive,
         p0=p0,
         gate_paths=loaded.gates,
+        pivots=deterministic_articles(loaded),
         labels={cid: prep.scenario.target.name for cid, prep in loaded.preps.items()},
     )
     if has_succession(ctx):
