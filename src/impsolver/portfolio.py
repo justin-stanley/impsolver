@@ -33,6 +33,7 @@ from .simulate import (
     p_complete,
     run_raw_articles,
     simulate_article,
+    summarize_raw,
 )
 
 FAR = dt.date(9999, 12, 31)
@@ -592,7 +593,9 @@ def deterministic_articles(loaded: Loaded) -> dict[str, DeterministicArticle]:
         prep = loaded.preps.get(c.id)
         if prep is None:
             continue
-        art = c.article or prep.scenario.articles[0]
+        # Same article as the gate-path row: the one the simulation reported.
+        sim = loaded.gates.get(c.id)
+        art = c.article or (sim.article if sim else prep.scenario.articles[0])
         out[c.id] = evaluate_article(
             prep, art, path_for(prep.rules, prep.scenario, default_path(prep))
         )
@@ -621,7 +624,7 @@ def load(path: str | Path) -> Loaded:
                 raws = run_raw_articles(prep, arts, path_, pf.draws, seed, rho)
                 p0[c.id] = float(any_complete(raws).mean())
                 best = max(arts, key=lambda a: float(raws[a].complete.mean()))
-                gates[c.id] = simulate_article(prep, best, path_, pf.draws, seed, rho)
+                gates[c.id] = summarize_raw(raws[best], best, path_, pf.draws)
         else:
             assert c.p is not None
             p0[c.id] = c.p

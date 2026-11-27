@@ -31,6 +31,12 @@ All notable changes are listed here. The format follows
 
 ### Fixed
 
+- Review fixes for PR #13: the planning page's pivot list uses the same article as its gate-path
+  row; `gate_correlation` keeps the bloc swing fixed across gates so national and portfolio-shared
+  swings stay shared; a multi-article candidate is simulated once per article; `attendance: random`
+  with no absence rates warns; `evaluate` and `flips` note that they use fixed attendance; CBC runs
+  with a zero gap on every PuLP version.
+
 ## [0.1.0] - 2026-11-27
 
 First public release.

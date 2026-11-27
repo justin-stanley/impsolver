@@ -49,7 +49,7 @@ def _cbc() -> Any:
     """A silent CBC solver: the one bundled with PuLP < 4, else ``COIN_CMD`` (``pulp[cbc]``)."""
     bundled = getattr(pulp, "PULP_CBC_CMD", None)
     if bundled is not None:  # PuLP < 4
-        solver = bundled(msg=False)
+        solver = bundled(msg=False, gapRel=0.0)
     else:
         coin: Any = pulp.COIN_CMD  # untyped in PuLP 4
         solver = coin(msg=False, gapRel=0.0)

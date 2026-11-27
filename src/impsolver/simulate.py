@@ -122,9 +122,10 @@ class ChamberModel:
     ) -> npt.NDArray[np.bool_]:
         """Boolean PRO array [g, draws, n]. ``z`` ([draws, blocs]) lets callers share swings.
 
-        ``gate_correlation`` (c) mixes each later gate's draw with a fresh one:
-        x_g = sqrt(c) x_(g-1) + sqrt(1-c) x', applied to the bloc swing, the factor weights and the
-        individual noise alike. ``z`` is used for the first gate.
+        ``gate_correlation`` (c) mixes each later gate's member-level draw with a fresh one:
+        x_g = sqrt(c) x_(g-1) + sqrt(1-c) x', applied to the factor weights and the individual
+        noise. The bloc swing ``z`` is one party mood for the whole chamber and stays fixed across
+        gates, so swings shared with other chambers or other cases stay fully shared.
         """
         n = len(self.members)
         if z is None:
@@ -135,7 +136,6 @@ class ChamberModel:
         out = np.empty((len(self.stages), m, n), dtype=bool)
         for g in range(len(self.stages)):
             if g > 0 and gate_correlation < 1.0:
-                z = a * z + b * rng.standard_normal(z.shape)
                 e = a * e + b * rng.standard_normal(e.shape)
                 if w is not None:
                     w = a * w + b * rng.standard_normal(w.shape)
@@ -278,7 +278,11 @@ def summarize(x: npt.NDArray[np.int64]) -> CountSummary:
 def simulate_article(
     prep: Prepared, article: str, path: Path, draws: int, seed: int, rho: float
 ) -> SimArticle:
-    raw = run_raw(prep, article, path, draws, seed, rho)
+    return summarize_raw(run_raw(prep, article, path, draws, seed, rho), article, path, draws)
+
+
+def summarize_raw(raw: RawSim, article: str, path: Path, draws: int) -> SimArticle:
+    """Per-gate pass rates and P(complete) from one simulation run."""
     reached = np.ones(draws, dtype=bool)
     gates: list[SimGate] = []
     for k, st in enumerate(raw.stages):
