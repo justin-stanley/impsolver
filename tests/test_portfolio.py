@@ -188,3 +188,20 @@ def test_sixteen_candidates_finish_quickly() -> None:
     t = time.time()
     plans = search(make_ctx(p, {x.id: x.p or 0 for x in p.candidates})[0])
     assert time.time() - t < 30 and plans[0].order
+
+
+def test_every_left_out_candidate_has_a_reason() -> None:
+    p = pf(
+        [
+            c("a", 0.9, h=100, s=40),
+            c("b", 0.3, h=100, s=40),
+            c("lowp", 0.01),
+            c("dep", 0.8, after=["lowp"]),
+        ],
+        deadline="2027-07-30",
+        house_concurrency=1,
+    )
+    r = run(p)
+    reasons = {d.id: d.reason for d in r.dropped}
+    assert r.plans[0].order == ["a"]
+    assert reasons == {"lowp": "LOW_P", "dep": "DEPENDENCY_DROPPED", "b": "NOT_SELECTED"}

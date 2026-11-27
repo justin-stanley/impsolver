@@ -605,20 +605,60 @@ def make_ctx(
     return ctx, dropped
 
 
-def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> PortfolioResult:
-    pf, p0 = loaded.pf, loaded.p0
-    ctx, dropped = make_ctx(pf, p0)
-    plans = search(ctx, exhaustive)
-    best = plans[0]
-    chosen = set(best.order)
+def _left_out(ctx: Ctx, order: tuple[str, ...]) -> list[Dropped]:
+    """A reason for every eligible candidate that the recommended order does not try."""
+    out: list[Dropped] = []
+    chosen = set(order)
     for cid in ctx.eligible:
         if cid in chosen:
             continue
-        by = [o for o in best.order if excluded_pair(ctx, cid, o)]
+        by = [o for o in order if excluded_pair(ctx, cid, o)]
+        missing = [d for d in ctx.cands[cid].after if d not in chosen]
         if by:
-            dropped.append(
-                Dropped(id=cid, reason="EXCLUDED", detail=f"excluded by {', '.join(by)}")
+            out.append(Dropped(id=cid, reason="EXCLUDED", detail=f"excluded by {', '.join(by)}"))
+        elif missing:
+            out.append(
+                Dropped(
+                    id=cid,
+                    reason="DEPENDENCY_DROPPED",
+                    detail=f"waits on {', '.join(missing)}, which is not in the plan",
+                )
             )
+        else:
+            out.append(
+                Dropped(
+                    id=cid,
+                    reason="NOT_SELECTED",
+                    detail="fits on its own, but the best plan has more expected value without it",
+                )
+            )
+    return out
+
+
+def _best_value(ctx: Ctx, exhaustive: bool) -> tuple[tuple[str, ...], float, list[Plan]]:
+    plans = search(ctx, exhaustive)
+    if has_succession(ctx):
+        o, v, _ = best_with_succession(ctx, plans)
+        return o, v, plans
+    return plans[0].order, plans[0].value, plans
+
+
+def _order_value(ctx: Ctx, order: tuple[str, ...]) -> float:
+    if has_succession(ctx):
+        return evaluate_branching(ctx, order)[0]
+    return schedule_order(ctx, order).value
+
+
+def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> PortfolioResult:
+    """Best plans, the recommended order and its sensitivity.
+
+    With succession rules, the recommended order is the one that is best once removals are
+    allowed to change later cases; dropped reasons and sensitivity are reported for that order.
+    """
+    pf, p0 = loaded.pf, loaded.p0
+    ctx, dropped = make_ctx(pf, p0)
+    order, _, plans = _best_value(ctx, exhaustive)
+    dropped += _left_out(ctx, order)
     tops: list[PlanOut] = []
     seen: set[tuple[str, ...]] = set()
     for p in plans:
@@ -628,16 +668,18 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
         tops.append(PlanOut(order=list(p.order), expected_removals=p.value, slots=list(p.slots)))
         if len(tops) >= pf.top:
             break
-    sens = sensitivity(pf, p0, best.order, exhaustive)
-    fragile = any(r.fragile for r in sens)
+    sens = sensitivity(pf, p0, order, exhaustive)
     res = PortfolioResult(
-        plans=tops, dropped=dropped, sensitivity=sens, fragile=fragile, exhaustive=exhaustive, p0=p0
+        plans=tops,
+        dropped=dropped,
+        sensitivity=sens,
+        fragile=any(r.fragile for r in sens),
+        exhaustive=exhaustive,
+        p0=p0,
     )
-    order = best.order
     if has_succession(ctx):
-        o, v, tree = best_with_succession(ctx, plans)
-        res.succession_order, res.succession_value, res.decision_tree = list(o), v, tree
-        order = o
+        v, tree = evaluate_branching(ctx, order)
+        res.succession_order, res.succession_value, res.decision_tree = list(order), v, tree
     if joint and order:
         res.removals_dist = removals_dist(loaded, ctx, order)
     return res
@@ -646,6 +688,7 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
 def sensitivity(
     pf: Portfolio, p0: dict[str, float], base: tuple[str, ...], exhaustive: bool
 ) -> list[SensRow]:
+    """Regret of keeping ``base`` when fatigue or durations differ from the inputs."""
     rows: list[SensRow] = []
     cases: list[tuple[str, float, float]] = [
         (f"fatigue delta {d:+.1f}", d, 1.0) for d in SENS_DELTAS
@@ -653,8 +696,8 @@ def sensitivity(
     cases += [(f"durations x{s}", pf.fatigue_delta, s) for s in SENS_SCALES]
     for label, d, s in cases:
         ctx, _ = make_ctx(pf, p0, d, s)
-        best = search(ctx, exhaustive)[0].value
-        base_v = schedule_order(ctx, base).value
+        _, best, _ = _best_value(ctx, exhaustive)
+        base_v = _order_value(ctx, base)
         regret = max(0.0, best - base_v)
         rows.append(
             SensRow(

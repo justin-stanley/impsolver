@@ -100,3 +100,11 @@ def test_variant_needs_fresh_house_time_after_verdict() -> None:
     assert tree.removed is not None and tree.verdict is not None
     v_line = next(ln for ln in tree.removed.schedule if ln.startswith("V "))
     assert v_line.split("House ")[1][:10] > tree.verdict.isoformat()
+
+
+def test_sensitivity_uses_recommended_order() -> None:
+    ctx = _ctx(_pf(0.9))
+    r = solve(Loaded(ctx.pf, {}, ctx.p0), joint=False)
+    base = next(row for row in r.sensitivity if row.label == "fatigue delta +0.0")
+    assert r.succession_order == ["T", "X"]
+    assert base.base_rescheduled == pytest.approx(1.06) and base.regret == pytest.approx(0.0)
