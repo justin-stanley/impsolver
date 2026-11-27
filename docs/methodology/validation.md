@@ -1,5 +1,8 @@
 # Validation and limits
 
+The [methodology paper draft](https://github.com/justin-stanley/impsolver/blob/main/paper/paper.md)
+summarises the methods and the validation below in JOSS format.
+
 ## What has been checked
 
 - **Arithmetic.** All 85 historical votes in the 13 fixtures reproduce their recorded outcome and

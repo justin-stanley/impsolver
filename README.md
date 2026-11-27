@@ -134,7 +134,8 @@ make test lint docs
 ```
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Report security or misuse issues privately
-([SECURITY.md](SECURITY.md)). Cite the software with [CITATION.cff](CITATION.cff).
+([SECURITY.md](SECURITY.md)). Cite the software with [CITATION.cff](CITATION.cff). A JOSS-style
+methodology paper draft is in [paper/paper.md](paper/paper.md).
 
 ## License
 

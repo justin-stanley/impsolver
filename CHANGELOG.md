@@ -57,6 +57,8 @@ All notable changes are listed here. The format follows
   without congressional history in any chamber of the alignment file (chambers it does not cover
   are skipped with a warning; a source with commas must be quoted); no scores are shipped and
   default results are unchanged.
+- A JOSS-style methodology paper draft (`paper/paper.md`, `paper/paper.bib`) quoting only numbers
+  the code produces, with the commands in an appendix and a test that keeps them current.
 - Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
   Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
 - Optional random attendance in the Monte Carlo (`attendance: random`, `absence_rate`, member
