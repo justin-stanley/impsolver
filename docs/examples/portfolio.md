@@ -19,9 +19,9 @@ How to read it:
 - **Sensitivity** re-solves with other fatigue values and durations and shows how much the
   recommended order would lose.
 
-The same result as a planning page, with a timeline, gate-by-gate odds and the removals
-distribution, is the [demo](../demo/index.html). Build your own with
-`impsolver portfolio FILE --html plan.html`.
+The same result as a planning page, with a timeline, gate-by-gate odds, the members nearest each
+case's binding-gate threshold (by the supplied probabilities) and the removals distribution, is
+the [demo](../demo/index.html). Build your own with `impsolver portfolio FILE --html plan.html`.
 
 ## Comparing scenarios
 

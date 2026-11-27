@@ -14,6 +14,8 @@ All notable changes are listed here. The format follows
 - Scenario option `gate_correlation` (0 to 1, default 1) sets how much each member's Monte Carlo
   draw carries from one gate to the next in a chamber; marginals are preserved and default
   results do not change.
+- `evaluate` lists, per article, the members nearest the threshold at the binding gate (by the
+  supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

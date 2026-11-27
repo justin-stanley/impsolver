@@ -4,7 +4,8 @@
 
 The page shows only what the user supplied and what the solver computed from it: the plans, the
 timeline of House and Senate work, each case's gate-by-gate odds, succession branches, the
-removals distribution, sensitivity, and why candidates were left out. It never adds targets.
+removals distribution, the members nearest each binding gate's threshold, sensitivity, and why
+candidates were left out. It never adds targets.
 """
 
 from __future__ import annotations
@@ -279,6 +280,47 @@ def gate_paths(res: PortfolioResult, pf: Portfolio) -> str:
     )
 
 
+# ----------------------------------------------------------------------- pivots
+
+PIVOT_HEADING = "Members nearest the threshold (by the supplied probabilities)"
+PIVOT_NOTE = (
+    "For each case built from a scenario: the members at its binding gate who are not counted PRO "
+    "at the scenario cutoffs, highest supplied probability first (ties by id). The list covers the "
+    "shortfall at the minimum plus five, up to 25. It restates the inputs; it is not a forecast."
+)
+
+
+def pivots_html(res: PortfolioResult, pf: Portfolio) -> str:
+    blocks: list[str] = []
+    for c in pf.candidates:
+        art = res.pivots.get(c.id)
+        if art is None:
+            continue
+        gate = next(g for g in art.gates if g.stage == art.binding_gate)
+        rows = (
+            "".join(
+                f"<tr><td>{e(m.id)}</td><td>{e(m.name)}</td><td>{e(m.bloc)}</td>"
+                f"<td class=num>{m.p:.3f}</td><td>{e(m.source)}</td></tr>"
+                for m in art.pivots
+            )
+            or "<tr><td colspan=5 class=note>No non-PRO members at this gate.</td></tr>"
+        )
+        blocks.append(
+            f"<h3>{e(_label(res, c.id))}</h3><p class=note>Article {e(art.article)}, path "
+            f"{e(art.path)}: binding gate {e(art.binding_gate)} "
+            f"({e(GATE_LABELS.get(art.binding_gate, gate.label))}); {gate.pro_min} counted PRO "
+            f"of {gate.required} needed, short {gate.short_at_min} at the minimum.</p>"
+            "<table><tr><th>Id</th><th>Name</th><th>Bloc</th><th class=num>p</th>"
+            f"<th>Source</th></tr>{rows}</table>"
+        )
+    if not blocks:
+        return ""
+    return (
+        f'<section id="pivots"><h2>{e(PIVOT_HEADING)}</h2><div class="panel">'
+        f"<p class=note>{e(PIVOT_NOTE)}</p>{''.join(blocks)}</div></section>"
+    )
+
+
 # ------------------------------------------------------------------ succession
 
 
@@ -413,6 +455,7 @@ lane(s), one Senate trial at a time.</p>
 </div>
 <h2>Plans and timeline</h2><div class="panel"><div class="tabs">{tabs}</div>{sections}</div>
 <h2>Gate paths</h2><div class="panel">{gate_paths(res, pf)}</div>
+{pivots_html(res, pf)}
 {succession}
 <h2>Removals</h2><div class="panel">{removals_svg(res)}</div>
 <h2>Left out</h2><div class="panel"><table><tr><th>Candidate</th><th>Reason</th><th>Detail</th>

@@ -91,7 +91,7 @@ majority of sworn members) is required at every gate.
 
 | Command | What it does |
 | --- | --- |
-| `evaluate` | Classifies members as PRO, CON or uncertain by cutoffs and bounds each gate: PASS, FAIL or CONTESTED, with the binding gate. |
+| `evaluate` | Classifies members as PRO, CON or uncertain by cutoffs and bounds each gate: PASS, FAIL or CONTESTED, with the binding gate and the members nearest its threshold (by the supplied probabilities). |
 | `flips` | The fewest members whose stance would have to change, by exact ILP (`--greedy` for a heuristic). Supports bloc caps, exclusions and modelled absences. |
 | `simulate` | Gaussian-copula Monte Carlo with bloc swings and, optionally, co-defection loadings learned from roll calls. |
 | `viability` | Ranks the scenarios you supply by P(removal), flips needed and the uniform shift in support that would make each viable. |

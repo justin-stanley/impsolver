@@ -10,4 +10,13 @@ Article I, path A: FAIL, ends at H2; binding gate H2
   S2    conviction                              47      47    67 FAIL (presiding: president_pro_tempore_or_vp)
   S3    disqualification                        47      47    51 FAIL
   controlling coalition at binding gate (non-PRO members): R 219
+  members nearest the threshold (by the supplied probabilities) at H2, short 3 at the minimum:
+    R-001        R    p=0.080 party_prior    R member 1
+    R-002        R    p=0.080 party_prior    R member 2
+    R-003        R    p=0.080 party_prior    R member 3
+    R-004        R    p=0.080 party_prior    R member 4
+    R-005        R    p=0.080 party_prior    R member 5
+    R-006        R    p=0.080 party_prior    R member 6
+    R-007        R    p=0.080 party_prior    R member 7
+    R-008        R    p=0.080 party_prior    R member 8
 ```
