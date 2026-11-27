@@ -1,6 +1,5 @@
 ```console
 $ impsolver portfolio examples/portfolio-example.yaml
-impsolver evaluates only the targets you supply; it does not nominate targets.
 
 Plan 1: E[removals]=1.377  order official-f > official-c > official-a > official-b
   official-f       House 2027-01-04..2027-02-05  trial 2027-02-06..2027-02-19  p0=0.450 p=0.450

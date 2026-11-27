@@ -31,11 +31,11 @@ def test_no_embedded_target_lists() -> None:
         assert word not in src
 
 
-def test_cli_states_neutrality() -> None:
+def test_cli_help_describes_the_tool() -> None:
     r = subprocess.run(
         [sys.executable, "-m", "impsolver.cli", "--help"], capture_output=True, text=True
     )
-    assert "does not nominate targets" in r.stdout
+    assert "Counts the votes needed" in r.stdout
 
 
 def test_portfolio_ids_come_from_input(tmp_path: Path) -> None:

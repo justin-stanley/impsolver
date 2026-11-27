@@ -48,7 +48,7 @@ def test_compare(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_viability(capsys: pytest.CaptureFixture[str]) -> None:
     rc, out, _ = run(capsys, "viability", SCEN, "--draws", "1000")
-    assert rc == 0 and "does not nominate targets" in out
+    assert rc == 0 and "Example Official" in out
 
 
 def test_backtest(capsys: pytest.CaptureFixture[str]) -> None:

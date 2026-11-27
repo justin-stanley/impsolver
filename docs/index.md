@@ -1,14 +1,13 @@
 # impsolver
 
-impsolver does the vote math for U.S. federal impeachment and removal. Give it a target **you**
-choose, a chamber roster and per-member probabilities. It works out what the House and Senate
-rules require at each step, how close the case is, which votes decide it, and, for several cases
-at once, which order and timing give the most expected removals.
+impsolver counts the votes needed to impeach and remove a U.S. official, and estimates the odds of
+getting them. You describe a case: the official, the chamber rosters, and each member's
+probability of voting for it. impsolver works out what the House and Senate rules require at each
+step, how close the case is, which votes decide it, and, for several cases at once, which order
+and timing give the most expected removals.
 
-!!! note "Neutral by design"
-    impsolver evaluates only the targets in its input files. It never suggests, ranks or adds
-    targets, and its results are only as good as the probabilities you give it. Read the
-    [responsible-use policy](responsible-use.md) and [validation and limits](methodology/validation.md)
+!!! note "Results depend on your inputs"
+    Every probability is an input you supply. Read [validation and limits](methodology/validation.md)
     before quoting any number.
 
 ## What it answers
