@@ -73,7 +73,7 @@ def bloc_signs(p: FloatArr, bloc_idx: npt.NDArray[np.int64], n_blocs: int) -> Fl
 
 def chamber_weight(prep: Prepared, chamber: str) -> float:
     sc = prep.scenario
-    w: float = sc.alignment_chamber_weight.get(chamber, 1.0)  # type: ignore[call-overload]
+    w: float = sc.alignment_chamber_weight.get(chamber, 0.0)  # type: ignore[call-overload]
     return sc.alignment_weight * w
 
 

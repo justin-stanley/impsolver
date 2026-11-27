@@ -81,3 +81,14 @@ def test_senate_alignment_off_by_default(rules: RuleSet) -> None:
     )
     assert default["house"].F is not None and default["senate"].F is None
     assert opted["senate"].F is not None
+
+
+def test_partial_chamber_weight_keeps_senate_default(rules: RuleSet) -> None:
+    prep = make_prep(
+        rules,
+        make_comp({"D": 1}, {"D": 1}),
+        alignment="x.json",
+        party_priors={"D": {"*": 0.5}},
+        alignment_chamber_weight={"house": 0.5},
+    )
+    assert prep.scenario.alignment_chamber_weight == {"house": 0.5, "senate": 0.0}

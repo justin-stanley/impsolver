@@ -116,3 +116,25 @@ def test_validate_fails_on_warnings(capsys: pytest.CaptureFixture[str], tmp_path
     )
     rc, _, err = run(capsys, "validate", RULES, COMP, str(scen))
     assert rc == 2 and "warning: override for NOPE" in err
+
+
+def test_portfolio_and_viability_print_scenario_warnings(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    scen = tmp_path / "s.yaml"
+    scen.write_text(
+        Path(SCEN)
+        .read_text()
+        .replace("../rules", str(REPO / "rules"))
+        .replace("../compositions", str(REPO / "compositions"))
+        + "overrides: {NOPE: {'*': 1.0}}\n"
+    )
+    pf = tmp_path / "pf.yaml"
+    pf.write_text(
+        "schema_version: 1\nstart: 2027-01-04\ndeadline: 2028-12-15\ndraws: 200\n"
+        "candidates:\n  - {id: a, scenario: s.yaml, house_days: 5, senate_days: 5}\n"
+    )
+    rc, _, err = run(capsys, "portfolio", str(pf))
+    assert rc == 0 and "warning: candidate a: override for NOPE" in err
+    rc, _, err = run(capsys, "viability", str(scen), "--draws", "500")
+    assert rc == 0 and "warning: override for NOPE" in err

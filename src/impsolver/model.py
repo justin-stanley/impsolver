@@ -196,6 +196,9 @@ class DefectionPrior(Strict):
     stages: list[str] = [STAR]
 
 
+ALIGNMENT_CHAMBER_DEFAULT: dict[Chamber, float] = {"house": 1.0, "senate": 0.0}
+
+
 class Scenario(Strict):
     schema_version: Literal[1]
     target: Target
@@ -232,6 +235,11 @@ class Scenario(Strict):
             raise ValueError("cutoffs must satisfy 0 <= lo < hi <= 1")
         if not self.articles:
             raise ValueError("at least one article is required")
+        # A partial alignment_chamber_weight keeps the default for chambers it does not name.
+        self.alignment_chamber_weight = {
+            **ALIGNMENT_CHAMBER_DEFAULT,
+            **self.alignment_chamber_weight,
+        }
         if self.defection_prior is not None and self.alignment is None:
             raise ValueError("defection_prior needs an alignment file with break counts")
         return self

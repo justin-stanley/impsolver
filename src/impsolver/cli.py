@@ -36,13 +36,15 @@ from .model import (
     Scenario,
 )
 from .paths import PathError
-from .portfolio import PortfolioError, run_portfolio
+from .portfolio import PortfolioError
+from .portfolio import load as load_portfolio_inputs
+from .portfolio import solve as solve_portfolio
 from .prepare import Prepared
 from .prepare import prepare as _prepare_raw
 from .priors import PriorError
 from .results import Evaluation, FlipResult, Simulation
 from .simulate import simulate
-from .viability import assess_paths
+from .viability import Case, assess
 
 NEUTRALITY = "impsolver evaluates only the targets you supply; it does not nominate targets."
 
@@ -211,7 +213,8 @@ def cmd_compare(a: argparse.Namespace) -> int:
 
 
 def cmd_viability(a: argparse.Namespace) -> int:
-    rows = assess_paths(a.scenarios, target_p=a.target_p, max_gap=a.max_gap, draws=a.draws)
+    cases = [Case(str(p), prepare(p)) for p in a.scenarios]
+    rows = assess(cases, target_p=a.target_p, max_gap=a.max_gap, draws=a.draws)
 
     def text() -> str:
         out = [NEUTRALITY]
@@ -245,7 +248,11 @@ def cmd_backtest(a: argparse.Namespace) -> int:
 
 
 def cmd_portfolio(a: argparse.Namespace) -> int:
-    r = run_portfolio(a.file, exhaustive=a.exhaustive)
+    loaded = load_portfolio_inputs(a.file)
+    for cid, prep in loaded.preps.items():
+        for w in prep.warnings:
+            print(f"warning: candidate {cid}: {w}", file=sys.stderr)
+    r = solve_portfolio(loaded, exhaustive=a.exhaustive)
 
     def text() -> str:
         out = [NEUTRALITY]
