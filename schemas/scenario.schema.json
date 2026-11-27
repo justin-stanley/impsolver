@@ -246,6 +246,22 @@
       "title": "Senate Tie Break",
       "type": "string"
     },
+    "attendance": {
+      "default": "fixed",
+      "enum": [
+        "fixed",
+        "random"
+      ],
+      "title": "Attendance",
+      "type": "string"
+    },
+    "absence_rate": {
+      "default": 0.0,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Absence Rate",
+      "type": "number"
+    },
     "defection_prior": {
       "anyOf": [
         {

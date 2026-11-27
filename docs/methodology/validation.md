@@ -47,4 +47,4 @@ In the Senate they were not, so Senate alignment is off by default.
 | Same draw at every gate in a chamber | always | H1 adds little risk once H2 is modelled |
 | Senate tie-break | none | Changes S1 and S3 when the Senate splits evenly |
 | Senate alignment weight | 0 | On applies loadings that showed no validation signal |
-| Attendance | fixed by roster | Nobody is randomly absent |
+| Attendance | fixed by roster | `random` drops members at their missed-vote rates; absences lower the S2 threshold and can deny a quorum |

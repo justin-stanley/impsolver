@@ -8,7 +8,9 @@ Alignment{schema_version 1, encoding: Literal["unsigned_breaks"] (reject files w
 congresses[int], kappa, min_shared, bodies{name: AlignmentBody}}
 AlignmentBody{k, n_contested, members[AlignedMember], bloc_mean_loadings{bloc:[k]},
 bloc_break_rate{bloc:float}}. Each vector has length k and norm^2<=1.
-AlignedMember{id, name, party, bloc, n_votes, breaks:int|None, loadings[k]}
+AlignedMember{id, name, party, bloc, n_votes, breaks:int|None, loadings[k], n_missed:int|None,
+n_possible:int|None}. n_missed counts roll calls whose only code is 9 (not voting); n_possible
+counts every roll call listing the member. Both default to None so older files load.
 
 ## Alignment fit
 VOTEVIEW_PARTY {100:D,200:R,328:I}; YEA 1,2,3; NAY 4,5,6; K=5 KAPPA=50 MIN_SHARED=10 MIN_BLOC_VOTES=5,

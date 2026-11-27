@@ -155,7 +155,8 @@ pages they were checked against.
 - **Correlation choices move results.** The same draw is reused across gates in a chamber, House
   and Senate swings are independent unless `national_swing` is set, and every scenario in a
   portfolio shares one party swing.
-- **Procedure is simplified.** Attendance is fixed by the roster, nobody votes "present" in
+- **Procedure is simplified.** Attendance is fixed by the roster unless a scenario sets
+  `attendance: random` (Monte Carlo only, at missed-vote rates), nobody votes "present" in
   simulations, and how a tied Senate majority vote resolves is an input (`senate_tie_break`)
   because the rule for impeachment trials is not settled here.
 - **Scheduling is approximate.** Working days come from simple calendars, Senate time is reserved
