@@ -62,6 +62,11 @@ Gaussian copula: u_i = sqrt(rho) z_bloc + sqrt(1-rho) e_i, and PRO iff u_i < Phi
 With alignment: u_ig = sqrt(rho) z_bloc + sqrt(1-rho)(s_ig F_i·w + sqrt(psi_i) e_i), where
 psi_i = 1-||F_i||^2. s_ig is the sign of (bloc lean - 0.5), and the lean is the mean p of the
 bloc's free members at the gate. Defaults: 100k draws in 10k chunks, PCG64(seed).
+Attendance (`attendance: fixed|random`, default fixed): with random, each present member is absent
+in a draw with probability Member.p_absent, else the alignment file's n_missed/n_possible, else
+`absence_rate` (default 0). One draw per chamber covers all its gates, from a separate stream
+PCG64([seed, 0xA77E]). Absent members leave votes cast, the 2/3-of-present denominator and quorum.
+Deterministic `evaluate` and `flips` keep fixed attendance.
 
 ## Alignment, defection prior, calibration, viability, portfolio
 See `docs/design-reference.md` and the module docstrings in `src/impsolver/`.

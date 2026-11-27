@@ -138,6 +138,20 @@
           "title": "Attendance",
           "type": "string"
         },
+        "p_absent": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P Absent"
+        },
         "notes": {
           "anyOf": [
             {

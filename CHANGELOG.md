@@ -7,6 +7,8 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- Optional random attendance in the Monte Carlo (`attendance: random`, `absence_rate`, member
+  `p_absent`, and `n_missed`/`n_possible` in alignment files); the default `fixed` leaves results unchanged.
 
 ### Changed
 

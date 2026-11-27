@@ -22,7 +22,8 @@ reported as `NO_QUORUM`, not as a failure on the merits.
 
 **Two-thirds of those present.** Members answering "present" count in the denominator by default
 (`present_in_denominator`). Absent members do not, so attendance moves the threshold:
-2/3 of 100 is 67, of 99 is 66, of 54 is 36.
+2/3 of 100 is 67, of 99 is 66, of 54 is 36. `evaluate` uses the roster's attendance; to let
+attendance vary, set `attendance: random` and simulate (see [the probability model](model.md#attendance)).
 
 **Presiding officer.** For a presidential trial the Chief Justice presides at S2; otherwise the
 President pro tempore or the Vice President. How an exact tie on a Senate majority vote (S1, S3)
