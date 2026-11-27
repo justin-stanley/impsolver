@@ -14,7 +14,7 @@ the scenarios it references). See [Getting started](../getting-started.md#start-
 | Composition | `schemas/composition.schema.json` | `compositions/shorthand-119.yaml`, `compositions/us-119.yaml` |
 | Scenario | `schemas/scenario.schema.json` | `examples/scenario-example.yaml` |
 | Portfolio | `schemas/portfolio.schema.json` | `examples/portfolio-example.yaml` |
-| Alignment | `schemas/alignment.schema.json` | `alignment/us-116.json` |
+| Alignment | `schemas/alignment.schema.json` | `alignment/us-116.json`, `alignment/us-116-118.json` (pooled) |
 | Historical fixture | `schemas/fixture.schema.json` | `src/impsolver/data/fixtures/trump-2021.yaml` |
 | Crossover fixture | `schemas/crossovers.schema.json` | `src/impsolver/data/fixtures/members/trump-2021-crossovers.yaml` |
 

@@ -315,6 +315,10 @@ class Alignment(Strict):
     kappa: float
     min_shared: int
     bodies: dict[str, AlignmentBody]
+    # Recency weighting of pooled congresses: a roll call in congress c has weight
+    # 0.5 ** ((latest - c) / half_life). None (the default) weights every roll call equally and is
+    # left out of written files, so single-congress files keep their original form.
+    half_life: float | None = Field(default=None, gt=0)
 
 
 # ------------------------------------------------------------------------ fixtures

@@ -23,6 +23,9 @@ All notable changes are listed here. The format follows
   more than one event; it reports only, and no default changes.
 - Crossover fixtures take an optional `not_voting` list, and `impsolver score` leaves those members
   out instead of scoring them as non-crossers (2021: 41 House and 8 Senate Republicans of the 116th).
+- `impsolver align` pools several congresses, optionally with a recency weight (`--half-life`, in
+  congresses; recorded as `half_life`), and `alignment/us-116-118.json` pools the 116th to 118th
+  Congresses (Voteview checksums added); `us-116.json`, `us-119.json` and default results are unchanged.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

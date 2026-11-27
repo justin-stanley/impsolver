@@ -22,6 +22,37 @@
 In the House, the eight crossers were more aligned with each other than random same-party sets.
 In the Senate they were not, so Senate alignment is off by default.
 
+### Pooled history (116th to 118th Congress)
+
+The same fixture, still matched on 116th Congress ids, was run against the pooled
+`alignment/us-116-118.json` (equal weight) and against a pool with `--half-life 1`
+(`impsolver calibrate --alignment FILE`, 5000 permutations, seed 0):
+
+| History | Body | Party members | Crossers' break rate | Party break rate | Alignment, crossers vs random (p) | β |
+| --- | --- | --- | --- | --- | --- | --- |
+| 116 | House | 201 | 0.165 | 0.069 | 0.33 vs 0.19 (0.012) | 1.31 ± 0.43 |
+| 116 to 118, equal | House | 303 | 0.177 | 0.064 | 0.30 vs 0.19 (0.024) | 1.62 ± 0.49 |
+| 116 to 118, half-life 1 | House | 299 | 0.178 | 0.065 | 0.30 vs 0.19 (0.027) | 1.66 ± 0.49 |
+| 116 | Senate | 54 | 0.058 | 0.027 | 0.20 vs 0.25 (0.753) | 0.89 ± 0.47 |
+| 116 to 118, equal | Senate | 64 | 0.246 | 0.090 | 0.34 vs 0.21 (0.013) | 1.44 ± 0.49 |
+| 116 to 118, half-life 1 | Senate | 58 | 0.297 | 0.099 | 0.32 vs 0.20 (0.011) | 1.38 ± 0.48 |
+
+In the House, pooling changes little: the crossers break about 2.8 times as often as the party
+rather than 2.4 times, and their co-defection signal is about as strong. In the Senate the pooled
+crossers break about 2.7 times as often as their party (2.1 times in the 116th alone) and now look
+aligned. **Do not read the pooled Senate result as validation.** The 117th Congress held the
+votes being predicted, so the pool contains them: the House impeachment vote
+([Clerk roll call 17 of 2021](https://clerk.house.gov/Votes/202117), 232 to 197; roll call 16 in
+Voteview's 117th Congress file) and the Senate verdict
+([vote 59 of the 117th Congress](https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00059.htm),
+57 to 43), along with the votes cast after them in the 117th and 118th Congresses. The comparison
+population also changes: the pooled party sets include members who served only in the 118th and
+were not in office for the 2021 votes, and they enter the party break rate, the random
+same-party sets and the β fit as non-crossers. The 116th-only calibration is the only one without
+these problems, and the defaults (`alignment_chamber_weight` Senate 0, the β values above) still
+rest on it. The pooled file is offered as a longer history for scenarios about later congresses,
+not as a better-validated one.
+
 ## Calibration sweep
 
 `impsolver score` turns the 2021 check into scores. For every member of the crossing party with
