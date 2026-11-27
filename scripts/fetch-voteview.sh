@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Download the Voteview member and vote files used to build rosters and alignment.
 # Usage: scripts/fetch-voteview.sh [CONGRESS ...]   (default: 116 119)
-# Voteview asks that the data be cited; see the "Data" section of README.md.
+# Voteview asks that the data be cited; see DATA.md.
 set -euo pipefail
 dest="$(cd "$(dirname "$0")/.." && pwd)/data/voteview"
 mkdir -p "$dest"

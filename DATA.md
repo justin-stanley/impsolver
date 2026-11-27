@@ -27,8 +27,24 @@ data files. If you reuse the derived files below, cite Voteview as above.
 Each file carries the citation and access date: the roster in its header comment, the alignment
 files in their `source` field. The raw CSVs are not redistributed. Download them with
 `scripts/fetch-voteview.sh` (they come from `https://voteview.com/static/data/out/`), then rebuild
-with the commands in `README.md`. Pass `--accessed YYYY-MM-DD` so the citation in the regenerated
-file records when you downloaded the data.
+with the commands below. Pass `--accessed YYYY-MM-DD` so the citation in the regenerated file
+records when you downloaded the data. `make reproduce` runs all of this and checks the result
+against the committed files.
+
+```bash
+scripts/fetch-voteview.sh 116 119
+V=data/voteview
+impsolver roster --members $V/H119_members.csv --members $V/S119_members.csv \
+  --votes $V/H119_votes.csv --votes $V/S119_votes.csv --caucus 328=D \
+  --member-caucus K000401=R --vacate H001082 --as-of 2026-11-27 --accessed 2026-11-27 \
+  --out compositions/us-119.yaml
+impsolver align --votes $V/H116_votes.csv --votes $V/S116_votes.csv \
+  --members $V/H116_members.csv --members $V/S116_members.csv --caucus 328=D \
+  --accessed 2026-11-27 --out alignment/us-116.json
+impsolver align --votes $V/H119_votes.csv --votes $V/S119_votes.csv \
+  --members $V/H119_members.csv --members $V/S119_members.csv --caucus 328=D \
+  --member-caucus K000401=R --accessed 2026-11-27 --out alignment/us-119.json
+```
 
 ### Corrections applied on top of Voteview
 
