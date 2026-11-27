@@ -7,6 +7,8 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
+  `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
 
 ### Changed
 

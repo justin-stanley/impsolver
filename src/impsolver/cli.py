@@ -17,7 +17,7 @@ from . import alignment as alignment_mod
 from . import roster as roster_mod
 from .backtest import run_backtest
 from .calibrate import calibrate
-from .deterministic import evaluate
+from .deterministic import default_path, evaluate
 from .flips import ABSENCE_NOTE, FlipError, find_flips
 from .loader import (
     BUILTIN_FIXTURES,
@@ -25,8 +25,10 @@ from .loader import (
     load_alignment,
     load_composition,
     load_crossovers,
+    load_portfolio,
     load_rules,
     load_scenario,
+    resolve,
     resolve_rules,
 )
 from .members import ResolutionError
@@ -39,7 +41,7 @@ from .model import (
     RuleSet,
     Scenario,
 )
-from .paths import PathError
+from .paths import PathError, path_for
 from .portfolio import PortfolioError
 from .portfolio import load as load_portfolio_inputs
 from .portfolio import solve as solve_portfolio
@@ -49,6 +51,7 @@ from .priors import PriorError
 from .report import render as render_report
 from .results import Evaluation, FlipResult, Simulation
 from .simulate import simulate
+from .templates import DEFAULT_NAMES, TEMPLATES
 from .viability import Case, assess
 
 NEUTRALITY = "impsolver evaluates only the targets you supply; it does not nominate targets."
@@ -56,6 +59,10 @@ NEUTRALITY = "impsolver evaluates only the targets you supply; it does not nomin
 
 class CliError(Exception):
     pass
+
+
+# Which template each template refers to when they share a folder.
+NEEDS = {"scenario": "composition", "portfolio": "scenario"}
 
 
 def _emit(args: argparse.Namespace, obj: Any, text: Callable[[], str]) -> None:
@@ -136,10 +143,46 @@ def prepare(path: str, composition: str | None = None) -> Prepared:
     return prep
 
 
+def _validate_portfolio(path: str) -> tuple[str, list[str]]:
+    """Check a portfolio and every scenario it references without simulating them.
+
+    Returns a one-line summary and the warnings, each prefixed with its candidate id.
+    """
+    pf = load_portfolio(path)  # also rejects unknown ids in after/excludes/succession
+    warnings: list[str] = []
+    n_scen = 0
+    for c in pf.candidates:
+        if c.scenario is None:
+            continue
+        n_scen += 1
+        try:
+            prep = _prepare_raw(resolve(c.scenario, path))
+            if c.article is not None and c.article not in prep.scenario.articles:
+                raise CliError(
+                    f"article {c.article} is not in the scenario's articles "
+                    f"({', '.join(prep.scenario.articles)})"
+                )
+            path_for(prep.rules, prep.scenario, default_path(prep))
+            evaluate(prep)  # resolves every probability
+        except ERRORS as e:
+            msg = str(e) if not isinstance(e, KeyError) else f"unknown key {e}"
+            raise CliError(f"{path}: candidate {c.id}: {msg}") from e
+        warnings += [f"candidate {c.id}: {w}" for w in prep.warnings]
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    return f"portfolio ok: {len(pf.candidates)} candidates, {n_scen} scenarios", warnings
+
+
 def cmd_validate(a: argparse.Namespace) -> int:
     report: dict[str, str] = {}
-    rules = load_rules(resolve_rules(a.rules, Path.cwd() / "_"))
-    report[a.rules] = f"rules ok: {len(rules.stages)} stages"
+    if a.rules is None and a.portfolio is None:
+        raise CliError(
+            "validate needs a rule set (with optional composition and scenario), "
+            "--portfolio FILE, or both"
+        )
+    if a.rules is not None:
+        rules = load_rules(resolve_rules(a.rules, Path.cwd() / "_"))
+        report[a.rules] = f"rules ok: {len(rules.stages)} stages"
     if a.composition:
         c = load_composition(a.composition)
         report[a.composition] = "composition ok: " + ", ".join(
@@ -152,7 +195,26 @@ def cmd_validate(a: argparse.Namespace) -> int:
         if prep.warnings:
             raise CliError(f"{a.scenario}: {len(prep.warnings)} warning(s); see above")
         report[a.scenario] = "scenario ok"
+    if a.portfolio:
+        summary, warnings = _validate_portfolio(a.portfolio)
+        if warnings:
+            raise CliError(f"{a.portfolio}: {len(warnings)} warning(s); see above")
+        report[a.portfolio] = summary
     _emit(a, report, lambda: "\n".join(f"{k}: {v}" for k, v in report.items()))
+    return 0
+
+
+def cmd_init(a: argparse.Namespace) -> int:
+    text = TEMPLATES[a.kind]
+    if a.out is None:
+        sys.stdout.write(text)
+        return 0
+    out = Path(a.out)
+    if out.exists() and not a.force:
+        raise CliError(f"{out} already exists; pass --force to overwrite it")
+    out.write_text(text, encoding="utf-8")
+    hint = f"; it expects {DEFAULT_NAMES[NEEDS[a.kind]]} next to it" if a.kind in NEEDS else ""
+    print(f"wrote {a.kind} template to {out}{hint}", file=sys.stderr)
     return 0
 
 
@@ -364,10 +426,31 @@ def build_parser() -> argparse.ArgumentParser:
         p.set_defaults(fn=fn)
         return p
 
-    p = add("validate", cmd_validate, help="validate rules, composition and scenario files")
-    p.add_argument("rules", help="built-in rule set name (us-federal) or a YAML path")
+    p = add(
+        "validate",
+        cmd_validate,
+        help="validate rules, composition, scenario and portfolio files",
+        description="Check input files without running them. Exits 2 on any error or warning.",
+    )
+    p.add_argument("rules", nargs="?", help="built-in rule set name (us-federal) or a YAML path")
     p.add_argument("composition", nargs="?")
     p.add_argument("scenario", nargs="?")
+    p.add_argument(
+        "--portfolio",
+        metavar="FILE",
+        help="also check a portfolio and every scenario its candidates reference",
+    )
+
+    p = add(
+        "init",
+        cmd_init,
+        help="write a commented starter file (placeholder officials only)",
+        description="Write a commented template that validates. composition.yaml, "
+        "scenario.yaml and portfolio.yaml in one folder refer to each other.",
+    )
+    p.add_argument("kind", choices=sorted(TEMPLATES))
+    p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
+    p.add_argument("--force", action="store_true", help="overwrite an existing --out file")
 
     p = add("evaluate", cmd_evaluate, help="deterministic bounds per gate")
     p.add_argument("scenario")

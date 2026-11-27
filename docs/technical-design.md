@@ -84,4 +84,5 @@ These change behavior relative to the original design.
 - Portfolio search: exact up to `exact_limit` = 10 eligible candidates, beam of 4096 above that.
 - `flips` uses the ILP by default (`--greedy` for the heuristic).
 - Unknown stage keys and shift articles are errors. Unknown member ids and blocs are warnings, and
-  `validate` exits 2 on any warning.
+  `validate` exits 2 on any warning. `validate --portfolio` applies the same checks to every
+  scenario a portfolio references, without simulating them.
