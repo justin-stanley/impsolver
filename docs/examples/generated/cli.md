@@ -1,13 +1,13 @@
 ```text
 usage: impsolver [-h] [--format {text,json}]
-                 {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
+                 {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,score,schema,roster,align}
                  ...
 
 Neutral vote-math solver for impeachment (House) and conviction (Senate). impsolver evaluates only
 the targets you supply; it does not nominate targets.
 
 positional arguments:
-  {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,schema,roster,align}
+  {validate,init,evaluate,flips,simulate,compare,viability,backtest,portfolio,calibrate,score,schema,roster,align}
     validate            validate rules, composition, scenario and portfolio files
     init                write a commented starter file (placeholder officials only)
     evaluate            deterministic bounds per gate
@@ -18,6 +18,7 @@ positional arguments:
     backtest            replay historical roll calls
     portfolio           schedule a portfolio of candidates
     calibrate           check alignment against known crossovers
+    score               score crossing predictions on crossover fixtures over a grid of settings
     schema              write JSON schemas
     roster              build a composition from Voteview (see roster --help)
     align               fit alignment loadings from Voteview (see align --help)
@@ -201,6 +202,40 @@ options:
   --min-votes MIN_VOTES
   --permutations PERMUTATIONS
   --seed SEED
+```
+
+### `impsolver score`
+
+```text
+usage: impsolver score [-h] [--format {text,json}] --alignment ALIGNMENT [--beta B,B,...]
+                       [--rho R,R,...] [--weight W,W,...] [--base-rate BASE_RATE]
+                       [--min-votes MIN_VOTES] [--draws DRAWS] [--seed SEED] [--top TOP]
+                       [--marginal-only]
+                       [fixtures ...]
+
+Brier and log scores of per-member crossing predictions on crossover fixtures, over a grid of beta
+(defection prior), rho and alignment weight, and one kappa per alignment file. Reports the best
+settings and, with several events, leave-one-event-out scores. It never changes defaults.
+
+positional arguments:
+  fixtures              crossover fixtures (default: every built-in fixture)
+
+options:
+  -h, --help            show this help message and exit
+  --format {text,json}
+  --alignment ALIGNMENT
+                        alignment file; repeat with files fitted at other kappa values (impsolver
+                        align --kappa K)
+  --beta B,B,...
+  --rho R,R,...
+  --weight W,W,...      alignment weights to try
+  --base-rate BASE_RATE
+                        crossing base rate for every event (default: each event's observed share)
+  --min-votes MIN_VOTES
+  --draws DRAWS         importance draws per event
+  --seed SEED
+  --top TOP             conditional settings to list
+  --marginal-only       skip the conditional (rho, weight, kappa) grid
 ```
 
 ### `impsolver schema`

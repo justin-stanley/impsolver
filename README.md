@@ -98,6 +98,7 @@ majority of sworn members) is required at every gate.
 | `portfolio` | Orders and schedules several cases with House concurrency, one Senate trial at a time, calendars, deadlines, fatigue and succession, then reports sensitivity and the joint distribution of removals. |
 | `backtest` | Replays 13 past cases against the rules: the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas votes, Belknap (1876) and seven trials of federal judges. |
 | `calibrate` | Tests whether learned alignment picks out members who actually crossed party lines. |
+| `score` | Scores per-member crossing predictions (Brier, log loss) over a grid of β, ρ, alignment weight and κ; reports only, never changes defaults. |
 | `roster`, `align` | Build a composition and alignment loadings from Voteview data. |
 | `validate`, `init`, `compare`, `schema` | Check files (portfolios too), write starter templates, compare compositions, write JSON schemas. |
 
