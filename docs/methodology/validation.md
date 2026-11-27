@@ -1,8 +1,7 @@
 # Validation and limits
 
 The methodology paper draft, `paper/paper.md` in the repository, summarises the methods and the
-validation below in JOSS format. It is a draft and is not yet on the main branch, so it is not
-linked from here.
+validation below in JOSS format.
 
 ## What has been checked
 

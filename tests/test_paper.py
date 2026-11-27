@@ -55,6 +55,9 @@ QUOTED = [
     ("0.3846 at the default", "score", "beta  1.00  Brier 0.1157  log 0.3846  <- default"),
     ("scores\n0.1828", "score", "rho 0.6, weight 1, kappa 50: Brier 0.0465  log 0.1828"),
     ("(0.1691)", "score", "beta 1.25, rho 0, weight 0.5, kappa 50   Brier 0.0442  log 0.1691"),
+    ("7 of the 4,000 draws are effective", "score", "smallest effective draws: 7 of 4000"),
+    ("1 of 4,000 in the Senate", "score", "smallest effective draws: 1 of 4000"),
+    ("fewer than 100 effective draws", "score", "best settings skip points below 100"),
 ]  # fmt: skip
 
 
