@@ -23,6 +23,17 @@ data files. If you reuse the derived files below, cite Voteview as above.
 | `compositions/us-119.yaml` | `H119_members.csv`, `S119_members.csv`, `H119_votes.csv`, `S119_votes.csv` | `impsolver roster` |
 | `alignment/us-116.json` | `H116_votes.csv`, `S116_votes.csv`, `H116_members.csv`, `S116_members.csv` | `impsolver align` |
 | `alignment/us-119.json` | `H119_votes.csv`, `S119_votes.csv`, `H119_members.csv`, `S119_members.csv` | `impsolver align` |
+| `alignment/us-116-118.json` | `H{116,117,118}_votes.csv`, `S{116,117,118}_votes.csv`, `H{116,117,118}_members.csv`, `S{116,117,118}_members.csv` | `impsolver align` (pooled, equal weight) |
+
+`us-116-118.json` pools the 116th, 117th and 118th Congresses with every roll call weighted
+equally. Members are matched across congresses by Bioguide ID, and each member's party and bloc
+are those of the latest congress they served in (votes cast under an earlier party are scored
+against that party's bloc). Like the other files it maps independents (party code 328) to the
+Democratic bloc: the senate.gov
+[party division page](https://www.senate.gov/about/parties-leadership/party-division.htm)
+(checked 2026-11-27) says both independents in the 117th Congress, and the independents of the
+118th, Manchin included after his switch, caucused with the Democrats. The House had no
+independents in either congress.
 
 The alignment files also record each member's missed votes (`n_missed`, roll calls coded 9, "not
 voting") out of the roll calls Voteview lists them on (`n_possible`); `attendance: random` uses

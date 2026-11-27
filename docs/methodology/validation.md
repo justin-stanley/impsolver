@@ -22,6 +22,32 @@
 In the House, the eight crossers were more aligned with each other than random same-party sets.
 In the Senate they were not, so Senate alignment is off by default.
 
+### Pooled history (116th to 118th Congress)
+
+The same fixture, still matched on 116th Congress ids, was run against the pooled
+`alignment/us-116-118.json` (equal weight) and against a pool with `--half-life 1`
+(`impsolver calibrate --alignment FILE`, 5000 permutations, seed 0):
+
+| History | Body | Party members | Crossers' break rate | Party break rate | Alignment, crossers vs random (p) | β |
+| --- | --- | --- | --- | --- | --- | --- |
+| 116 | House | 201 | 0.165 | 0.069 | 0.33 vs 0.19 (0.012) | 1.31 ± 0.43 |
+| 116 to 118, equal | House | 303 | 0.177 | 0.064 | 0.30 vs 0.19 (0.024) | 1.62 ± 0.49 |
+| 116 to 118, half-life 1 | House | 299 | 0.178 | 0.065 | 0.30 vs 0.19 (0.027) | 1.66 ± 0.49 |
+| 116 | Senate | 54 | 0.058 | 0.027 | 0.20 vs 0.25 (0.753) | 0.89 ± 0.47 |
+| 116 to 118, equal | Senate | 64 | 0.246 | 0.090 | 0.34 vs 0.21 (0.013) | 1.44 ± 0.49 |
+| 116 to 118, half-life 1 | Senate | 58 | 0.297 | 0.099 | 0.32 vs 0.20 (0.011) | 1.38 ± 0.48 |
+
+In the House, pooling changes little: the crossers break about 2.8 times as often as the party
+rather than 2.4 times, and their co-defection signal is about as strong. In the Senate the pooled
+crossers break about 2.7 times as often as their party (2.1 times in the 116th alone) and now look
+aligned. **Do not read the pooled Senate result as validation.** The 117th Congress began on
+January 3, 2021, so the pool contains the votes being predicted (in the Voteview files, House
+roll call 16 of the 117th Congress, 232 to 197 with 10 Republicans in favour, and Senate roll call
+59, 57 to 43 with 7 Republicans for conviction) and four years of votes cast after them. The 116th-only
+calibration is the only one without that leakage, and the defaults (`alignment_chamber_weight`
+Senate 0, the β values above) still rest on it. The pooled file is offered as a longer history for
+scenarios about later congresses, not as a better-validated one.
+
 ## What has not been checked
 
 - The probabilities themselves. They are inputs, and the tool cannot tell you whether they are

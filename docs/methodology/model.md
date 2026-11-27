@@ -77,6 +77,12 @@ gate, the sign of the factor term follows the bloc's lean, so "breaking" always 
 against the bloc's likely position. Senate loadings are off by default
 (`alignment_chamber_weight`); see [validation](validation.md).
 
+`impsolver align` can pool several congresses: pass the vote and member files of each (the
+committed `alignment/us-116-118.json` pools the 116th to 118th). Every roll call counts equally
+unless you pass `--half-life H`, which gives a roll call from a congress d congresses before the
+latest a weight of 0.5^(d/H); the weights apply to the correlations and to the break and attendance
+counts written to the file, and the file records `half_life`.
+
 ### Defection prior
 
 `defection_prior` shifts party-prior probabilities by each member's historical break rate, shrunk

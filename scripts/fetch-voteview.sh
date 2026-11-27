@@ -2,13 +2,13 @@
 # SPDX-FileCopyrightText: 2026 Justin Stanley
 # SPDX-License-Identifier: MIT
 # Download the Voteview member and vote files used to build rosters and alignment.
-# Usage: scripts/fetch-voteview.sh [CONGRESS ...]   (default: 116 119)
+# Usage: scripts/fetch-voteview.sh [CONGRESS ...]   (default: 116 117 118 119)
 # Voteview asks that the data be cited; see the "Data" section of README.md.
 set -euo pipefail
 dest="$(cd "$(dirname "$0")/.." && pwd)/data/voteview"
 mkdir -p "$dest"
 congresses=("$@")
-[ ${#congresses[@]} -eq 0 ] && congresses=(116 119)
+[ ${#congresses[@]} -eq 0 ] && congresses=(116 117 118 119)
 for c in "${congresses[@]}"; do
   for ch in H S; do
     for kind in votes members; do

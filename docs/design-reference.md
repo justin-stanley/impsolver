@@ -5,7 +5,8 @@ Detailed formulas and defaults behind `docs/technical-design.md`. Where the two 
 
 ## Alignment JSON
 Alignment{schema_version 1, encoding: Literal["unsigned_breaks"] (reject files without it), source,
-congresses[int], kappa, min_shared, bodies{name: AlignmentBody}}
+congresses[int], kappa, min_shared, bodies{name: AlignmentBody}, half_life: float>0|None}.
+half_life is omitted from the file when None (equal weight), so single-congress files are unchanged.
 AlignmentBody{k, n_contested, members[AlignedMember], bloc_mean_loadings{bloc:[k]},
 bloc_break_rate{bloc:float}}. Each vector has length k and norm^2<=1.
 AlignedMember{id, name, party, bloc, n_votes, breaks:int|None, loadings[k], n_missed:int|None,
@@ -28,7 +29,14 @@ max norm^2 0.999. Merge the two rows a party switcher gets.
 7. Loadings = top-k eigvecs * sqrt(eigval); sign so the largest-|.| entry is positive; rescale rows to
    norm^2<=0.999.
 8. Members with no history get the bloc mean loadings.
-CLI: python -m impsolver.alignment --votes --members (repeatable) --caucus 328=D --k --kappa --min-shared --out
+Pooling: pass the files of several congresses; roll calls are keyed (congress, rollnumber) and
+members are merged by Bioguide ID within a chamber (party and bloc from the latest congress).
+--half-life h gives a roll call in congress c the weight w=0.5**((latest-c)/h); default None = w=1.
+With weights: n=(present*w)@present.T, sx=(filled*w)@present.T, sxy=(filled*w)@filled.T; min_shared
+counts unweighted shared roll calls; shrinkage uses the weighted n; breaks, n_votes, n_missed,
+n_possible are weighted sums rounded to int, and bloc_break_rate is the weighted rate. The
+contested test is per roll call and unweighted.
+CLI: python -m impsolver.alignment --votes --members (repeatable) --caucus 328=D --half-life --k --kappa --min-shared --out
 
 ## Copula MC
 100k draws in 10k chunks, PCG64(seed). Reuse the same u across gates within a draw (scenario
@@ -56,8 +64,8 @@ support_gap: bisect delta in [0,8], tol .01, CRN, 20k draws. Sort by p_complete 
 Labels: viable (p>=.5), reachable (gap<=2), out of reach.
 
 ## Voteview URLs (data/voteview/)
-https://voteview.com/static/data/out/votes/{H|S}{116|119}_votes.csv
-https://voteview.com/static/data/out/members/{H|S}{116|119}_members.csv
+https://voteview.com/static/data/out/votes/{H|S}{116|117|118|119}_votes.csv
+https://voteview.com/static/data/out/members/{H|S}{116|117|118|119}_members.csv
 
 ## Portfolio
 Portfolio{schema_version, start, deadline, house_concurrency=2, fatigue_delta=0, trial_carryover=false,

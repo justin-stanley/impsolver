@@ -116,12 +116,12 @@ regenerate them:
 
 [DATA.md](DATA.md) lists every file derived from Voteview, the source files and access date behind
 each one, and the corrections applied on top of it. The derived files
-(`compositions/us-119.yaml`, `alignment/us-116.json`, `alignment/us-119.json`) carry the same
-citation. The raw CSVs are not included. Download them with `scripts/fetch-voteview.sh`, then
-rebuild (pass `--accessed` with your download date):
+(`compositions/us-119.yaml`, `alignment/us-116.json`, `alignment/us-119.json` and the pooled
+`alignment/us-116-118.json`) carry the same citation. The raw CSVs are not included. Download
+them with `scripts/fetch-voteview.sh`, then rebuild (pass `--accessed` with your download date):
 
 ```bash
-scripts/fetch-voteview.sh 116 119
+scripts/fetch-voteview.sh 116 117 118 119
 V=data/voteview
 impsolver roster --members $V/H119_members.csv --members $V/S119_members.csv \
   --votes $V/H119_votes.csv --votes $V/S119_votes.csv --caucus 328=D \
@@ -133,6 +133,14 @@ impsolver align --votes $V/H116_votes.csv --votes $V/S116_votes.csv \
 impsolver align --votes $V/H119_votes.csv --votes $V/S119_votes.csv \
   --members $V/H119_members.csv --members $V/S119_members.csv --caucus 328=D \
   --member-caucus K000401=R --accessed 2026-11-27 --out alignment/us-119.json
+# 116th-118th pooled; add --half-life N to weight recent congresses more (default: equal weight)
+impsolver align --votes $V/H116_votes.csv --votes $V/S116_votes.csv \
+  --votes $V/H117_votes.csv --votes $V/S117_votes.csv \
+  --votes $V/H118_votes.csv --votes $V/S118_votes.csv \
+  --members $V/H116_members.csv --members $V/S116_members.csv \
+  --members $V/H117_members.csv --members $V/S117_members.csv \
+  --members $V/H118_members.csv --members $V/S118_members.csv \
+  --caucus 328=D --accessed 2026-11-27 --out alignment/us-116-118.json
 ```
 
 The `us-119` roster reflects the 119th Congress as of 2026-11-27, checked against the

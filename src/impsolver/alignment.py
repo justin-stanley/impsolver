@@ -6,6 +6,10 @@ The encoding is "unsigned breaks". On each contested roll call, a member's entry
 against their bloc's majority and 0 if they voted with it. Pearson correlations between members'
 break series are shrunk toward their bloc-pair mean, projected to the nearest correlation matrix,
 and factored into k loadings per member.
+
+Several congresses can be pooled by passing the files of each. By default every roll call has the
+same weight; with a half-life h (in congresses) a roll call from congress c has weight
+0.5 ** ((latest - c) / h), which applies to the correlations and to every count written out.
 """
 
 from __future__ import annotations
@@ -212,26 +216,47 @@ def cell_blocs(
     return out.astype(str)
 
 
+def congress_weights(congresses: list[int], half_life: float | None) -> dict[int, float]:
+    """Weight per congress: 1 for the latest, halving every ``half_life`` congresses before it."""
+    if half_life is None:
+        return {c: 1.0 for c in congresses}
+    if half_life <= 0:
+        raise ValueError(f"half-life must be positive, got {half_life}")
+    latest = max(congresses)
+    return {c: 0.5 ** ((latest - c) / half_life) for c in congresses}
+
+
+def roll_weights(keys: list[tuple[int, int]], weights: dict[int, float] | None) -> FloatArr | None:
+    """Per-roll-call weights in ``keys`` order, or None when every weight is 1."""
+    if weights is None or all(w == 1.0 for w in weights.values()):
+        return None
+    return np.array([weights[c] for c, _ in keys], dtype=float)
+
+
 def missed_votes(
-    members: list[VVMember], rolls: dict[tuple[int, int], dict[int, int]]
+    members: list[VVMember],
+    rolls: dict[tuple[int, int], dict[int, int]],
+    weights: dict[int, float] | None = None,
 ) -> list[tuple[int, int]]:
     """(n_missed, n_possible) per member over every roll call, not only contested ones.
 
     A roll call is possible for a member when Voteview lists any of their icpsrs on it (Voteview
     omits members who were not serving). It is missed when the only code recorded is 9 (not
-    voting). Yea, nay and present (codes 1 to 8) all count as attending.
+    voting). Yea, nay and present (codes 1 to 8) all count as attending. With ``weights`` (per
+    congress), each roll call counts its congress's weight and the totals are rounded.
     """
     out: list[tuple[int, int]] = []
     for m in members:
-        missed = possible = 0
-        for votes in rolls.values():
+        missed = possible = 0.0
+        for (cong, _), votes in rolls.items():
             codes = [votes[ic] for ic in m.icpsrs if ic in votes]
             if not codes:
                 continue
-            possible += 1
+            w = 1.0 if weights is None else weights[cong]
+            possible += w
             if all(c == NOT_VOTING for c in codes):
-                missed += 1
-        out.append((missed, possible))
+                missed += w
+        out.append((round(missed), round(possible)))
     return out
 
 
@@ -301,13 +326,26 @@ def unsigned_breaks(
     return out
 
 
-def pairwise_pearson(x: FloatArr, min_shared: int = MIN_SHARED) -> tuple[FloatArr, FloatArr]:
-    """Pairwise-complete Pearson correlation of 0/1 rows. Returns (corr, n_shared)."""
+def pairwise_pearson(
+    x: FloatArr, min_shared: int = MIN_SHARED, weights: FloatArr | None = None
+) -> tuple[FloatArr, FloatArr]:
+    """Pairwise-complete Pearson correlation of 0/1 rows. Returns (corr, n_shared).
+
+    With column ``weights`` the moments are weighted and n_shared is the summed weight of the
+    shared columns; ``min_shared`` still counts shared columns, unweighted.
+    """
     present = (~np.isnan(x)).astype(float)
     filled = np.nan_to_num(x)
-    n = present @ present.T
-    sx = filled @ present.T
-    sxy = filled @ filled.T
+    if weights is None:
+        n = present @ present.T
+        sx = filled @ present.T
+        sxy = filled @ filled.T
+        shared = n
+    else:
+        n = (present * weights) @ present.T
+        sx = (filled * weights) @ present.T
+        sxy = (filled * weights) @ filled.T
+        shared = present @ present.T
     with np.errstate(invalid="ignore", divide="ignore"):
         mi = sx / n
         mj = sx.T / n
@@ -315,7 +353,7 @@ def pairwise_pearson(x: FloatArr, min_shared: int = MIN_SHARED) -> tuple[FloatAr
         var_i = mi * (1 - mi)
         var_j = mj * (1 - mj)
         corr = cov / np.sqrt(var_i * var_j)
-    enough = n >= min_shared
+    enough = shared >= min_shared
     defined = enough & (var_i > 0) & (var_j > 0)
     corr = np.where(defined, np.clip(np.nan_to_num(corr), -1, 1), np.where(enough, 0.0, np.nan))
     return corr, n
@@ -375,6 +413,7 @@ class BodyFit:
     n_contested: int
     loadings: FloatArr
     has_history: npt.NDArray[np.bool_]
+    weights: FloatArr | None = None  # per contested roll call; None = all 1
 
 
 def fit_body(
@@ -386,21 +425,33 @@ def fit_body(
     min_shared: int = MIN_SHARED,
     caster: npt.NDArray[np.int64] | None = None,
     member_caucus: dict[str, str] | None = None,
+    weights: FloatArr | None = None,
 ) -> BodyFit:
+    """Fit one chamber. ``weights`` (one per roll call, column of ``votes``) are recency weights."""
     mc = member_caucus or {}
     blocs = [member_bloc(m, caucus, mc) for m in members]
     cells = cell_blocs(members, caster, caucus, mc) if caster is not None else None
     mask = contested_mask(votes, blocs, cells=cells)
     br = unsigned_breaks(votes[:, mask], blocs, cells[:, mask] if cells is not None else None)
+    w = weights[mask] if weights is not None else None
     has = (~np.isnan(br)).sum(axis=1) > 0
     load = np.zeros((len(members), k))
     hist = np.flatnonzero(has)
     if hist.size:
         hb = [blocs[i] for i in hist]
-        corr, n = pairwise_pearson(br[hist], min_shared)
+        corr, n = pairwise_pearson(br[hist], min_shared, w)
         c = nearest_correlation(shrink(corr, n, hb, kappa))
         load[hist] = factor(c, min(k, hist.size))
-    return BodyFit(members, blocs, br, int(mask.sum()), load, has)
+    return BodyFit(members, blocs, br, int(mask.sum()), load, has, w)
+
+
+def _weighted_counts(x: FloatArr, w: FloatArr | None) -> tuple[float, float]:
+    """(breaks, votes) over the non-NaN cells of ``x``, each column counted with its weight."""
+    cast = ~np.isnan(x)
+    if w is None:
+        return float(np.nansum(x)), float(cast.sum())
+    wb = np.broadcast_to(w, x.shape)
+    return float((np.nan_to_num(x) * wb).sum()), float((cast * wb).sum())
 
 
 def to_alignment_body(
@@ -413,13 +464,12 @@ def to_alignment_body(
         h = r[fit.has_history[r]]
         mean = fit.loadings[h].mean(axis=0) if h.size else np.zeros(k)
         means[b] = [float(v) for v in cap_norm(mean[None, :])[0]]
-        x = fit.breaks[r]
-        cast = float((~np.isnan(x)).sum())
-        rates[b] = float(np.nansum(x) / cast) if cast else 0.0
+        brk, cast = _weighted_counts(fit.breaks[r], fit.weights)
+        rates[b] = brk / cast if cast else 0.0
     out: list[AlignedMember] = []
     for i, m in enumerate(fit.members):
-        x = fit.breaks[i]
-        nv = int((~np.isnan(x)).sum())
+        brk, cast = _weighted_counts(fit.breaks[i], fit.weights)
+        nv = round(cast)
         hist = bool(fit.has_history[i])
         out.append(
             AlignedMember(
@@ -428,7 +478,7 @@ def to_alignment_body(
                 party=m.party,
                 bloc=fit.blocs[i],
                 n_votes=nv,
-                breaks=int(np.nansum(x)) if hist else None,
+                breaks=round(brk) if hist else None,
                 loadings=[float(v) for v in fit.loadings[i]] if hist else means[fit.blocs[i]],
                 n_missed=missed[i][0] if missed is not None else None,
                 n_possible=missed[i][1] if missed is not None else None,
@@ -452,32 +502,54 @@ def build_alignment(
     min_shared: int = MIN_SHARED,
     member_caucus: dict[str, str] | None = None,
     accessed: dt.date | None = None,
+    half_life: float | None = None,
 ) -> Alignment:
+    """Fit every chamber in the vote files, pooling all the congresses they cover.
+
+    ``half_life`` (in congresses) down-weights older congresses; None weights them equally.
+    """
     members = read_members(member_paths)
     rolls = read_votes(vote_paths)
+    congresses = sorted({c for rc in rolls.values() for c, _ in rc})
+    if not congresses:
+        raise ValueError("no House or Senate roll calls in the vote files")
+    weights = congress_weights(congresses, half_life)
     bodies: dict[str, AlignmentBody] = {}
-    congresses: set[int] = set()
     for chamber, rc in sorted(rolls.items()):
         ms = sorted((m for m in members if m.chamber == chamber), key=lambda m: m.id)
         x, keys, caster = vote_matrix(ms, rc)
-        congresses |= {c for c, _ in keys}
         keep = (~np.isnan(x)).any(axis=1)
         ms = [m for m, kk in zip(ms, keep, strict=True) if kk]
-        fit = fit_body(ms, x[keep], caucus, k, kappa, min_shared, caster[keep], member_caucus)
-        bodies[chamber] = to_alignment_body(fit, k, missed_votes(ms, rc))
+        fit = fit_body(
+            ms,
+            x[keep],
+            caucus,
+            k,
+            kappa,
+            min_shared,
+            caster[keep],
+            member_caucus,
+            roll_weights(keys, weights),
+        )
+        missed = missed_votes(ms, rc, weights if half_life is not None else None)
+        bodies[chamber] = to_alignment_body(fit, k, missed)
     return Alignment(
         schema_version=1,
         encoding="unsigned_breaks",
         source=voteview_source([*vote_paths, *member_paths], accessed or dt.date.today()),
-        congresses=sorted(congresses),
+        congresses=congresses,
         kappa=kappa,
         min_shared=min_shared,
         bodies=bodies,
+        half_life=half_life,
     )
 
 
 def write_alignment(a: Alignment, out: Path) -> None:
-    out.write_text(json.dumps(a.model_dump(mode="json"), indent=1) + "\n", encoding="utf-8")
+    data = a.model_dump(mode="json")
+    if data.get("half_life") is None:
+        data.pop("half_life", None)  # equal weighting: keep the original file layout
+    out.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -497,6 +569,14 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="date the Voteview files were downloaded (for the citation; default today)",
     )
+    ap.add_argument(
+        "--half-life",
+        type=float,
+        default=None,
+        metavar="CONGRESSES",
+        help="recency weight when pooling congresses: a roll call's weight halves every this many "
+        "congresses before the latest (default: equal weight)",
+    )
     ap.add_argument("--k", type=int, default=K)
     ap.add_argument("--kappa", type=float, default=KAPPA)
     ap.add_argument("--min-shared", type=int, default=MIN_SHARED)
@@ -513,11 +593,14 @@ def main(argv: list[str] | None = None) -> int:
             a.min_shared,
             mc,
             a.accessed,
+            a.half_life,
         )
     except (OSError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
     write_alignment(al, a.out)
+    weighting = "equal weight" if al.half_life is None else f"half-life {al.half_life:g}"
+    print(f"congresses {', '.join(map(str, al.congresses))} ({weighting})")
     for name, b in al.bodies.items():
         print(
             f"{name}: {len(b.members)} members, {b.n_contested} contested roll calls, "

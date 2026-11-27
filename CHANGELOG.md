@@ -18,6 +18,9 @@ All notable changes are listed here. The format follows
   supplied probabilities), in its text and JSON output and on the `portfolio --html` page.
 - `impsolver validate --portfolio FILE` checks a portfolio and every scenario it references, and
   `impsolver init scenario|portfolio|composition` writes commented templates that validate (#4).
+- `impsolver align` pools several congresses, optionally with a recency weight (`--half-life`, in
+  congresses; recorded as `half_life`), and `alignment/us-116-118.json` pools the 116th to 118th
+  Congresses (Voteview checksums added); `us-116.json`, `us-119.json` and default results are unchanged.
 
 ### Changed
 - `backtest` scores completion per case (a conviction on any article completes it) instead of per

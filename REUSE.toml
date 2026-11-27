@@ -13,6 +13,7 @@ path = [
   "compositions/us-119.yaml",
   "alignment/us-116.json",
   "alignment/us-119.json",
+  "alignment/us-116-118.json",
   "data/voteview.sha256",
 ]
 precedence = "override"
