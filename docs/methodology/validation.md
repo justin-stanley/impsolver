@@ -44,6 +44,10 @@ Each alignment file is one κ; to sweep κ, refit with `impsolver align --kappa 
 file with `--alignment`. With more than one crossover fixture, each event is held out in turn:
 the best settings on the others are scored on it, next to the defaults' score.
 
+The "smallest effective draws" line is the minimum over the whole grid. Below, it comes from
+corner settings (β ≥ 2, ρ = 0.9, weight 1); the best and default settings have about 1,000 or
+more of the 4,000 draws.
+
 --8<-- "examples/generated/score.md"
 
 Refitting the 116th Congress alignment at κ = 10 and κ = 200 (same Voteview files as
