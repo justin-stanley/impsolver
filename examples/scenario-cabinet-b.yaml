@@ -1,0 +1,12 @@
+# Hypothetical case with weaker cross-party support. Probabilities are placeholders.
+schema_version: 1
+target: {name: Official B, office: cabinet_secretary}
+articles: [I]
+rules: ../rules/us-federal.yaml
+composition: ../compositions/shorthand-119.yaml
+party_priors:
+  D: {"*": 0.96}
+  I: {"*": 0.9}
+  R: {"*": 0.22, H1: 0.30, S1: 0.35}
+rho: 0.6
+seed: 22

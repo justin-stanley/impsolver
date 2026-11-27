@@ -1,0 +1,12 @@
+# Hypothetical cabinet-level case on the party-shorthand chamber. Probabilities are placeholders.
+schema_version: 1
+target: {name: Official A, office: cabinet_secretary}
+articles: [I]
+rules: ../rules/us-federal.yaml
+composition: ../compositions/shorthand-119.yaml
+party_priors:
+  D: {"*": 0.97}
+  I: {"*": 0.95}
+  R: {"*": 0.30, H1: 0.40, S1: 0.45}
+rho: 0.6
+seed: 21

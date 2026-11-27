@@ -8,7 +8,7 @@ candidates; the tool never nominates targets. See `docs/functional-spec.md` and
 uv venv -p python3.12 .venv && uv pip install -p .venv/bin/python -e '.[dev]'
 .venv/bin/impsolver backtest
 .venv/bin/impsolver evaluate examples/scenario-us119.yaml
-.venv/bin/impsolver portfolio examples/portfolio-example.yaml
+.venv/bin/impsolver portfolio examples/portfolio-example.yaml --html examples/portfolio-example.html
 ```
 
 Regenerate the data-derived files (after downloading the Voteview CSVs into `data/voteview/`):

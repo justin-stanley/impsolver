@@ -25,7 +25,8 @@ from .members import logit, sigmoid
 from .model import ChamberCalendar, Portfolio, PortfolioCandidate
 from .paths import path_for
 from .prepare import Prepared, prepare
-from .simulate import p_complete, run_raw
+from .results import SimArticle
+from .simulate import p_complete, run_raw, simulate_article
 
 FAR = dt.date(9999, 12, 31)
 MAX_BRANCH_TRIGGERS = 3
@@ -506,6 +507,19 @@ def best_with_succession(
 # ------------------------------------------------------------------------ result
 
 
+REASON_TEXT = {
+    "LOW_P": "Chance of removal is below p_floor.",
+    "NO_FIT": "Cannot finish by its deadline.",
+    "EXCLUDED": "Cannot run alongside a case in the plan.",
+    "DEPENDENCY_DROPPED": "Depends on a case that is not in the plan.",
+    "NOT_SELECTED": "Left out to maximize expected removals.",
+}
+
+
+def excluded_reason_text(reason: str) -> str:
+    return REASON_TEXT.get(reason, "")
+
+
 class Dropped(BaseModel):
     id: str
     reason: str
@@ -548,6 +562,8 @@ class PortfolioResult(BaseModel):
     removals_dist: RemovalsDist | None = None
     exhaustive: bool
     p0: dict[str, float]
+    gate_paths: dict[str, SimArticle] = {}
+    labels: dict[str, str] = {}
 
 
 # ------------------------------------------------------------------- top level
@@ -558,21 +574,29 @@ class Loaded:
     pf: Portfolio
     preps: dict[str, Prepared]
     p0: dict[str, float]
+    gates: dict[str, SimArticle] = field(default_factory=dict)
 
 
 def load(path: str | Path) -> Loaded:
     pf = load_portfolio(path)
     preps: dict[str, Prepared] = {}
     p0: dict[str, float] = {}
+    gates: dict[str, SimArticle] = {}
     for c in pf.candidates:
         if c.scenario is not None:
             prep = prepare(resolve(c.scenario, path))
             preps[c.id] = prep
-            p0[c.id] = p_complete(prep, c.article, draws=pf.draws, seed=prep.scenario.seed)
+            art = c.article or prep.scenario.articles[0]
+            path_ = path_for(prep.rules, prep.scenario, default_path(prep))
+            sim = simulate_article(
+                prep, art, path_, pf.draws, prep.scenario.seed, prep.scenario.rho
+            )
+            gates[c.id] = sim
+            p0[c.id] = sim.p_complete
         else:
             assert c.p is not None
             p0[c.id] = c.p
-    return Loaded(pf, preps, p0)
+    return Loaded(pf, preps, p0, gates)
 
 
 def make_ctx(
@@ -676,6 +700,8 @@ def solve(loaded: Loaded, exhaustive: bool = False, joint: bool = True) -> Portf
         fragile=any(r.fragile for r in sens),
         exhaustive=exhaustive,
         p0=p0,
+        gate_paths=loaded.gates,
+        labels={cid: prep.scenario.target.name for cid, prep in loaded.preps.items()},
     )
     if has_succession(ctx):
         v, tree = evaluate_branching(ctx, order)

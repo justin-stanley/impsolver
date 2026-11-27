@@ -18,7 +18,9 @@ targets.
   uniform support gap.
 - **portfolio**: orders and schedules a user-supplied set of candidates under House concurrency,
   one Senate trial at a time, calendars, deadlines, fatigue and succession effects. Includes
-  sensitivity analysis and the joint distribution of removals.
+  sensitivity analysis and the joint distribution of removals. `--html OUT` writes a self-contained
+  planning page: a timeline of House and Senate work for the top plans, each case's gate-by-gate
+  odds, succession branches, the removals distribution, left-out candidates and sensitivity.
 - **backtest**: replays the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas roll calls.
 - **calibrate**: checks the learned alignment against the 2021 Republican crossover votes.
 - **roster** and **align**: build the composition and the alignment files from Voteview CSVs.

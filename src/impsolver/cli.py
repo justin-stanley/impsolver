@@ -42,6 +42,7 @@ from .portfolio import solve as solve_portfolio
 from .prepare import Prepared
 from .prepare import prepare as _prepare_raw
 from .priors import PriorError
+from .report import render as render_report
 from .results import Evaluation, FlipResult, Simulation
 from .simulate import simulate
 from .viability import Case, assess
@@ -253,6 +254,9 @@ def cmd_portfolio(a: argparse.Namespace) -> int:
         for w in prep.warnings:
             print(f"warning: candidate {cid}: {w}", file=sys.stderr)
     r = solve_portfolio(loaded, exhaustive=a.exhaustive)
+    if a.html:
+        Path(a.html).write_text(render_report(r, loaded.pf), encoding="utf-8")
+        print(f"wrote {a.html}", file=sys.stderr)
 
     def text() -> str:
         out = [NEUTRALITY]
@@ -401,6 +405,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("portfolio", cmd_portfolio, help="schedule a portfolio of candidates")
     p.add_argument("file")
     p.add_argument("--exhaustive", action="store_true")
+    p.add_argument("--html", metavar="OUT", help="also write a self-contained HTML planning page")
 
     p = add("calibrate", cmd_calibrate, help="check alignment against known crossovers")
     p.add_argument("fixture")

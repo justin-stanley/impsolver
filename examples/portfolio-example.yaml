@@ -1,5 +1,5 @@
-# Hypothetical portfolio. Candidates and probabilities are supplied by the user;
-# the solver only orders and schedules them.
+# Hypothetical portfolio. Candidates, probabilities and durations are placeholders supplied by
+# the user; the solver only orders and schedules them. It never adds candidates.
 schema_version: 1
 start: 2027-01-04
 deadline: 2028-12-15
@@ -17,9 +17,13 @@ calendar:
     recess: [[2027-08-02, 2027-09-06], [2028-08-01, 2028-09-05]]
   trial_saturdays: true
 candidates:
-  - {id: official-a, scenario: scenario-example.yaml, house_days: 40, senate_days: 25}
-  - {id: official-b, p: 0.35, house_days: 30, senate_days: 15, weight: 1.0}
+  - {id: official-a, scenario: scenario-cabinet-a.yaml, house_days: 40, senate_days: 25}
+  - {id: official-b, scenario: scenario-cabinet-b.yaml, house_days: 30, senate_days: 15}
   - {id: official-c, p: 0.6, house_days: 20, senate_days: 10, senate_committee: true,
      committee_floor_days: 2, excludes: [official-d]}
   - {id: official-d, p: 0.5, house_days: 20, senate_days: 10}
   - {id: official-e, p: 0.02, house_days: 10, senate_days: 5}
+  # If official-a is removed, official-f (a deputy) becomes acting head: a different case.
+  - {id: official-f, p: 0.45, house_days: 25, senate_days: 12,
+     succession: [{on_removal_of: official-a, becomes: official-f-acting}]}
+  - {id: official-f-acting, p: 0.3, house_days: 25, senate_days: 12, variant_of: official-f}
