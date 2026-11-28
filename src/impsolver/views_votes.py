@@ -19,6 +19,7 @@ from .model import ThresholdRule
 from .portfolio import PortfolioResult
 from .results import SimGate
 from .thresholds import required_pro
+from .views_whatif import WHATIF_BAR, gate_whatif
 
 MEMBER_HEADING = "Members nearest the threshold (by the supplied probabilities)"
 MEMBER_NOTE = (
@@ -563,6 +564,8 @@ def gate_panel(
     sim: SimGate | None,
     cutoffs: tuple[float, float],
     on: bool,
+    cid: str = "",
+    uncertain: bool = False,
 ) -> str:
     facts = f"<p class=facts>{tag('counted')} {e(tally_summary(g))}"
     if sim is not None:
@@ -593,6 +596,7 @@ def gate_panel(
         f"<p class=rule>{e(g.rule.sentence)}</p>{tally_svg(g, sim)}{KEY}{facts}"
         f"{count_curve(g, sim)}"
         f'<div class="vgrid"><div>{bloc_table(g)}</div><div>{threshold_steps(g)}</div></div>'
+        f"{gate_whatif(cid, g, case, cutoffs, uncertain) if cid else ''}"
         f"<h4>{e(MEMBER_HEADING)}</h4><p class=note>{tag('supplied')} {e(MEMBER_NOTE)}"
         f"{DECISIVE_NOTE if sim is not None and sim.decisive_share else ''}</p>"
         f"{member_svg(g, case, cutoffs)}{member_list(g, case, sim)}</div>"
@@ -656,13 +660,11 @@ def votes_tab(res: PortfolioResult) -> str:
             )
         else:
             inputs = "Inputs are taken as exact: no range is drawn over the supplied priors."
-        cutoffs = (
-            res.meta.scenarios[cid].cutoffs
-            if res.meta and cid in res.meta.scenarios
-            else (0.1, 0.9)
-        )
+        sm = res.meta.scenarios.get(cid) if res.meta else None
+        cutoffs = sm.cutoffs if sm else (0.1, 0.9)
+        unc = sm.uncertain_priors if sm else True
         panels = "".join(
-            gate_panel(key, g, case, sims.get(g.stage), cutoffs, g.stage == binding)
+            gate_panel(key, g, case, sims.get(g.stage), cutoffs, g.stage == binding, cid, unc)
             for g in case.gates
         )
         sections.append(
@@ -670,4 +672,7 @@ def votes_tab(res: PortfolioResult) -> str:
             f"{pct(p_rm, mc)} ({in_100(p_rm)}{se}). {inputs} Pick a gate to see its count.</p>"
             f"{ladder(key, case, sims, binding)}{panels}</section>"
         )
-    return f'<div class="caserail" role="group" aria-label="Cases">{rail}</div>{"".join(sections)}'
+    return (
+        f'{WHATIF_BAR}<div class="caserail" role="group" aria-label="Cases">{rail}</div>'
+        f"{''.join(sections)}"
+    )

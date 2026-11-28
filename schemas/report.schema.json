@@ -1284,6 +1284,11 @@
         "uncertainty_draws": {
           "title": "Uncertainty Draws",
           "type": "integer"
+        },
+        "uncertain_priors": {
+          "default": false,
+          "title": "Uncertain Priors",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1326,6 +1331,31 @@
             "$ref": "#/$defs/Slot"
           },
           "title": "Slots",
+          "type": "array"
+        },
+        "kind": {
+          "default": "sensitivity",
+          "title": "Kind",
+          "type": "string"
+        },
+        "house_lanes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "House Lanes"
+        },
+        "order": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Order",
           "type": "array"
         }
       },
@@ -2099,6 +2129,14 @@
       "default": 1,
       "title": "Schema Version",
       "type": "integer"
+    },
+    "what_if": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SensRow"
+      },
+      "title": "What If",
+      "type": "array"
     },
     "meta": {
       "anyOf": [

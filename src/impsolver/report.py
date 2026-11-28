@@ -20,6 +20,7 @@ from .portfolio import PlanOut, PortfolioResult, Slot, TreeNode, excluded_reason
 from .tornado import TORNADO_NOTE, Tornado, tornado_note
 from .views_floor import FLOOR_CSS, left_out_table, plan_views, why_dates
 from .views_votes import VOTES_CSS, votes_tab
+from .views_whatif import WHATIF_CSS, WHATIF_JS, other_settings
 
 OPTIONAL_GATES = {"S3"}
 GATE_LABELS = {
@@ -522,7 +523,9 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(title)}</title><style>{CSS}{SHELL_CSS}{VOTES_CSS}{FLOOR_CSS}</style></head><body><main>
+<title>{e(title)}</title><style>{CSS}{SHELL_CSS}{VOTES_CSS}{FLOOR_CSS}{
+        WHATIF_CSS
+    }</style></head><body><main>
 <h1>{e(title)}</h1>
 <p class="sub">Window {pf.start} to {pf.deadline}; {pf.house_concurrency} House
 lane(s), one Senate trial at a time.</p>
@@ -540,6 +543,7 @@ lane(s), one Senate trial at a time.</p>
 <h2>Votes</h2><div class="panel">{votes_tab(res)}</div></section>
 <section class="tabpanel{on("floor")}" id="panel-floor" role="tabpanel" aria-labelledby="tab-floor">
 <h2>Plans and timeline</h2><div class="panel"><div class="tabs">{tabs}</div>{sections}</div>
+{other_settings(pf, res)}
 <h2>Left out</h2><div class="panel">{left_out_table(res)}</div></section>
 <section class="tabpanel{on("outcomes")}" id="panel-outcomes" role="tabpanel"
 aria-labelledby="tab-outcomes">
@@ -553,7 +557,7 @@ best).</p><table><tr><th>Change</th><th class=num>Best</th><th class=num>Recomme
 </th><th class=num>Regret</th><th></th></tr>{sens}</table></div></section>
 {footer(res)}
 <script type="application/json" id="impsolver-data">{data}</script>
-<script>{JS}</script></main></body></html>
+<script>{JS}{WHATIF_JS}</script></main></body></html>
 """
 
 
