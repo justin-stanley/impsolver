@@ -102,3 +102,13 @@ def test_user_text_in_the_votes_tab_is_escaped() -> None:
     r = solve(Loaded(p, {}, {x.id: x.p or 0 for x in p.candidates}), joint=False)
     tab = votes_tab(r)
     assert "<i>x</i>" not in tab and "&lt;i&gt;x&lt;/i&gt;" in tab
+
+
+def test_plan_buttons_and_scroll_regions_are_reachable(res: PortfolioResult) -> None:
+    html = render(res, load(REPO / "examples" / "portfolio-example.yaml").pf)
+    # The plan picker is a group of toggle buttons, not tabs without a tablist.
+    assert '<div class="tabs" role="group" aria-label="Plans">' in html
+    assert 'data-plan="plan1" aria-controls="plan1" aria-pressed="true"' in html
+    # Regions that can scroll sideways take keyboard focus.
+    assert '<div class="scrollx">' not in html and '<div class="scrollx" tabindex="0">' in html
+    assert "<th></th>" not in html

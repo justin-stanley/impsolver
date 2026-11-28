@@ -82,6 +82,11 @@ def test_scenarios_side_by_side(tmp_path: Path) -> None:
     html = render_comparison(c)
     assert "Official A" in html and "Official B" in html
     assert html.count('class="tornado"') == 2
+    # Each side shows the counted tally of every gate against its threshold.
+    gates = c.a.gates["I"].gates
+    assert [g.stage for g in gates] == [g.stage for g in c.a.simulation.articles[0].gates]
+    assert html.count("<p class=facts>") == 2 * len(gates)
+    assert f"{gates[0].required} needed" in html
     assert not re.search(r"""(src|href)=["']?https?://""", html)
 
 
@@ -100,6 +105,9 @@ def test_portfolios_side_by_side(tmp_path: Path) -> None:
     html = render_comparison(c)
     assert "Expected removals, recommended plan" in html and "B − A" in html
     assert html.count('class="tornado"') == 2  # one scenario candidate per side
+    # Each side draws its recommended order on the lane calendar.
+    assert html.count("<h3>Floor time</h3>") == 2 and html.count('class="lanes"') == 2
+    assert all(s.house_lane is not None for s in c.a.slots)
 
 
 def test_portfolio_side_with_succession_and_left_out() -> None:

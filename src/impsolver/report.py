@@ -18,8 +18,17 @@ from .compare import Comparison, PortfolioSide, ScenarioSide
 from .model import Portfolio
 from .portfolio import PlanOut, PortfolioResult, Slot, TreeNode, excluded_reason_text
 from .tornado import TORNADO_NOTE, Tornado, tornado_note
-from .views_floor import FLOOR_CSS, left_out_table, plan_views, why_dates
-from .views_votes import VOTES_CSS, votes_tab
+from .views_floor import (
+    CALENDAR_KEY,
+    FLOOR_CSS,
+    calendar_summary,
+    lane_calendar,
+    left_out_table,
+    plan_views,
+    why_dates,
+)
+from .views_votes import KEY, VOTES_CSS, gate_name, tally_summary, tally_svg, votes_tab
+from .views_votes import tag as tag_chip
 from .views_whatif import WHATIF_CSS, WHATIF_JS, other_settings
 
 OPTIONAL_GATES = {"S3"}
@@ -49,7 +58,7 @@ border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:150p
 .kpi b{display:block;font-size:22px}.kpi span{color:var(--muted);font-size:13px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.tabs button{font:inherit;
 border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;
-padding:5px 12px;cursor:pointer}.tabs button[aria-selected=true]{background:var(--ink);
+padding:5px 12px;cursor:pointer}.tabs button[aria-pressed=true]{background:var(--ink);
 color:var(--bg);border-color:var(--ink)}.plan{display:none}.plan.on{display:block}
 table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:6px 8px;
 border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
@@ -92,9 +101,9 @@ JS = """
 (function(){var d=document;d.documentElement.classList.add('js');
 function all(s,r){return Array.prototype.slice.call((r||d).querySelectorAll(s));}
 all('.tabs button').forEach(function(b){b.addEventListener('click',function(){
-all('.tabs button').forEach(function(x){x.setAttribute('aria-selected','false');});
+all('.tabs button').forEach(function(x){x.setAttribute('aria-pressed','false');});
 all('.plan').forEach(function(x){x.classList.remove('on');});
-b.setAttribute('aria-selected','true');d.getElementById(b.dataset.plan).classList.add('on');});});
+b.setAttribute('aria-pressed','true');d.getElementById(b.dataset.plan).classList.add('on');});});
 var tabs=all('.maintabs [role=tab]'),state={tab:null,cid:null,gate:null};
 function showTab(id,focus){var hit=false;tabs.forEach(function(t){var on=t.dataset.tab===id;
 hit=hit||on;});if(!hit)return false;tabs.forEach(function(t){var on=t.dataset.tab===id;
@@ -168,98 +177,6 @@ def slot_table(slots: Iterable[Slot], res: PortfolioResult) -> str:
 
 # --------------------------------------------------------------------- gate paths
 
-
-def gate_paths(res: PortfolioResult, pf: Portfolio) -> str:
-    out: list[str] = []
-    for c in pf.candidates:
-        sim = res.gate_paths.get(c.id)
-        if sim is None:
-            p = res.p0.get(c.id)
-            if p is not None:
-                out.append(
-                    f"<tr><td>{e(_label(res, c.id))}</td><td><span class=note>P "
-                    f"{_pct(p)} supplied directly; no gate breakdown</span></td></tr>"
-                )
-            continue
-        chips: list[str] = []
-        optional: list[str] = []
-        for g in sim.gates:
-            weak = " weak" if g.p_pass_given_reached < 0.5 else ""
-            chip = (
-                f'<span class="gate{weak}" title="{e(GATE_LABELS.get(g.stage, g.stage))}">'
-                f"<b>{e(g.stage)} {_pct(g.p_pass_given_reached)}</b>"
-                f"<small>{e(GATE_LABELS.get(g.stage, ''))}<br>reached {_pct(g.p_reached)} · "
-                f"median PRO {g.pro_count.p50:.0f}</small></span>"
-            )
-            (optional if g.stage in OPTIONAL_GATES else chips).append(chip)
-        extra = (
-            f'<div class="path"><span class=note>Optional, after conviction:</span>'
-            f"{''.join(optional)}</div>"
-            if optional
-            else ""
-        )
-        p_rm = res.p0.get(c.id, sim.p_complete)
-        art_note = (
-            f"article {e(sim.article)}"
-            if abs(p_rm - sim.p_complete) < 1e-12
-            else f"gates for article {e(sim.article)} ({_pct(sim.p_complete)} alone), "
-            "the likeliest; removal on any article"
-        )
-        out.append(
-            f"<tr><td>{e(_label(res, c.id))}<br><span class=note>path {e(sim.path)}, "
-            f"{art_note}<br>P(removal) {_pct(p_rm)}</span></td><td>"
-            f'<div class="path">{"<span class=arrow>→</span>".join(chips)}</div>{extra}</td></tr>'
-        )
-    if not out:
-        return "<p class=note>No candidates.</p>"
-    return (
-        "<table><tr><th>Candidate</th><th>Gates in order: chance of passing once reached "
-        "(red border: under 50%)</th></tr>" + "".join(out) + "</table>"
-    )
-
-
-# ----------------------------------------------------------------------- pivots
-
-PIVOT_HEADING = "Members nearest the threshold (by the supplied probabilities)"
-PIVOT_NOTE = (
-    "For each case built from a scenario: the members at its binding gate who are not counted PRO "
-    "at the scenario cutoffs, highest supplied probability first (ties by id). The list covers the "
-    "shortfall at the minimum plus five, up to 25. It restates the inputs; it is not a forecast."
-)
-
-
-def pivots_html(res: PortfolioResult, pf: Portfolio) -> str:
-    blocks: list[str] = []
-    for c in pf.candidates:
-        art = res.pivots.get(c.id)
-        if art is None:
-            continue
-        gate = next(g for g in art.gates if g.stage == art.binding_gate)
-        rows = (
-            "".join(
-                f"<tr><td>{e(m.id)}</td><td>{e(m.name)}</td><td>{e(m.bloc)}</td>"
-                f"<td class=num>{m.p:.3f}</td><td>{e(m.source)}</td></tr>"
-                for m in art.pivots
-            )
-            or "<tr><td colspan=5 class=note>No non-PRO members at this gate.</td></tr>"
-        )
-        blocks.append(
-            f"<h3>{e(_label(res, c.id))}</h3><p class=note>Article {e(art.article)}, path "
-            f"{e(art.path)}: binding gate {e(art.binding_gate)} "
-            f"({e(GATE_LABELS.get(art.binding_gate, gate.label))}); {gate.pro_min} counted PRO "
-            f"of {gate.required} needed, short {gate.short_at_min} at the minimum.</p>"
-            "<table><tr><th>Id</th><th>Name</th><th>Bloc</th><th class=num>p</th>"
-            f"<th>Source</th></tr>{rows}</table>"
-        )
-    if not blocks:
-        return ""
-    return (
-        f'<section id="pivots"><h2>{e(PIVOT_HEADING)}</h2><div class="panel">'
-        f"<p class=note>{e(PIVOT_NOTE)}</p>{''.join(blocks)}</div></section>"
-    )
-
-
-# ----------------------------------------------------------------------- tornado
 
 TORNADO_HEADING = "What moves each case (one notch per input)"
 
@@ -467,7 +384,8 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
     )
     rec_order = res.succession_order or (res.plans[0].order if res.plans else [])
     tabs = "".join(
-        f'<button data-plan="{pid}" aria-selected="{"true" if k == 0 else "false"}">'
+        f'<button type="button" data-plan="{pid}" aria-controls="{pid}" '
+        f'aria-pressed="{"true" if k == 0 else "false"}">'
         f"{e(name)} · {p.expected_removals:.2f}</button>"
         for k, (pid, name, p) in enumerate(plans)
     )
@@ -542,7 +460,8 @@ lane(s), one Senate trial at a time.</p>
 <section class="tabpanel{on("votes")}" id="panel-votes" role="tabpanel" aria-labelledby="tab-votes">
 <h2>Votes</h2><div class="panel">{votes_tab(res)}</div></section>
 <section class="tabpanel{on("floor")}" id="panel-floor" role="tabpanel" aria-labelledby="tab-floor">
-<h2>Plans and timeline</h2><div class="panel"><div class="tabs">{tabs}</div>{sections}</div>
+<h2>Plans and timeline</h2><div class="panel"><div class="tabs" role="group" aria-label="Plans">
+{tabs}</div>{sections}</div>
 {other_settings(pf, res)}
 <h2>Left out</h2><div class="panel">{left_out_table(res)}</div></section>
 <section class="tabpanel{on("outcomes")}" id="panel-outcomes" role="tabpanel"
@@ -554,7 +473,7 @@ aria-labelledby="tab-outcomes">
 <h2>Sensitivity</h2><div class="panel"><p class=note>Regret is the expected removals lost by keeping
 the recommended order when an input changes. It is flagged fragile above max(0.01, 5% of the
 best).</p><table><tr><th>Change</th><th class=num>Best</th><th class=num>Recommended order
-</th><th class=num>Regret</th><th></th></tr>{sens}</table></div></section>
+</th><th class=num>Regret</th><th>Verdict</th></tr>{sens}</table></div></section>
 {footer(res)}
 <script type="application/json" id="impsolver-data">{data}</script>
 <script>{JS}{WHATIF_JS}</script></main></body></html>
@@ -619,6 +538,17 @@ def _portfolio_column(tag: str, side: PortfolioSide) -> str:
         if rd is not None
         else ""
     )
+    calendar = ""
+    if res.inputs is not None and side.slots:
+        plan = PlanOut(
+            order=side.recommended_order,
+            expected_removals=side.expected_removals,
+            slots=side.slots,
+        )
+        calendar = (
+            f"<h3>Floor time</h3><p class=note>{e(calendar_summary(plan))}</p>"
+            f"{lane_calendar(res.inputs, plan, res)}{CALENDAR_KEY}"
+        )
     return (
         f'<div class="panel"><h2>{e(tag)}</h2><p class="file">{e(side.file)}</p>'
         f'<div class="kpis"><div class="kpi"><b>{side.expected_removals:.2f}</b><span>expected '
@@ -628,6 +558,7 @@ def _portfolio_column(tag: str, side: PortfolioSide) -> str:
         f"</div><p>Order: {e(' → '.join(side.recommended_order) or 'none')}</p>{dist}"
         "<table><tr><th>Candidate</th><th class=num>P alone</th><th>In the plan</th></tr>"
         f"{''.join(rows)}</table>"
+        + calendar
         + "".join(tornado_svg(t) for t in res.tornado.values())
         + "</div>"
     )
@@ -661,6 +592,16 @@ def _scenario_column(tag: str, side: ScenarioSide) -> str:
             "<th class=num>Reached</th><th class=num>Pass if reached</th><th class=num>Median "
             f"PRO</th></tr>{gates}</table>"
         )
+        sims = {g.stage: g for g in art.gates}
+        case = side.gates.get(art.article)
+        for g in case.gates if case else []:
+            parts.append(
+                f"<h4>{e(g.stage)} · {e(gate_name(g.stage, g.label))}</h4>"
+                f"<p class=rule>{e(g.rule.sentence)}</p>{tally_svg(g, sims.get(g.stage))}"
+                f"<p class=facts>{tag_chip('counted')} {e(tally_summary(g))}</p>"
+            )
+        if case:
+            parts.append(KEY)
     parts.append(tornado_svg(side.tornado) + "</div>")
     return "".join(parts)
 
@@ -705,7 +646,8 @@ def render_comparison(cmp: Comparison, title: str = "Plan comparison") -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(title)}</title><style>{CSS}</style></head><body><main>
+<title>{e(title)}</title><style>{CSS}{SHELL_CSS}{VOTES_CSS}{FLOOR_CSS}</style>
+</head><body><main>
 <h1>{e(title)}</h1>
 <p class="sub">{e(COMPARE_NOTE)}</p>
 <p class="file">A: {e(cmp.a.file)}<br>B: {e(cmp.b.file)}</p>

@@ -7,6 +7,10 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- The `compare-plans --html` page reuses the planning page's drawings: each portfolio side shows
+  its recommended order on the lane calendar, and each scenario side shows every gate's counted
+  tally against its threshold with the rule in words. Scenario sides carry the gate detail as
+  `gates`, and portfolio sides carry annotated slots. No result changes.
 - What-if controls on the planning page. Each gate panel in the Votes tab has a form that redoes
   the gate's counted arithmetic in the browser: more members absent from a bloc, uncertain members
   of a bloc counted as PRO, and other cutoffs (locked when a scenario supplies prior ranges). It
@@ -72,6 +76,9 @@ All notable changes are listed here. The format follows
   `impsolver compare-plans A.yaml B.yaml [--html OUT]` shows two portfolios or two scenarios side
   by side; default results do not change.
 
+### Removed
+- `report.gate_paths` and `report.pivots_html`, which the Votes tab replaced.
+
 ### Changed
 - `portfolio` with succession rules: after each trigger's verdict, every branch re-orders the cases
   not yet started (all orders when at most 6 remain); a case already started stays in the plan
@@ -87,6 +94,10 @@ All notable changes are listed here. The format follows
   removals distribution; default numbers change only for scenarios with more than one article.
 
 ### Fixed
+- Accessibility of the HTML pages, checked with axe-core (WCAG 2 A and AA plus best practices) on
+  every tab, in light and dark, and with scripts off: the plan picker is a labelled group of
+  toggle buttons instead of buttons with a tab state and no tab role, regions that scroll
+  sideways take keyboard focus, and the sensitivity table's last column has a heading.
 
 - Review fixes for PR #13: the planning page's pivot list uses the same article as its gate-path
   row; `gate_correlation` keeps the bloc swing fixed across gates so national and portfolio-shared

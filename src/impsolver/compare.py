@@ -13,6 +13,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from .contract import CaseGates, annotate, case_gates
 from .deterministic import evaluate
 from .loader import read_data
 from .portfolio import PortfolioResult, Slot, make_ctx, schedule_order
@@ -48,6 +49,8 @@ class ScenarioSide(BaseModel):
     simulation: Simulation
     evaluation: Evaluation
     tornado: Tornado
+    # The counted tally of every gate, by article (see ``contract.case_gates``).
+    gates: dict[str, CaseGates] = {}
 
 
 class Comparison(BaseModel):
@@ -79,7 +82,8 @@ def portfolio_side(path: str | Path, exhaustive: bool = False) -> tuple[Portfoli
         else (res.plans[0].expected_removals if res.plans else 0.0)
     )
     ctx, _ = make_ctx(loaded.pf, loaded.p0, p0e=loaded.p0_epochs)
-    slots = list(schedule_order(ctx, tuple(order)).slots)
+    slots = [s.model_copy() for s in schedule_order(ctx, tuple(order)).slots]
+    annotate(ctx, slots)
     side = PortfolioSide(
         file=str(path), result=res, recommended_order=order, expected_removals=value, slots=slots
     )
@@ -103,6 +107,7 @@ def scenario_side(prep: Prepared, path: str | Path, draws: int) -> ScenarioSide:
         ),
         evaluation=evaluate(prep),
         tornado=tornado(prep, article, draws, cid="", base=base),
+        gates={a: case_gates(prep, a) for a in scen.articles},
     )
 
 

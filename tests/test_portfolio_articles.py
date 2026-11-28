@@ -11,7 +11,6 @@ from impsolver.deterministic import default_path
 from impsolver.paths import path_for
 from impsolver.portfolio import load, run_portfolio, solve
 from impsolver.prepare import prepare
-from impsolver.report import gate_paths
 from impsolver.simulate import (
     any_complete,
     p_any_complete,
@@ -20,6 +19,7 @@ from impsolver.simulate import (
     run_raw_articles,
     simulate_article,
 )
+from impsolver.views_votes import pct, votes_tab
 
 COMP = """schema_version: 1
 name: t
@@ -151,9 +151,9 @@ def test_report_shows_any_article_probability(tmp_path: Path) -> None:
     _scen(tmp_path, OPPOSING)
     loaded = load(_pf(tmp_path, ONE))
     res = solve(loaded, joint=False)
-    html = gate_paths(res, loaded.pf)
+    html = votes_tab(res)
     assert "removal on any article" in html
-    assert f"P(removal) {100 * loaded.p0['a']:.1f}%" in html
+    assert f"P(removal) {pct(loaded.p0['a'], res.gate_paths['a'].mc_se)}" in html
     assert f"({100 * loaded.gates['a'].p_complete:.1f}% alone)" in html
 
 
