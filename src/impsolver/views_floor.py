@@ -132,21 +132,28 @@ def lane_calendar(pf: Portfolio, plan: PlanOut, res: PortfolioResult, full: bool
                 f'height="{row_h * len(keys) - 2}" fill="var(--recess)"><title>{who} recess '
                 f"{a} to {b}</title></rect>"
             )
-    # Month ticks.
-    d = dt.date(start.year, start.month, 1)
+    weekly = span < 60
+    d = start + (7 - start.weekday()) * ONE if weekly else dt.date(start.year, start.month, 1)
     parts.append(f'<text x="{left}" y="{top - 12}" class="muted">{start:%b} {start.day}</text>')
     while d <= end:
         if d > start:
+            tick = x(d)
             parts.append(
-                f'<line x1="{x(d):.1f}" x2="{x(d):.1f}" y1="{top - 6}" y2="{bottom}" '
+                f'<line x1="{tick:.1f}" x2="{tick:.1f}" y1="{top - 6}" y2="{bottom}" '
                 f'stroke="var(--line)"/>'
             )
-            if (span < 400 or d.month in (1, 4, 7, 10)) and x(d) - left > 46:
-                label = f"{d:%b %Y}" if d.month == 1 or span >= 400 else f"{d:%b}"
+            if (span < 400 or d.month in (1, 4, 7, 10)) and tick - left > 46:
+                if weekly:
+                    label = f"{d:%b} {d.day}"
+                else:
+                    label = f"{d:%b %Y}" if d.month == 1 or span >= 400 else f"{d:%b}"
+                near_end = weekly and left + width - tick < 46
+                label_x = tick - 3 if near_end else tick + 3
+                anchor = ' text-anchor="end"' if near_end else ""
                 parts.append(
-                    f'<text x="{x(d) + 3:.1f}" y="{top - 12}" class="muted">{label}</text>'
+                    f'<text x="{label_x:.1f}" y="{top - 12}" class="muted"{anchor}>{label}</text>'
                 )
-        d = dt.date(d.year + (d.month == 12), d.month % 12 + 1, 1)
+        d = d + 7 * ONE if weekly else dt.date(d.year + (d.month == 12), d.month % 12 + 1, 1)
     for key, name in rows:
         y = row_y[key]
         weight = ' style="font-weight:600"' if key == "floor" else ""

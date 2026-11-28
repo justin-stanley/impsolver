@@ -59,6 +59,25 @@ def test_lane_calendar_has_a_row_per_resource(loaded: Loaded, res: PortfolioResu
     assert full.count("House recess") == 3 and full.count("Senate recess") == 2
 
 
+@pytest.mark.parametrize(("days", "full"), [(26, False), (59, True), (60, True)])
+def test_lane_calendar_labels_weeks_for_short_windows(days: int, full: bool) -> None:
+    start = dt.date(2025, 3, 26)
+    p = pf([c("a", 0.6, h=1, s=1)], start=start, deadline=start + dt.timedelta(days=days))
+    r = solve(Loaded(p, {}, {"a": 0.6}), joint=False, sensitivities=False)
+    svg = lane_calendar(p, r.plans[0], r, full=full)
+
+    assert ">Mar 26</text>" in svg
+    if days < 60:
+        assert ">Mar 31</text>" in svg
+        assert ">Apr 7</text>" in svg
+        assert ">Apr</text>" not in svg
+        if days == 26:
+            assert 'text-anchor="end">Apr 21</text>' in svg
+    else:
+        assert ">Apr</text>" in svg
+        assert ">Apr 7</text>" not in svg
+
+
 def test_no_committee_row_without_committee_cases() -> None:
     p = pf([c("a", 0.6), c("b", 0.4)])
     r = solve(Loaded(p, {}, {x.id: x.p or 0 for x in p.candidates}), joint=False)
