@@ -100,6 +100,30 @@ the 5th/95th percentiles across them and s.e. sqrt(var_t/N + p(1-p)/draws).
 ## Alignment, defection prior, calibration, viability, portfolio
 See `docs/design-reference.md` and the module docstrings in `src/impsolver/`.
 
+## Report contract
+`portfolio --format json` (and the data embedded in `--html`) is a `PortfolioResult`; its schema
+is `schemas/report.schema.json`. Version 2 (`src/impsolver/contract.py`) adds what a page needs to
+draw from the JSON alone, and changes no number:
+- `meta` (version, draws, file names, each scenario's seed, rho and cutoffs) and `inputs` (the
+  portfolio as given).
+- On each slot: `house_lane` (the scheduler always uses the lane that frees first, so replaying
+  that recovers it), `house_start_reason` (`window_start`, `lane_free`, `release`, `after`,
+  `not_before`) and `trial_start_reason` (`ready`, `committee`, `floor_busy`) with the case
+  involved, `ready`, committee dates, and `house_days`, `trial_days`, `wait_trial_days` and
+  `slack_days` in session days.
+- On each plan: `budget`, the session days available and used per resource (House lanes, Senate
+  committee, Senate floor) between the window's start and deadline.
+- On each dropped candidate: `numbers`. LOW_P gives `p` and `p_floor`; NO_FIT gives `deadline`,
+  `earliest_end` (scheduled first, with no deadline) and `days_over`; EXCLUDED gives `by`, `value`
+  and `swap_value` (the best plan without the excluding cases); DEPENDENCY_DROPPED gives
+  `waits_on`; NOT_SELECTED gives `value_without` and `value_with` (the best insertion into the
+  recommended order).
+- On each sensitivity row: `slots`, the recommended order re-scheduled under that setting.
+- `gates[candidate]`: for the article the page shows, each gate's rule (with a sentence), seats,
+  vacancies, members present, votes required, tally by bloc, the rank pivot (the member at position
+  `required` when present members are sorted by supplied probability), and per-member columns
+  (`p`, `source`, `cls`) aligned with the chamber roster.
+
 ## Changes since the original design
 These change behavior relative to the original design.
 - `alignment_chamber_weight` (default `{house: 1, senate: 0}`) multiplies `alignment_weight` for each
