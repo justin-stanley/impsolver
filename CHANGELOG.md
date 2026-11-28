@@ -7,6 +7,13 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- The `portfolio --html` page has four tabs (Votes, Floor time, Outcomes, What moves it) that work
+  with the keyboard, keep the selected tab, case and gate in the URL fragment, and print as
+  stacked sections. The new Votes tab replaces the gate chips and the pivot tables: per case a
+  gate ladder (share of draws that reach each gate, and the pass rate once reached), and per gate
+  a tally strip against the threshold, the rule in words, a table by bloc, every member by
+  supplied probability with the rank pivot, a folded member list, and the votes needed as members
+  go absent. No result changes.
 - The portfolio JSON report is now complete enough to draw the planning page from it alone
   (`schema_version: 2`, schema in `schemas/report.schema.json`). New fields, all additive: `meta`
   and `inputs`; on each slot its House lane, the rule that set each date, committee dates, waiting

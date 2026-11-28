@@ -22,9 +22,11 @@ works out what the rules require and how close each case is.
 - **portfolio**: orders and schedules a user-supplied set of candidates under House concurrency,
   one Senate trial at a time, calendars, deadlines, fatigue and succession effects. Includes
   sensitivity analysis and the joint distribution of removals. `--html OUT` writes a self-contained
-  planning page: a timeline of House and Senate work for the top plans, each case's gate-by-gate
-  odds, the members nearest each scenario case's binding-gate threshold, succession branches, the
-  removals distribution, left-out candidates and sensitivity.
+  planning page with four tabs. Votes: per scenario case a gate ladder, and per gate the count
+  against the threshold, the rule in words, a table by bloc, every member by supplied probability
+  with the rank pivot, and the votes needed as members go absent. Floor time: a timeline of House
+  and Senate work for the top plans, and the left-out candidates. Outcomes: succession branches
+  and the removals distribution. What moves it: the tornado charts and sensitivity.
 - **backtest**: replays the Johnson, Clinton, Trump (2019 and 2021) and Mayorkas roll calls, the
   Belknap trial (1876) and the Senate trials of Judges Swayne, Archbald, Ritter, Claiborne,
   Hastings, Nixon and Porteous.
