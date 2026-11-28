@@ -934,16 +934,16 @@ def _p_removal_of(
     seed, rho = prep.scenario.seed, prep.scenario.rho
     if c.article is not None or len(prep.scenario.articles) == 1:
         art = c.article or prep.scenario.articles[0]
-        sim = simulate_article(prep, art, path_, draws, seed, rho)
+        sim = simulate_article(prep, art, path_, draws, seed, rho, detail=gate)
         return sim.p_complete, sim
     # Removal happens if any article convicts: one joint simulation over articles.
     arts = list(prep.scenario.articles)
-    raws = run_raw_articles(prep, arts, path_, draws, seed, rho)
+    raws = run_raw_articles(prep, arts, path_, draws, seed, rho, decisive=gate)
     p = float(any_complete(raws).mean())
     if not gate:
         return p, None
     best = max(arts, key=lambda a: float(raws[a].complete.mean()))
-    return p, summarize_raw(raws[best], best, path_, draws)
+    return p, summarize_raw(raws[best], best, path_, draws, detail=True)
 
 
 def load(path: str | Path) -> Loaded:

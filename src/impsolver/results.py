@@ -104,11 +104,27 @@ class CountSummary(BaseModel):
     p95: float
 
 
+class CountHist(BaseModel):
+    """How many draws gave each count: ``counts[i]`` draws had ``start + i``."""
+
+    start: int
+    counts: list[int]
+
+
 class SimGate(BaseModel):
     stage: str
     p_reached: float
     p_pass_given_reached: float
-    pro_count: CountSummary
+    pro_count: CountSummary  # over every draw, as if the vote were held each time
+    # Detail for the planning page (``simulate_article(..., detail=True)``); None otherwise.
+    n_reached: int | None = None
+    pass_se: float | None = None  # standard error of p_pass_given_reached
+    pro_count_reached: CountSummary | None = None  # over the draws that reach the gate
+    pro_hist: CountHist | None = None  # PRO count over the draws that reach the gate
+    present_count: CountSummary | None = None  # members in the chamber; random attendance only
+    # Per roster member: the share of draws in which the gate's result would flip if that one
+    # member's vote flipped (0 for a member who is absent throughout).
+    decisive_share: list[float] | None = None
 
 
 class SimArticle(BaseModel):

@@ -407,6 +407,41 @@ def removals_svg(res: PortfolioResult) -> str:
     )
 
 
+def removals_sentence(probs: list[float]) -> str:
+    """The removals distribution in words: the likeliest count and both tails as frequencies."""
+    if not probs:
+        return ""
+    mode = max(range(len(probs)), key=lambda k: (probs[k], -k))
+    text = f"Most likely {mode}."
+    if mode != 0:
+        text += f" None in {round(100 * probs[0])} of 100 runs."
+    k = mode + 2
+    if k < len(probs):
+        text += f" {k} or more in {round(100 * sum(probs[k:]))} of 100."
+    return text
+
+
+def footer(res: PortfolioResult) -> str:
+    """What was run: version, draws, files and each scenario's seed and settings."""
+    m = res.meta
+    if m is None:
+        return ""
+    rows = "".join(
+        f"<li>{e(cid)}: {e(sc.file)}, seed {sc.seed}, rho {sc.rho:g}, cutoffs "
+        f"{sc.cutoffs[0]:g} and {sc.cutoffs[1]:g}, attendance {e(sc.attendance)}"
+        f"{f', {sc.uncertainty_draws} uncertainty draws' if sc.uncertainty_draws else ''}</li>"
+        for cid, sc in m.scenarios.items()
+    )
+    return (
+        f'<footer class="note" style="margin-top:36px"><p>impsolver {e(m.impsolver_version)}'
+        f"{', ' + e(m.portfolio_file) if m.portfolio_file else ''}; {m.draws:,} draws per "
+        "scenario case. Numbers marked simulated carry Monte Carlo error; supplied numbers are "
+        "the inputs as given; counted numbers are arithmetic at the scenario cutoffs. Model "
+        "settings such as rho and fatigue are not part of any range shown; see What moves it."
+        f"</p>{f'<ul>{rows}</ul>' if rows else ''}</footer>"
+    )
+
+
 # ----------------------------------------------------------------------- page
 
 
@@ -463,6 +498,11 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
         )
     data = json.dumps(res.model_dump(mode="json"), default=str).replace("</", "<\\/")
     start = "votes" if res.gates else "floor"
+    dist_words = (
+        "<br>" + e(removals_sentence(res.removals_dist.probabilities))
+        if res.removals_dist is not None
+        else ""
+    )
     names = [("votes", "Votes"), ("floor", "Floor time"), ("outcomes", "Outcomes")]
     names.append(("moves", "What moves it"))
     tablist = (
@@ -487,7 +527,8 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
 <p class="sub">Window {pf.start} to {pf.deadline}; {pf.house_concurrency} House
 lane(s), one Senate trial at a time.</p>
 <div class="kpis">
-<div class="kpi"><b>{rec_value:.2f}</b><span>expected removals, recommended plan</span></div>
+<div class="kpi"><b>{rec_value:.2f}</b><span>expected removals, recommended plan{dist_words}
+</span></div>
 <div class="kpi"><b>{len(rec_order)}</b><span>cases attempted</span></div>
 <div class="kpi"><b>{len(res.dropped)}</b><span>left out</span></div>
 <div class="kpi"><b class="{"fragile" if res.fragile else ""}">{
@@ -510,6 +551,7 @@ aria-labelledby="tab-outcomes">
 the recommended order when an input changes. It is flagged fragile above max(0.01, 5% of the
 best).</p><table><tr><th>Change</th><th class=num>Best</th><th class=num>Recommended order
 </th><th class=num>Regret</th><th></th></tr>{sens}</table></div></section>
+{footer(res)}
 <script type="application/json" id="impsolver-data">{data}</script>
 <script>{JS}</script></main></body></html>
 """

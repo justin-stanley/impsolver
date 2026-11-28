@@ -130,9 +130,12 @@ def test_single_article_scenario_unchanged(tmp_path: Path) -> None:
     loaded = load(_pf(tmp_path, ONE))
     prep = loaded.preps["a"]
     path = path_for(prep.rules, prep.scenario, default_path(prep))
-    sim = simulate_article(prep, "I", path, DRAWS, prep.scenario.seed, prep.scenario.rho)
+    args = (prep, "I", path, DRAWS, prep.scenario.seed, prep.scenario.rho)
+    sim = simulate_article(*args)
     assert loaded.p0["a"] == sim.p_complete
-    assert loaded.gates["a"] == sim
+    # The portfolio asks for the page's per-gate detail; the numbers themselves are the same.
+    assert loaded.gates["a"] == simulate_article(*args, detail=True)
+    assert loaded.gates["a"].gates[0].pro_count == sim.gates[0].pro_count
 
 
 def test_removals_dist_uses_any_article(tmp_path: Path) -> None:

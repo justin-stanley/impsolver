@@ -7,6 +7,15 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- The planning page shows uncertainty more plainly. Each gate gets a histogram of the simulated
+  PRO count over the draws that reach it, on the tally strip's scale, with the share on each side
+  of the line as a frequency. Percentages are rounded to a whole percent when their standard error
+  is over half a point. Numbers are tagged supplied, counted or simulated. The summary states the
+  removals distribution in words, and a footer lists the version, draws, files and seeds. The
+  member list adds a simulated decisive share (the share of draws in which the gate's result
+  would flip if that member's vote flipped). `simulate_article(..., detail=True)` and
+  `run_raw(..., decisive=True)` supply the new per-gate fields; they read the same draws, and no
+  result changes.
 - The Floor time tab of the `portfolio --html` page draws each plan by resource: a lane calendar
   with a row per House lane, a row for cases waiting for the Senate floor, the Senate committee
   and the single Senate floor, with idle gaps, per-chamber recess bands and a whole-window view

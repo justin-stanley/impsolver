@@ -66,6 +66,10 @@ padding:0 4px;margin-left:4px;font-weight:600}
 color:var(--muted);margin:6px 0}
 .key svg{vertical-align:middle;margin-right:5px}
 :focus-visible{outline:2px solid var(--house);outline-offset:2px}
+.src{display:inline-block;font-size:11px;line-height:16px;padding:0 5px;border-radius:4px;
+border:1px solid var(--muted);color:var(--ink);text-transform:uppercase;letter-spacing:.03em}
+.src.counted{background:var(--chip)}.src.simulated{border-style:dashed}
+.halo2{paint-order:stroke;stroke:var(--panel);stroke-width:4px}
 """
 
 
@@ -73,8 +77,17 @@ def e(x: object) -> str:
     return html.escape(str(x), quote=True)
 
 
-def pct(p: float) -> str:
+def pct(p: float, se: float | None = None) -> str:
+    """A percentage. With a standard error over half a point it is rounded to a whole percent,
+    so the page never prints more digits than the simulation supports."""
+    if se is not None and se > 0.005:
+        return f"{100 * p:.0f}%"
     return f"{100 * p:.1f}%"
+
+
+def tag(kind: str) -> str:
+    """A small label saying where a number comes from: supplied, counted or simulated."""
+    return f'<span class="src {kind}">{kind}</span>'
 
 
 def in_100(p: float) -> str:
@@ -107,17 +120,12 @@ def ladder(cid_key: str, case: CaseGates, sims: dict[str, SimGate], binding: str
         if sim is not None:
             reach = sim.p_reached
             lines += f"<small>reached: {pct(reach)}</small>"
+            passes = pct(sim.p_pass_given_reached, sim.pass_se)
             if g.optional:
-                lines += (
-                    f"<small>Optional, after conviction; then passes: "
-                    f"{pct(sim.p_pass_given_reached)}</small>"
-                )
+                lines += f"<small>Optional, after conviction; then passes: {passes}</small>"
             else:
                 weak = sim.p_pass_given_reached < 0.5
-                lines += (
-                    f"<small>then passes: {pct(sim.p_pass_given_reached)}"
-                    f"{' (under 50%)' if weak else ''}</small>"
-                )
+                lines += f"<small>then passes: {passes}{' (under 50%)' if weak else ''}</small>"
             bar = f'<span class="surv"><i style="width:{100 * reach:.1f}%"></i></span>'
         pressed = "true" if g.stage == binding else "false"
         items.append(
@@ -129,6 +137,11 @@ def ladder(cid_key: str, case: CaseGates, sims: dict[str, SimGate], binding: str
 
 
 # ----------------------------------------------------------------- tally strip
+
+DECISIVE_NOTE = (
+    " Decisive share is simulated: the share of all draws in which this gate's result would "
+    "flip if that one member's vote flipped."
+)
 
 KEY = (
     '<div class="key" aria-hidden="true">'
@@ -221,7 +234,7 @@ def tally_svg(g: GateDetail, sim: SimGate | None) -> str:
         )
     height = y + h + 40
     if sim is not None:
-        c = sim.pro_count
+        c = sim.pro_count_reached or sim.pro_count
         wy = height + 8
         parts.append(
             f"<g><title>Simulated PRO count: median {c.p50:.0f}, 5 to 95% range {c.p5:.0f} to "
@@ -243,6 +256,68 @@ def tally_svg(g: GateDetail, sim: SimGate | None) -> str:
     return (
         f'<div class="scrollx"><svg viewBox="0 0 760 {ty + 8:.0f}" width="100%" '
         f'style="min-width:520px" role="img" aria-label="{e(label)}">{"".join(parts)}</svg></div>'
+    )
+
+
+def count_curve(g: GateDetail, sim: SimGate | None) -> str:
+    """Histogram of the simulated PRO count over the draws that reach the gate.
+
+    It shares the tally strip's seat scale. Bars at or past the threshold are filled; the share
+    on each side is stated as a frequency.
+    """
+    if sim is None or sim.pro_hist is None or not sim.pro_hist.counts:
+        return ""
+    hist = sim.pro_hist
+    left, span, base, tall = 12.0, 736.0, 124.0, 84.0
+    seats = max(1, g.seats)
+    unit = span / seats
+    most = max(hist.counts)
+    total = sum(hist.counts)
+    bars: list[str] = []
+    for i, n in enumerate(hist.counts):
+        if not n:
+            continue
+        k = hist.start + i
+        hgt = max(1.0, tall * n / most)
+        style = (
+            'fill="var(--house)"' if k >= g.required else 'fill="var(--muted)" fill-opacity="0.55"'
+        )
+        bars.append(
+            f'<rect x="{left + unit * (k - 0.5):.1f}" y="{base - hgt:.1f}" '
+            f'width="{max(1.0, unit - 0.6):.1f}" height="{hgt:.1f}" {style}/>'
+        )
+    xn = left + unit * (min(g.required, seats) - 0.5)
+    hit = sim.p_pass_given_reached
+    miss_words = f"{in_100(1 - hit)} fall short"
+    hit_words = f"{in_100(hit)} get there"
+    label = (
+        f"Simulated PRO count at {g.stage} over the {total} draws that reach it: "
+        f"{hit_words}, {miss_words}."
+    )
+    if xn < 250:
+        words = (
+            f'<text x="{xn + 8:.1f}" y="14" style="font-weight:600" class="halo2">'
+            f'{e(hit_words)}</text><text x="{xn + 8:.1f}" y="30" class="halo2">'
+            f"{e(miss_words)}</text>"
+        )
+    else:
+        words = (
+            f'<text x="{xn + 8:.1f}" y="14" style="font-weight:600" class="halo2">'
+            f'{e(hit_words)}</text><text x="{xn - 8:.1f}" y="14" text-anchor="end" '
+            f'class="halo2">{e(miss_words)}</text>'
+        )
+    return (
+        "<h4>How often the count gets there</h4>"
+        f'<div class="scrollx"><svg viewBox="0 0 760 {base + 22:.0f}" width="100%" '
+        f'style="min-width:520px" role="img" aria-label="{e(label)}">{"".join(bars)}'
+        f'<line x1="{left}" x2="{left + span}" y1="{base}" y2="{base}" stroke="var(--muted)"/>'
+        f'<line x1="{xn:.1f}" x2="{xn:.1f}" y1="20" y2="{base}" '
+        f'stroke="var(--ink)" stroke-width="2.5"/>{words}'
+        f'<text x="{xn:.1f}" y="{base + 16}" text-anchor="middle" style="font-weight:600">'
+        f"{g.required}</text></svg></div>"
+        f"<p class=note>{tag('simulated')} One bar per PRO count, on the same scale as the strip "
+        f"above, over the {total:,} draws that reach this gate. Bloc swings move many members "
+        "together, so the shape can have two humps and a single average would mislead.</p>"
     )
 
 
@@ -371,10 +446,25 @@ def member_svg(g: GateDetail, case: CaseGates, cutoffs: tuple[float, float]) -> 
     )
 
 
-def member_list(g: GateDetail, case: CaseGates) -> str:
-    """Every member in rank order; identical neighbours are folded into one row."""
+def member_list(g: GateDetail, case: CaseGates, sim: SimGate | None = None) -> str:
+    """Every member in rank order; identical neighbours are folded into one row.
+
+    With simulation detail, a last column gives each member's decisive share: the share of draws
+    in which the gate's result would flip if that one member's vote flipped.
+    """
     roster = case.rosters[g.chamber]
     order = _ranked(g, case)
+    dec = sim.decisive_share if sim is not None else None
+    if dec is not None and len(dec) != len(roster.ids):
+        dec = None
+
+    def decisive(run: list[int]) -> str:
+        if dec is None:
+            return ""
+        vals = [dec[i] for i in run]
+        lo, hi = min(vals), max(vals)
+        text = pct(lo) if hi - lo < 0.0005 else f"{pct(lo)} to {pct(hi)}"
+        return f"<td class=num>{text}</td>"
 
     def key(i: int) -> tuple[str, float, int, str]:
         return (roster.blocs[i], g.p[i], g.source[i], g.cls[i])
@@ -405,7 +495,8 @@ def member_list(g: GateDetail, case: CaseGates) -> str:
             rows.append(
                 f"<tr{mark}><td class=num>{ranks}</td><td colspan=2><details><summary>"
                 f"{e(roster.ids[run[0]])} to {e(roster.ids[run[-1]])}: {len(run)} members."
-                f"{note}</summary>{names}</details></td><td>{e(roster.blocs[i0])}</td>{tail}</tr>"
+                f"{note}</summary>{names}</details></td><td>{e(roster.blocs[i0])}</td>{tail}"
+                f"{decisive(run)}</tr>"
             )
         else:
             for n, i in enumerate(run):
@@ -414,14 +505,16 @@ def member_list(g: GateDetail, case: CaseGates) -> str:
                     f"<tr{' class=pivotrow' if is_pivot else ''}>"
                     f"<td class=num>{first + n if present else ''}</td><td>{e(roster.ids[i])}"
                     f"{' (rank pivot)' if is_pivot else ''}</td><td>{e(roster.names[i])}</td>"
-                    f"<td>{e(roster.blocs[i])}</td>{tail}</tr>"
+                    f"<td>{e(roster.blocs[i])}</td>{tail}{decisive([i])}</tr>"
                 )
         j = k + 1
     return (
         f'<details class="memlist"><summary>Member list ({len(order)})</summary>'
         "<table><tr><th scope=col class=num>Rank</th><th scope=col>Id</th><th scope=col>Name</th>"
         "<th scope=col>Bloc</th><th scope=col class=num>p</th><th scope=col>Source</th>"
-        f"<th scope=col>Class</th></tr>{''.join(rows)}</table></details>"
+        f"<th scope=col>Class</th>"
+        f"{'<th scope=col class=num>Decisive share</th>' if dec is not None else ''}</tr>"
+        f"{''.join(rows)}</table></details>"
     )
 
 
@@ -471,23 +564,38 @@ def gate_panel(
     cutoffs: tuple[float, float],
     on: bool,
 ) -> str:
-    facts = f"<p class=facts>{e(tally_summary(g))}"
+    facts = f"<p class=facts>{tag('counted')} {e(tally_summary(g))}"
     if sim is not None:
-        c = sim.pro_count
-        facts += (
-            f" Simulated PRO count over the draws that reach this gate: median {c.p50:.0f}, "
-            f"5 to 95% range {c.p5:.0f} to {c.p95:.0f}. It passes "
-            f"{pct(sim.p_pass_given_reached)} of the times it is reached "
-            f"({in_100(sim.p_pass_given_reached)}); {in_100(sim.p_reached)} draws reach it."
+        c = sim.pro_count_reached or sim.pro_count
+        scope = (
+            "over the draws that reach this gate"
+            if sim.pro_count_reached is not None
+            else "over every draw"
         )
+        se = f", standard error {100 * sim.pass_se:.1f} points" if sim.pass_se is not None else ""
+        facts += (
+            f"<br>{tag('simulated')} PRO count {scope}: median {c.p50:.0f}, "
+            f"5 to 95% range {c.p5:.0f} to {c.p95:.0f}. The gate passes "
+            f"{pct(sim.p_pass_given_reached, sim.pass_se)} of the times it is reached "
+            f"({in_100(sim.p_pass_given_reached)}{se}); {in_100(sim.p_reached)} draws reach it."
+        )
+        if sim.present_count is not None:
+            pc = sim.present_count
+            needs = [required_with_absences(g, g.present - int(v)) for v in (pc.p5, pc.p95)]
+            facts += (
+                f" Attendance is drawn at random: {pc.p5:.0f} to {pc.p95:.0f} members vote "
+                f"(5 to 95% range), so the votes needed range from {min(needs)} to {max(needs)}."
+            )
     facts += "</p>"
     return (
         f'<div class="gatepanel{" on" if on else ""}" id="{key}-{e(g.stage)}" '
         f'data-gate="{e(g.stage)}"><h4>{e(g.stage)} · {e(gate_name(g.stage, g.label))}</h4>'
         f"<p class=rule>{e(g.rule.sentence)}</p>{tally_svg(g, sim)}{KEY}{facts}"
+        f"{count_curve(g, sim)}"
         f'<div class="vgrid"><div>{bloc_table(g)}</div><div>{threshold_steps(g)}</div></div>'
-        f"<h4>{e(MEMBER_HEADING)}</h4><p class=note>{e(MEMBER_NOTE)}</p>"
-        f"{member_svg(g, case, cutoffs)}{member_list(g, case)}</div>"
+        f"<h4>{e(MEMBER_HEADING)}</h4><p class=note>{tag('supplied')} {e(MEMBER_NOTE)}"
+        f"{DECISIVE_NOTE if sim is not None and sim.decisive_share else ''}</p>"
+        f"{member_svg(g, case, cutoffs)}{member_list(g, case, sim)}</div>"
     )
 
 
@@ -523,8 +631,8 @@ def votes_tab(res: PortfolioResult) -> str:
         case = res.gates.get(cid)
         if case is None:
             sections.append(
-                f"{head}<p><span class=note>P {pct(res.p0[cid])} supplied directly; no gate "
-                "breakdown</span></p></section>"
+                f"{head}<p>{tag('supplied')} <span class=note>P {pct(res.p0[cid])} supplied "
+                "directly; no gate breakdown</span></p></section>"
             )
             continue
         sim = res.gate_paths.get(cid)
@@ -539,7 +647,15 @@ def votes_tab(res: PortfolioResult) -> str:
             )
         else:
             art = f"article {e(case.article)}"
-        se = f" ± {100 * sim.mc_se:.1f}" if sim is not None else ""
+        se = f", standard error {100 * sim.mc_se:.1f} points" if sim is not None else ""
+        mc = sim.mc_se if sim is not None else None
+        if sim is not None and sim.p_complete_interval is not None:
+            lo_i, hi_i = sim.p_complete_interval
+            inputs = (
+                f"Across the uncertain inputs, the 5 to 95% range is {pct(lo_i)} to {pct(hi_i)}."
+            )
+        else:
+            inputs = "Inputs are taken as exact: no range is drawn over the supplied priors."
         cutoffs = (
             res.meta.scenarios[cid].cutoffs
             if res.meta and cid in res.meta.scenarios
@@ -550,8 +666,8 @@ def votes_tab(res: PortfolioResult) -> str:
             for g in case.gates
         )
         sections.append(
-            f"{head}<p class=note>path {e(case.path)}, {art}<br>P(removal) {pct(p_rm)}{se} "
-            f"({in_100(p_rm)}). Pick a gate to see its count.</p>"
+            f"{head}<p class=note>path {e(case.path)}, {art}<br>{tag('simulated')} P(removal) "
+            f"{pct(p_rm, mc)} ({in_100(p_rm)}{se}). {inputs} Pick a gate to see its count.</p>"
             f"{ladder(key, case, sims, binding)}{panels}</section>"
         )
     return f'<div class="caserail" role="group" aria-label="Cases">{rail}</div>{"".join(sections)}'
