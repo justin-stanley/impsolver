@@ -10,7 +10,6 @@ candidates were left out. It never adds targets.
 
 from __future__ import annotations
 
-import datetime as dt
 import html
 import json
 from collections.abc import Iterable
@@ -19,6 +18,7 @@ from .compare import Comparison, PortfolioSide, ScenarioSide
 from .model import Portfolio
 from .portfolio import PlanOut, PortfolioResult, Slot, TreeNode, excluded_reason_text
 from .tornado import TORNADO_NOTE, Tornado, tornado_note
+from .views_floor import FLOOR_CSS, left_out_table, plan_views, why_dates
 from .views_votes import VOTES_CSS, votes_tab
 
 OPTIONAL_GATES = {"S3"}
@@ -147,129 +147,6 @@ def _label(res: PortfolioResult, cid: str) -> str:
 
 
 # ----------------------------------------------------------------------- timeline
-
-
-def _recess_bands(pf: Portfolio) -> list[tuple[dt.date, dt.date, str]]:
-    out = [(a, b, "House") for a, b in pf.calendar.house.recess]
-    out += [(a, b, "Senate") for a, b in pf.calendar.senate.recess]
-    return out
-
-
-def timeline_svg(pf: Portfolio, slots: Iterable[Slot], res: PortfolioResult) -> str:
-    slots = sorted(slots, key=lambda s: s.house_start)
-    start = pf.start
-    last = max((s.trial_end for s in slots), default=pf.start)
-    # Zoom to the planned work; the session deadline is drawn only when it is in view.
-    end = min(max(pf.deadline, last), last + dt.timedelta(days=60))
-    span = max(1, (end - start).days)
-    left, width, row_h, top = 230, 860, 34, 30
-    height = top + row_h * max(1, len(slots)) + 30
-
-    def x(d: dt.date) -> float:
-        return left + width * (d - start).days / span
-
-    parts = [
-        f'<svg viewBox="0 0 {left + width + 20} {height}" width="100%" style="min-width:760px" '
-        f'role="img" '
-        f'aria-label="Timeline of House and Senate work per candidate">'
-    ]
-    for a, b, who in _recess_bands(pf):
-        if b < start or a > end:
-            continue
-        a2, b2 = max(a, start), min(b, end)
-        parts.append(
-            f'<rect x="{x(a2):.1f}" y="{top - 6}" width="{max(1, x(b2) - x(a2)):.1f}" '
-            f'height="{height - top - 18}" fill="var(--recess)"><title>{e(who)} recess '
-            f"{a}..{b}</title></rect>"
-        )
-    # month ticks
-    d = dt.date(start.year, start.month, 1)
-    first = True
-    while d <= end:
-        if first:
-            parts.append(
-                f'<text x="{left}" y="{top - 12}" class="muted">{start.strftime("%b %Y")}</text>'
-            )
-            first = False
-        elif d >= start:
-            parts.append(
-                f'<line x1="{x(d):.1f}" x2="{x(d):.1f}" y1="{top - 8}" y2="{height - 22}" '
-                f'stroke="var(--line)"/>'
-            )
-            if span < 400 or d.month in (1, 4, 7, 10):
-                parts.append(
-                    f'<text x="{x(d) + 3:.1f}" y="{top - 12}" class="muted">'
-                    f"{d.strftime('%b %Y')}</text>"
-                )
-        d = dt.date(d.year + (d.month == 12), d.month % 12 + 1, 1)
-    if pf.deadline <= end:
-        xd = x(pf.deadline)
-        parts.append(
-            f'<line x1="{xd:.1f}" x2="{xd:.1f}" y1="{top - 8}" y2="{height - 22}" '
-            f'stroke="var(--deadline)" stroke-width="2" stroke-dasharray="4 3"/>'
-            f'<text x="{xd - 4:.1f}" y="{height - 8}" text-anchor="end" fill="var(--deadline)">'
-            f"deadline {pf.deadline}</text>"
-        )
-    else:
-        parts.append(
-            f'<text x="{left + width}" y="{height - 8}" text-anchor="end" class="muted">'
-            f"session deadline {pf.deadline} is past the right edge</text>"
-        )
-    cands = {c.id: c for c in pf.candidates}
-    for i, s in enumerate(slots):
-        y = top + i * row_h
-        c = cands[s.id]
-        parts.append(
-            f'<text x="{left - 10}" y="{y + 15}" text-anchor="end">{e(_label(res, s.id))}</text>'
-            f'<text x="{left - 10}" y="{y + 28}" text-anchor="end" class="muted">'
-            f"P {_pct(s.p)}{' (fatigued from ' + _pct(s.p0) + ')' if s.p != s.p0 else ''}"
-            f"</text>"
-        )
-        h1, h2 = x(s.house_start), x(s.house_end + dt.timedelta(days=1))
-        parts.append(
-            f'<rect x="{h1:.1f}" y="{y + 4}" width="{max(2, h2 - h1):.1f}" height="18" rx="3" '
-            f'fill="var(--house)"><title>{e(s.id)}: House {s.house_start}..{s.house_end}'
-            f"</title></rect>"
-        )
-        if c.senate_committee:
-            com_start = s.house_end + dt.timedelta(days=1)
-            com_end = s.trial_start - dt.timedelta(days=1)
-            if com_end >= com_start:
-                c1, c2 = x(com_start), x(com_end + dt.timedelta(days=1))
-                parts.append(
-                    f'<rect x="{c1:.1f}" y="{y + 7}" width="{max(2, c2 - c1):.1f}" height="12" '
-                    f'rx="3" fill="var(--committee)"><title>{e(s.id)}: Senate committee and '
-                    f"wait {com_start}..{com_end}</title></rect>"
-                )
-        else:
-            w1, w2 = h2, x(s.trial_start)
-            if w2 > w1 + 1:
-                parts.append(
-                    f'<line x1="{w1:.1f}" x2="{w2:.1f}" y1="{y + 13}" y2="{y + 13}" '
-                    f'stroke="var(--wait)" stroke-width="2" stroke-dasharray="2 3">'
-                    f"<title>waiting for the Senate</title></line>"
-                )
-        t1, t2 = x(s.trial_start), x(s.trial_end + dt.timedelta(days=1))
-        parts.append(
-            f'<rect x="{t1:.1f}" y="{y + 4}" width="{max(2, t2 - t1):.1f}" height="18" rx="3" '
-            f'fill="var(--trial)"><title>{e(s.id)}: Senate trial {s.trial_start}..{s.trial_end}'
-            f"</title></rect>"
-        )
-        if c.deadline and c.deadline <= end:
-            xc = x(c.deadline)
-            parts.append(
-                f'<path d="M{xc - 4:.1f},{y + 1} h8 l-4,6 z" fill="var(--deadline)">'
-                f"<title>{e(s.id)} deadline {c.deadline}</title></path>"
-            )
-    parts.append("</svg>")
-    legend = (
-        '<div class="legend"><span><i class="sw" style="background:var(--house)"></i>House '
-        'work</span><span><i class="sw" style="background:var(--committee)"></i>Senate committee'
-        '</span><span><i class="sw" style="background:var(--trial)"></i>Senate trial</span>'
-        '<span><i class="sw" style="background:var(--recess)"></i>Recess</span>'
-        '<span><i class="sw" style="background:var(--deadline)"></i>Deadline</span></div>'
-    )
-    return "".join(parts) + legend
 
 
 def slot_table(slots: Iterable[Slot], res: PortfolioResult) -> str:
@@ -537,7 +414,8 @@ def _plan_section(idx: str, title: str, plan: PlanOut, pf: Portfolio, res: Portf
     return (
         f'<div class="plan" id="{idx}"><p><b>{e(title)}</b>: expected removals '
         f"{plan.expected_removals:.2f}; order {e(' → '.join(plan.order))}</p>"
-        f"{timeline_svg(pf, plan.slots, res)}<h3>Dates</h3>{slot_table(plan.slots, res)}</div>"
+        f"{plan_views(pf, plan, res)}<h3>Dates</h3>{slot_table(plan.slots, res)}"
+        f"<h3>Why these dates</h3>{why_dates(pf, plan, res)}</div>"
     )
 
 
@@ -560,14 +438,6 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
     sections = "".join(
         _plan_section(pid, name, p, pf, res).replace('class="plan"', 'class="plan on"', k == 0)
         for k, (pid, name, p) in enumerate(plans)
-    )
-    dropped = (
-        "".join(
-            f"<tr><td>{e(_label(res, d.id))}</td><td>{e(d.reason)}</td><td>"
-            f"{e(excluded_reason_text(d.reason))} ({e(d.detail)})</td></tr>"
-            for d in res.dropped
-        )
-        or "<tr><td colspan=3 class=note>Every candidate is in the recommended plan.</td></tr>"
     )
     sens = "".join(
         f"<tr><td>{e(r.label)}</td><td class=num>{r.best:.2f}</td>"
@@ -612,7 +482,7 @@ def render(res: PortfolioResult, pf: Portfolio, title: str = "Impeachment plan")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(title)}</title><style>{CSS}{SHELL_CSS}{VOTES_CSS}</style></head><body><main>
+<title>{e(title)}</title><style>{CSS}{SHELL_CSS}{VOTES_CSS}{FLOOR_CSS}</style></head><body><main>
 <h1>{e(title)}</h1>
 <p class="sub">Window {pf.start} to {pf.deadline}; {pf.house_concurrency} House
 lane(s), one Senate trial at a time.</p>
@@ -629,8 +499,7 @@ lane(s), one Senate trial at a time.</p>
 <h2>Votes</h2><div class="panel">{votes_tab(res)}</div></section>
 <section class="tabpanel{on("floor")}" id="panel-floor" role="tabpanel" aria-labelledby="tab-floor">
 <h2>Plans and timeline</h2><div class="panel"><div class="tabs">{tabs}</div>{sections}</div>
-<h2>Left out</h2><div class="panel"><table><tr><th>Candidate</th><th>Reason</th><th>Detail</th>
-</tr>{dropped}</table></div></section>
+<h2>Left out</h2><div class="panel">{left_out_table(res)}</div></section>
 <section class="tabpanel{on("outcomes")}" id="panel-outcomes" role="tabpanel"
 aria-labelledby="tab-outcomes">
 {succession}
