@@ -24,6 +24,7 @@ from .alignment import (
     voteview_source,
 )
 from .model import Body, Composition, Member
+from .scores import attach_scores, read_member_scores
 
 SEATS = {"house": 435, "senate": 100}
 TERRITORIES = {"DC", "PR", "GU", "VI", "AS", "MP", "USA"}
@@ -34,6 +35,29 @@ VOTED = set(range(1, 10))
 class RosterReport:
     comp: Composition
     lines: list[str]
+
+
+def resolve_caucus(
+    mid: str, party: str, member_caucus: dict[str, str], caucus: dict[str, str]
+) -> tuple[str | None, str | None]:
+    """(caucus, note): ``--member-caucus`` beats ``--caucus``; the note flags a party mapping."""
+    if mid in member_caucus:
+        c = member_caucus[mid]
+        return (None if c.lower() == "none" else c), None
+    if party in caucus:
+        cau = caucus[party]
+        return cau, f"caucus {cau} set from party mapping {party}={cau}"
+    return None, None
+
+
+def chamber_summary(chamber: str, members: list[Member], seats: int, extra: str) -> str:
+    """The per-chamber header line, e.g. ``house: 432 members (217R/214D/1I), 3 vacancies, ...``."""
+    parties = Counter(m.party for m in members)
+    return (
+        f"{chamber}: {len(members)} members ("
+        + "/".join(f"{n}{p}" for p, n in sorted(parties.items(), key=lambda kv: -kv[1]))
+        + f"), {seats - len(members)} vacancies, {extra}"
+    )
 
 
 def last_votes(
@@ -63,6 +87,7 @@ def build_roster(
     name: str = "us-119",
     vacate: list[str] | None = None,
     accessed: dt.date | None = None,
+    member_scores: Path | None = None,
 ) -> RosterReport:
     caucus = caucus or {}
     member_caucus = member_caucus or {}
@@ -113,15 +138,10 @@ def build_roster(
         flagged: list[str] = []
         for h in holders:
             notes: list[str] = []
-            if h.id in member_caucus:
-                c = member_caucus[h.id]
-                cau: str | None = None if c.lower() == "none" else c
-            elif h.party in caucus:
-                cau = caucus[h.party]
-                notes.append(f"caucus {cau} set from party mapping {h.party}={cau}")
+            cau, note = resolve_caucus(h.id, h.party, member_caucus, caucus)
+            if note:
+                notes.append(note)
                 flagged.append(f"{h.name} ({h.id})")
-            else:
-                cau = None
             if len(h.icpsrs) > 1:
                 notes.append("party switch merged from multiple Voteview rows")
             out.append(
@@ -139,18 +159,16 @@ def build_roster(
         if len(out) > total:
             raise ValueError(f"{chamber}: {len(out)} holders for {total} seats")
         bodies[chamber] = Body(seats=total, vacancies=total - len(out), members=out)
-        parties = Counter(m.party for m in out)
-        lines.append(
-            f"{chamber}: {len(out)} members ("
-            + "/".join(f"{n}{p}" for p, n in sorted(parties.items(), key=lambda kv: -kv[1]))
-            + f"), {total - len(out)} vacancies, {len(suspected)} suspected"
-        )
+        lines.append(chamber_summary(chamber, out, total, f"{len(suspected)} suspected"))
         lines += [f"  suspected vacancy: {s}" for s in suspected]
         lines += [f"  caucus from party mapping: {f}" for f in flagged]
     unknown = sorted((vacate_set | keep_set | set(member_caucus)) - known_ids)
     if unknown:
         raise ValueError(f"ids not found among current seat holders: {', '.join(unknown)}")
     comp = Composition(schema_version=1, name=name, as_of=as_of or dt.date.today(), bodies=bodies)  # type: ignore[arg-type]
+    if member_scores is not None:
+        scores, stats = read_member_scores(member_scores)
+        lines[1:1] = attach_scores(comp, scores, stats)
     return RosterReport(comp, lines)
 
 
@@ -170,9 +188,39 @@ def dump_composition(report: RosterReport) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="impsolver roster", description=__doc__)
-    ap.add_argument("--members", action="append", required=True, type=Path)
-    ap.add_argument("--votes", action="append", required=True, type=Path)
+    ap = argparse.ArgumentParser(
+        prog="impsolver roster",
+        description="Build a composition (who holds each seat) from Voteview member and vote "
+        "files, or, with --from-results, from a CSV of certified election results.",
+    )
+    vv = ap.add_argument_group("from Voteview")
+    vv.add_argument("--members", action="append", default=[], type=Path)
+    vv.add_argument("--votes", action="append", default=[], type=Path)
+    vv.add_argument("--keep", action="append", default=[], help="never mark ID as a vacancy")
+    vv.add_argument("--vacancy-gap", type=int, default=None, help="default 50")
+    rs = ap.add_argument_group("from certified results")
+    rs.add_argument(
+        "--from-results",
+        type=Path,
+        metavar="RESULTS.csv",
+        help="columns chamber,state,district,name,party[,bioguide_id][,caucus]; one row per seat",
+    )
+    rs.add_argument("--source", help="who certified the results (cited in the file header)")
+    rs.add_argument(
+        "--previous",
+        action="append",
+        default=[],
+        type=Path,
+        help="earlier composition to match returning members against (repeatable)",
+    )
+    rs.add_argument(
+        "--senate-holdovers",
+        action="store_true",
+        help="carry over senators from --previous whose seats were not up",
+    )
+    rs.add_argument(
+        "--allow-missing", action="store_true", help="count seats with no row as vacancies"
+    )
     ap.add_argument("--caucus", action="append", default=[], help="PARTY=BLOC")
     ap.add_argument(
         "--member-caucus",
@@ -180,34 +228,65 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="ID=BLOC ('none' = own party); beats --caucus",
     )
-    ap.add_argument("--keep", action="append", default=[], help="never mark ID as a vacancy")
     ap.add_argument(
-        "--vacate", action="append", default=[], help="treat ID's seat as vacant (e.g. resigned)"
+        "--vacate",
+        action="append",
+        default=[],
+        help="treat ID's seat as vacant (e.g. resigned); with --senate-holdovers, a previous "
+        "senator who does not hold over",
     )
-    ap.add_argument("--vacancy-gap", type=int, default=50)
     ap.add_argument(
         "--accessed",
         type=dt.date.fromisoformat,
         default=None,
-        help="date the Voteview files were downloaded (for the citation; default today)",
+        help="date the source files were downloaded (for the citation; default today)",
+    )
+    ap.add_argument(
+        "--member-scores",
+        type=Path,
+        default=None,
+        metavar="FILE.csv",
+        help="user-supplied scores (columns id,score,source) for a scenario's score_prior; "
+        "standardized within each source",
     )
     ap.add_argument("--as-of", type=dt.date.fromisoformat, default=None)
-    ap.add_argument("--name", default="us-119")
+    ap.add_argument("--name", default=None, help="composition name (default us-119 from Voteview)")
     ap.add_argument("--out", type=Path)
     a = ap.parse_args(argv)
     try:
-        rep = build_roster(
-            a.members,
-            a.votes,
-            parse_caucus(a.caucus),
-            parse_mapping(a.member_caucus),
-            a.keep,
-            a.vacancy_gap,
-            a.as_of,
-            a.name,
-            a.vacate,
-            a.accessed,
-        )
+        if a.from_results is not None:
+            rep = _from_results(a)
+            if a.member_scores is not None:
+                scores, stats = read_member_scores(a.member_scores)
+                rep.lines[1:1] = attach_scores(rep.comp, scores, stats)
+        else:
+            if not a.members or not a.votes:
+                raise ValueError("give --members and --votes, or --from-results")
+            stray = [
+                f
+                for f, v in (
+                    ("--source", a.source),
+                    ("--previous", a.previous),
+                    ("--senate-holdovers", a.senate_holdovers),
+                    ("--allow-missing", a.allow_missing),
+                )
+                if v
+            ]
+            if stray:
+                raise ValueError(f"{', '.join(stray)} only apply with --from-results")
+            rep = build_roster(
+                a.members,
+                a.votes,
+                parse_caucus(a.caucus),
+                parse_mapping(a.member_caucus),
+                a.keep,
+                50 if a.vacancy_gap is None else a.vacancy_gap,
+                a.as_of,
+                a.name or "us-119",
+                a.vacate,
+                a.accessed,
+                a.member_scores,
+            )
     except (OSError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -219,6 +298,30 @@ def main(argv: list[str] | None = None) -> int:
     for ln in rep.lines:
         print(ln, file=sys.stderr)
     return 0
+
+
+def _from_results(a: argparse.Namespace) -> RosterReport:
+    from .roster_results import build_from_results
+
+    if a.members or a.votes or a.keep or a.vacancy_gap is not None:
+        raise ValueError("--members, --votes, --keep and --vacancy-gap are for the Voteview mode")
+    if not a.source:
+        raise ValueError("--from-results needs --source (who certified the results)")
+    if not a.name:
+        raise ValueError("--from-results needs --name (for example us-120)")
+    return build_from_results(
+        a.from_results,
+        a.source,
+        a.name,
+        a.previous,
+        parse_caucus(a.caucus),
+        parse_mapping(a.member_caucus),
+        a.as_of,
+        a.accessed,
+        a.allow_missing,
+        a.senate_holdovers,
+        a.vacate,
+    )
 
 
 if __name__ == "__main__":

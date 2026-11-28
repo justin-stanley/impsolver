@@ -159,6 +159,30 @@
           "default": null,
           "title": "Ideology"
         },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "score_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score Source"
+        },
         "attendance": {
           "default": "present",
           "enum": [

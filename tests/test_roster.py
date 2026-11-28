@@ -8,6 +8,7 @@ import pytest
 
 from impsolver.loader import load_composition
 from impsolver.roster import build_roster, dump_composition
+from impsolver.roster import main as roster_main
 
 HEAD = (
     "congress,chamber,icpsr,state_icpsr,district_code,state_abbrev,party_code,bioname,bioguide_id"
@@ -109,6 +110,16 @@ def test_cli(files: tuple[Path, Path], tmp_path: Path) -> None:
     )
     assert r.returncode == 0, r.stderr
     assert "house:" in r.stderr and load_composition(out).as_of.isoformat() == "2026-11-27"
+
+
+def test_cli_in_process_vacancy_gap(
+    files: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    m, v = files
+    out = tmp_path / "c.yaml"
+    argv = ["--members", str(m), "--votes", str(v), "--vacancy-gap", "50", "--out", str(out)]
+    assert roster_main(argv) == 0
+    assert "house:" in capsys.readouterr().err and load_composition(out).name == "us-119"
 
 
 def test_real_us119_counts() -> None:

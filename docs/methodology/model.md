@@ -72,9 +72,9 @@ Because P(complete) is not linear in the priors, the pooled mean usually differs
 at the midpoints. The other commands use the midpoints, so a portfolio candidate or a viability
 row backed by this scenario does not include the prior uncertainty.
 
-With a `defection_prior`, `evaluate` and the other single-number commands adjust the midpoint;
-the outer loop adjusts each sampled value instead. Members whose probability the defection prior
-sets therefore have no separate low and high bounds in `evaluate`.
+With a `defection_prior` or a `score_prior`, `evaluate` and the other single-number commands
+adjust the midpoint; the outer loop adjusts each sampled value instead. Members whose probability
+either prior sets therefore have no separate low and high bounds in `evaluate`.
 
 See the [worked example](../examples/assumptions.md#a-range-instead-of-a-number).
 
@@ -158,3 +158,35 @@ counts written to the file, and the file records `half_life`.
 toward the bloc rate with `pseudo_votes`. Members who break more often move away from their
 party's lean. β = 1 by default. `impsolver score` shows how β and the correlation settings score
 against the known crossover votes; see [validation](validation.md#calibration-sweep).
+
+### Score prior
+
+Members who have just arrived have no break rate, so the defection prior leaves them at their
+party prior. `score_prior` is an optional hook for them: if you supply an external score for each
+such member (`impsolver roster --member-scores`, see [data sources](../data.md#member-scores-user-supplied)),
+a scenario can map it to a shift on the logit scale, per bloc:
+
+```yaml
+alignment: ../alignment/us-119.json
+score_prior:            # placeholder bloc and numbers, not estimates
+  BLOC_A: {slope: 0.5, intercept: 0.0}
+```
+
+For a member of bloc BLOC_A with standardized score z, every stage's party prior p becomes
+sigmoid(logit(p) + intercept + slope · z). It applies only to members who have a `score`, whose
+bloc is listed, who have no counted vote (`n_votes` 0) in any chamber of the scenario's alignment
+file, and whose probability is not already set by the composition (`p_pro`, including a defection
+prior's result) or an override. An override for some stages only excludes the member at every
+stage. That is why `score_prior` requires `alignment`. A former House member now in the Senate
+whose House votes are in the file therefore counts as having history. A chamber the alignment
+file does not cover is skipped, with a warning, because its members' history is unknown. A party
+prior of exactly 0 or 1 is left as it is.
+
+`n_votes` counts contested roll calls only, and in a pooled file with `half_life` it is the
+recency-weighted count rounded to a whole number. A member with only a few old contested votes
+can therefore have `n_votes` 0 and be treated as new.
+
+impsolver does not choose a direction or size for the shift and ships no scores: the sign of
+`slope` decides which end of the score's scale moves toward PRO, and both numbers are your
+assumptions to state. Nothing in the backtests calibrates them, and default results are unchanged
+when `score_prior` is absent.

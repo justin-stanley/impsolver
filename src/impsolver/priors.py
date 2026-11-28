@@ -106,6 +106,68 @@ def apply_defection_prior(
     return new
 
 
+def has_history(alignment: Alignment) -> set[str]:
+    """Ids with at least one counted vote (``n_votes > 0``) in any chamber of the alignment file.
+
+    ``n_votes`` counts contested roll calls only, after any recency weighting, so a member with
+    a few down-weighted contested votes can still have ``n_votes`` 0.
+    """
+    return {m.id for b in alignment.bodies.values() for m in b.members if m.n_votes > 0}
+
+
+def apply_score_prior(
+    scenario: Scenario,
+    comp: Composition,
+    rules: RuleSet,
+    alignment: Alignment,
+) -> tuple[Composition, int]:
+    """Move the party prior of scored members without congressional history.
+
+    A member qualifies when they carry a ``score``, their bloc has a ``score_prior`` entry, they
+    have no counted vote in any chamber of the alignment file, and neither the composition
+    (``p_pro``, which includes a defection prior's result) nor an override already sets their
+    probability. Their party prior becomes ``sigmoid(logit(p) + intercept + slope * score)``.
+    A chamber the alignment file does not cover is skipped, as in the defection prior, since its
+    members' history is unknown. Returns the new composition and the number of members moved.
+    """
+    new = comp.model_copy(deep=True)
+    matched = 0
+    seen = has_history(alignment)
+    for chamber, body in new.bodies.items():
+        if chamber not in alignment.bodies:
+            continue
+        stage_ids = [s.id for s in rules.stages if s.chamber == chamber]
+        members: list[Member] = []
+        for m in body.roster:
+            sp = scenario.score_prior.get(m.bloc)
+            if (
+                sp is None
+                or m.score is None
+                or m.id in seen
+                or m.p_pro
+                or m.id in scenario.overrides
+            ):
+                members.append(m)
+                continue
+            shift = sp.intercept + sp.slope * m.score
+            party = scenario.party_priors.get(m.bloc, {})
+            table: dict[str, float] = {}
+            for sid in stage_ids:
+                base = party.get(sid, party.get(STAR))
+                if base is not None:
+                    # As with the defection prior, an uncertain party prior enters at its mean
+                    # and simulate's outer loop re-applies this to each sampled value.
+                    p = point(base)
+                    table[sid] = p if p <= 0.0 or p >= 1.0 else sigmoid(logit(p) + shift)
+            if table:
+                matched += 1
+                members.append(m.model_copy(update={"p_pro": table, "p_source": "score_prior"}))
+            else:
+                members.append(m)
+        body.members = members
+    return new, matched
+
+
 def fit_beta(excess: list[float], crossed: list[int], iters: int = 50) -> tuple[float, float]:
     """Logistic fit P(cross) = sigmoid(c + beta*excess). Returns (beta, standard error)."""
     x = np.asarray(excess, dtype=float)

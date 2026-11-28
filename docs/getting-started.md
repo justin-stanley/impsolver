@@ -41,6 +41,9 @@ replays real roll calls against the built-in rules:
    own YAML file.
 2. **A composition** lists who holds each seat. Write one by hand, use party shorthand
    (`party_shorthand: {R: 219, D: 214}`), or build one from Voteview with `impsolver roster`.
+   For a new Congress that has not voted yet, `impsolver roster --from-results RESULTS.csv`
+   builds one from certified election results (see
+   [Data](data.md#a-roster-for-a-new-congress-from-certified-results)).
 3. **A scenario** names the target and gives probabilities: party priors per bloc and stage,
    per-member overrides, and optional shifts.
 

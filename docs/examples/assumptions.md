@@ -17,7 +17,7 @@ convict. This is one reason the [validation page](../methodology/validation.md) 
 choices among the assumptions that move results.
 
 Other inputs to try: `rho`, `gate_correlation`, `senate_tie_break`, `alignment` with
-`alignment_chamber_weight`, `defection_prior`, and `attendance: random` with `absence_rate` (see
+`alignment_chamber_weight`, `defection_prior`, `score_prior` (with your own member scores), and `attendance: random` with `absence_rate` (see
 [attendance](../methodology/model.md#attendance)).
 
 ## A range instead of a number

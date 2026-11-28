@@ -21,7 +21,7 @@ positional arguments:
     calibrate           check alignment against known crossovers
     score               score crossing predictions on crossover fixtures over a grid of settings
     schema              write JSON schemas
-    roster              build a composition from Voteview (see roster --help)
+    roster              build a composition from Voteview or certified results (see roster --help)
     align               fit alignment loadings from Voteview (see align --help)
 
 options:

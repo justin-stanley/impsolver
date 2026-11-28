@@ -79,6 +79,26 @@
       "title": "PriorRange",
       "type": "object"
     },
+    "ScorePrior": {
+      "additionalProperties": false,
+      "description": "Logit shift ``intercept + slope * score`` for a bloc's members without history.",
+      "properties": {
+        "slope": {
+          "title": "Slope",
+          "type": "number"
+        },
+        "intercept": {
+          "default": 0.0,
+          "title": "Intercept",
+          "type": "number"
+        }
+      },
+      "required": [
+        "slope"
+      ],
+      "title": "ScorePrior",
+      "type": "object"
+    },
     "Shift": {
       "additionalProperties": false,
       "properties": {
@@ -350,6 +370,14 @@
         }
       ],
       "default": null
+    },
+    "score_prior": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ScorePrior"
+      },
+      "default": {},
+      "title": "Score Prior",
+      "type": "object"
     },
     "uncertainty_draws": {
       "default": 0,

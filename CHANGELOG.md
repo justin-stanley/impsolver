@@ -47,6 +47,18 @@ All notable changes are listed here. The format follows
   candidate's reason; the re-scheduled `slots` on each sensitivity row; and `gates`, with each
   gate's rule in words, tally by bloc and every member's supplied probability and classification.
   No result changes.
+- `impsolver roster --from-results RESULTS.csv --source TEXT` builds a composition for a new
+  Congress from certified results: returning members matched by Bioguide ID (or flagged,
+  strictly one-to-one surname + given-name + state matches against `--previous`, keeping a
+  previous caucus when the party is unchanged), `new:ST-DD`/`new:ST-S1` placeholders,
+  vacancies, optional Senate holdovers; no real 120th roster is shipped.
+- `impsolver roster --member-scores FILE.csv` (user-supplied `id,score,source`, standardized per
+  source) and scenario `score_prior: {BLOC: {slope, intercept}}`, a logit shift for scored members
+  without congressional history in any chamber of the alignment file (chambers it does not cover
+  are skipped with a warning; a source with commas must be quoted); no scores are shipped and
+  default results are unchanged.
+- A JOSS-style methodology paper draft (`paper/paper.md`, `paper/paper.bib`) quoting only numbers
+  the code produces, with the commands in an appendix and a test that keeps them current.
 - Backtest fixtures for Belknap (1876) and the Senate trials of Judges Swayne, Archbald, Ritter,
   Claiborne, Hastings, Nixon and Porteous, with their disqualification votes.
 - Optional random attendance in the Monte Carlo (`attendance: random`, `absence_rate`, member
@@ -94,6 +106,10 @@ All notable changes are listed here. The format follows
   removals distribution; default numbers change only for scenarios with more than one article.
 
 ### Fixed
+- `roster --from-results` and `--member-scores` reject a name with an unquoted comma, cite
+  physical file lines, keep the newest of several `--previous` rosters and keep given-name
+  initials such as "SMITH, V.". `score_prior` now widens low and high bounds without a
+  `defection_prior`, and a `score_prior` bloc with no `party_priors` entry is a warning.
 - Accessibility of the HTML pages, checked with axe-core (WCAG 2 A and AA plus best practices) on
   every tab, in light and dark, and with scripts off: the plan picker is a labelled group of
   toggle buttons instead of buttons with a tab state and no tab role, regions that scroll
