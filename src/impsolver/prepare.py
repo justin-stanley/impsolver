@@ -79,6 +79,11 @@ def check_references(rules: RuleSet, comp: Composition, scenario: Scenario) -> l
         f"score_prior bloc {b} matches no scored member of composition {comp.name}"
         for b in sorted(set(scenario.score_prior) - scored_blocs)
     ]
+    warnings += [
+        f"score_prior bloc {b} has no party_priors entry, so the score prior moves none of its "
+        "members"
+        for b in sorted(set(scenario.score_prior) - set(scenario.party_priors))
+    ]
     if scenario.uncertainty_draws > 0 and not has_uncertainty(scenario):
         warnings.append("uncertainty_draws has no effect: no prior is a range or a beta")
     return warnings
@@ -113,12 +118,14 @@ class Prepared:
         """P(PRO) per member. ``bound`` picks the point value or the low / high bound of
         uncertain priors (see :mod:`impsolver.uncertainty`).
 
-        With a defection prior, members whose party prior was adjusted carry one number in
-        ``p_pro``; their bounds come from re-applying the prior to the low and high party values.
-        The adjustment pushes away from the party's lean, so it is not monotone across 0.5: the
-        lower of the two results is the low bound and the higher is the high bound.
+        With a defection prior or a score prior, members whose party prior was adjusted carry one
+        number in ``p_pro``; their bounds come from re-applying the member priors to the low and
+        high party values. The defection adjustment pushes away from the party's lean, so it is not
+        monotone across 0.5: the lower of the two results is the low bound and the higher is the
+        high bound.
         """
-        if bound != "point" and self.scenario.defection_prior is not None:
+        adjusted = self.scenario.defection_prior is not None or bool(self.scenario.score_prior)
+        if bound != "point" and adjusted:
             if self.input_comp is not None and self.alignment is not None:
                 ends = [
                     self._bound_prep(b).probs(chamber, stage, article, extra)

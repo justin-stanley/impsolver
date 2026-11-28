@@ -299,3 +299,36 @@ def test_outer_loop_reapplies_score_prior_through_simulate(rules: RuleSet) -> No
         for sim in (with_score, without)
     ]
     assert h1[0] > h1[1] + 0.5
+
+
+# ------------------------------------------------------------- PR #23 review fixes
+
+
+def test_score_prior_bounds_widen_without_defection_prior(rules: RuleSet) -> None:
+    scen = make_scenario(
+        party_priors={"R": {"*": {"low": 0.1, "high": 0.5}}, "D": {"*": 0.9}},
+        alignment="a.json",
+        score_prior={"R": {"slope": 1.0}},
+    )
+    prep = prepare_objects(rules, make_comp(_house(), {"R": 1}), scen, _alignment({"VET": 200}))
+    i = [m.id for m in prep.members("house")].index("NEW")
+    lo = prep.probs("house", "H2", "I", bound="low")[i]
+    hi = prep.probs("house", "H2", "I", bound="high")[i]
+    assert lo == pytest.approx(sigmoid(logit(0.1) + 1.5))
+    assert hi == pytest.approx(sigmoid(logit(0.5) + 1.5))
+
+
+def test_score_prior_bloc_without_party_prior_warns(rules: RuleSet) -> None:
+    scen = make_scenario(
+        party_priors={"R": {"*": 0.1}, "D": {"*": 0.9}},
+        alignment="a.json",
+        score_prior={"R": {"slope": 1.0}, "I": {"slope": 0.5}},
+    )
+    prep = prepare_objects(rules, make_comp(_house(), {"R": 1}), scen, _alignment({"VET": 200}))
+    assert any("score_prior bloc I has no party_priors entry" in w for w in prep.warnings)
+
+
+def test_score_file_errors_cite_physical_lines(tmp_path: Path) -> None:
+    p = _csv(tmp_path, ['A000001,0.5,"Line\nbreak"', "A000002,0.5"])
+    with pytest.raises(ScoreError, match=r":4: expected 3 fields"):
+        read_member_scores(p)

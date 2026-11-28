@@ -106,6 +106,10 @@ All notable changes are listed here. The format follows
   removals distribution; default numbers change only for scenarios with more than one article.
 
 ### Fixed
+- `roster --from-results` and `--member-scores` reject a name with an unquoted comma, cite
+  physical file lines, keep the newest of several `--previous` rosters and keep given-name
+  initials such as "SMITH, V.". `score_prior` now widens low and high bounds without a
+  `defection_prior`, and a `score_prior` bloc with no `party_priors` entry is a warning.
 - Accessibility of the HTML pages, checked with axe-core (WCAG 2 A and AA plus best practices) on
   every tab, in light and dark, and with scripts off: the plan picker is a labelled group of
   toggle buttons instead of buttons with a tab state and no tab role, regions that scroll

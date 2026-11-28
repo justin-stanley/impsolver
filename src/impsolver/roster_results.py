@@ -56,14 +56,18 @@ def _norm(text: str) -> list[str]:
     """Lower-case ASCII tokens without punctuation or generational suffixes."""
     s = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     toks = re.sub(r"[^a-z0-9\- ]+", " ", s).replace("-", " - ").split()
-    toks = [t for t in toks if t not in SUFFIXES]
+    # Generational suffixes only at the end ("Smith Jr"), so a given name or initial "V" stays.
+    while len(toks) > 1 and toks[-1] in SUFFIXES:
+        toks.pop()
     return " ".join(toks).replace(" - ", "-").split()
 
 
 def _drop_suffix(name: str) -> str:
     """Strip a trailing ", Jr." or ", III" so it is not read as "Last, First"."""
     head, sep, tail = name.rpartition(",")
-    if sep and tail.strip() and all(t in SUFFIXES for t in _norm_raw(tail)):
+    # "LAST, First, Jr." or "First Last, Jr." -- but not "SMITH, V.", where V is the given name.
+    full_head = "," in head or len(_norm_raw(head)) > 1
+    if sep and full_head and tail.strip() and all(t in SUFFIXES for t in _norm_raw(tail)):
         return _drop_suffix(head)
     return name
 
@@ -158,9 +162,15 @@ def read_results(path: Path) -> tuple[list[Row], list[str]]:
         unknown = [c for c in cols if c not in REQUIRED + OPTIONAL]
         if unknown:
             raise ValueError(f"{path.name}: unknown column(s) {', '.join(unknown)}")
-        for i, raw in enumerate(rd, start=2):
-            r = {k.strip(): (v or "").strip() for k, v in raw.items() if k is not None}
+        for raw in rd:
+            i = rd.line_num  # the physical line, even after a quoted field with a line break
             where = f"{path.name} line {i}"
+            if None in raw:
+                raise ValueError(
+                    f"{where}: more fields than the header has columns; put a name that contains "
+                    'a comma in double quotes, e.g. "SMITH, John"'
+                )
+            r = {k.strip(): (v or "").strip() for k, v in raw.items()}
             chamber = r["chamber"].lower()
             if chamber not in SEATS:
                 raise ValueError(f"{where}: chamber must be house or senate, got {r['chamber']!r}")
@@ -260,8 +270,10 @@ def build_from_results(
     prev: dict[str, Member] = {}
     prev_chamber: dict[str, str] = {}
     prev_names: list[str] = []
-    for p in previous or []:
-        comp = load_composition(p)
+    # With several --previous rosters, the newest (by as_of) wins for a member listed in more than
+    # one, whatever the order they are given in.
+    loaded = sorted(((load_composition(p), p) for p in previous or []), key=lambda cp: cp[0].as_of)
+    for comp, p in loaded:
         prev_names.append(f"{p.name} ({comp.name}, as of {comp.as_of.isoformat()})")
         for ch, body in comp.bodies.items():
             for m in body.roster:
@@ -270,8 +282,8 @@ def build_from_results(
                         f"--previous {p.name}: member {m.id} has no state; --previous needs a "
                         "roster of named members with states (not party_shorthand)"
                     )
-                prev.setdefault(m.id, m)
-                prev_chamber.setdefault(m.id, ch)
+                prev[m.id] = m
+                prev_chamber[m.id] = ch
     unknown = sorted(vacate_set - set(prev))
     if unknown:
         raise ValueError(f"--vacate ids not found in --previous: {', '.join(unknown)}")

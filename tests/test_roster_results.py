@@ -475,3 +475,47 @@ def test_cli_in_process(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     out = tmp_path / "c.yaml"
     assert roster_main([*base, "--out", str(out)]) == 0
     assert load_composition(out).name == "t"
+
+
+# ------------------------------------------------------------- PR #23 review fixes
+
+
+def test_unquoted_comma_in_a_name_is_an_error(tmp_path: Path) -> None:
+    p = tmp_path / "r.csv"
+    p.write_text("chamber,state,district,name,party,caucus\nhouse,AA,1,SMITH, John,R,\n")
+    with pytest.raises(ValueError, match=r"line 2: more fields than the header.*double quotes"):
+        build_from_results(p, SRC, "x", allow_missing=True)
+    p.write_text('chamber,state,district,name,party,caucus\nhouse,AA,1,"SMITH, John",R,\n')
+    rep = build_from_results(p, SRC, "x", allow_missing=True)
+    assert rep.comp.bodies["house"].roster[0].party == "R"
+
+
+def test_error_lines_are_physical_lines(tmp_path: Path) -> None:
+    p = tmp_path / "r.csv"
+    p.write_text(HEAD + '\nhouse,AA,1,"Ann\nAble",R,,\nhouse,AA,x,B,R,,\n')
+    with pytest.raises(ValueError, match="line 4: House district"):
+        build_from_results(p, SRC, "x", allow_missing=True)
+
+
+def test_newest_previous_roster_wins(tmp_path: Path) -> None:
+    old = tmp_path / "old"
+    new = tmp_path / "new"
+    old.mkdir()
+    new.mkdir()
+    mover = "{id: M000901, name: 'MOVER, Max', party: R, state: AA, district: 2}"
+    rep_old = prev_file(old, [mover])
+    rep_new = prev_file(new, [], ["{id: M000901, name: 'MOVER, Max', party: R, state: AA}"])
+    rep_new.write_text(rep_new.read_text().replace("2026-01-03", "2027-01-03"))
+    for order in ([rep_old, rep_new], [rep_new, rep_old]):
+        rep = build_from_results(
+            write(tmp_path, "senate,AA,,Max Mover,R,,"), SRC, "x", order, allow_missing=True
+        )
+        s = {m.id: m for m in rep.comp.bodies["senate"].roster}
+        assert "M000901" in s  # matched as a sitting senator, whatever the argument order
+
+
+def test_initial_v_is_kept() -> None:
+    assert given_names("V Smith") == ["v"]
+    assert same_given("V. Jane Smith", "SMITH, V. Jane")
+    assert same_given("V Smith", "SMITH, V.")
+    assert surname("Smith Jr") == ["smith"] and given_names("John Smith V") == ["john"]

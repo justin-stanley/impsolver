@@ -49,7 +49,8 @@ def read_member_scores(path: Path) -> tuple[dict[str, MemberScore], list[SourceS
         reader = csv.DictReader(f)
         if tuple(reader.fieldnames or ()) != COLUMNS:
             raise ScoreError(f"{path}: header must be exactly {','.join(COLUMNS)}")
-        for n, r in enumerate(reader, start=2):
+        for r in reader:
+            n = reader.line_num  # the physical line, even after a quoted field with a line break
             if None in r or None in r.values():
                 # An unquoted comma in the citation would otherwise cut it silently and could
                 # merge two sources into one standardization group.
