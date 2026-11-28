@@ -852,6 +852,11 @@ class SensRow(BaseModel):
     fragile: bool
     # The recommended order re-scheduled under this row's setting (without succession branches).
     slots: list[Slot] = []
+    # "sensitivity" (fatigue, durations), "setting" (lanes, Saturdays) or "order" (a swap of two
+    # neighbours in the recommended order, where ``base_rescheduled`` is the swapped order's value).
+    kind: str = "sensitivity"
+    house_lanes: int | None = None  # set when the row changes the number of House lanes
+    order: list[str] = []  # the order that ``slots`` schedules, when it is not the recommended
 
 
 class RemovalsDist(BaseModel):
@@ -885,6 +890,9 @@ class PortfolioResult(BaseModel):
     tornado: dict[str, Tornado] = {}
     # Report contract, version 2 (see ``contract.extend``). Version 1 reports lack these.
     schema_version: int = 1
+    # Other settings the page can show: the recommended order under one more or one fewer House
+    # lane and with trial Saturdays switched. Reported only; it never sets ``fragile``.
+    what_if: list[SensRow] = []
     meta: contract.ReportMeta | None = None
     inputs: Portfolio | None = None
     gates: dict[str, contract.CaseGates] = {}
@@ -1162,6 +1170,7 @@ def solve(
         res.removals_dist = removals_dist(loaded, ctx, order)
     if sensitivities:
         res.tornado = tornadoes(loaded, ctx, order)
+        res.what_if = what_if_rows(pf, p0, order, exhaustive, p0e)
     contract.extend(res, loaded, ctx, order, exhaustive)
     return res
 
@@ -1194,6 +1203,70 @@ def sensitivity(
                 regret=regret,
                 fragile=regret > max(0.01, 0.05 * best),
                 slots=slots,
+            )
+        )
+    return rows
+
+
+def what_if_rows(
+    pf: Portfolio,
+    p0: dict[str, float],
+    base: tuple[str, ...],
+    exhaustive: bool,
+    p0e: dict[str, list[float]] | None = None,
+) -> list[SensRow]:
+    """The recommended order under other lane and Saturday settings, and each neighbour swap."""
+    k = pf.house_concurrency
+    sat = pf.calendar.trial_saturdays
+    variants: list[tuple[str, Portfolio, int | None]] = []
+    for lanes in (k - 1, k + 1):
+        if lanes >= 1:
+            alt = pf.model_copy(update={"house_concurrency": lanes})
+            variants.append((f"House lanes {lanes}", alt, lanes))
+    cal = pf.calendar.model_copy(update={"trial_saturdays": not sat})
+    variants.append(
+        (f"trial Saturdays {'off' if sat else 'on'}", pf.model_copy(update={"calendar": cal}), None)
+    )
+    rows: list[SensRow] = []
+    for label, alt, n_lanes in variants:
+        ctx, _ = make_ctx(alt, p0, p0e=p0e)
+        _, best, _ = _best_value(ctx, exhaustive)
+        base_v = _order_value(ctx, base)
+        regret = max(0.0, best - base_v)
+        slots = [s.model_copy() for s in schedule_order(ctx, base).slots]
+        contract.annotate(ctx, slots)
+        rows.append(
+            SensRow(
+                label=label,
+                best=best,
+                base_rescheduled=base_v,
+                regret=regret,
+                fragile=regret > max(0.01, 0.05 * best),
+                slots=slots,
+                kind="setting",
+                house_lanes=n_lanes,
+            )
+        )
+    # Each swap of two neighbours in the recommended order, under the supplied settings.
+    ctx, _ = make_ctx(pf, p0, p0e=p0e)
+    base_v = _order_value(ctx, base)
+    for i in range(len(base) - 1):
+        swapped = (*base[:i], base[i + 1], base[i], *base[i + 2 :])
+        plan = schedule_order(ctx, swapped)
+        value = _order_value(ctx, swapped)
+        slots = [s.model_copy() for s in plan.slots]
+        contract.annotate(ctx, slots)
+        regret = max(0.0, base_v - value)
+        rows.append(
+            SensRow(
+                label=f"order: {base[i + 1]} before {base[i]}",
+                best=base_v,
+                base_rescheduled=value,
+                regret=regret,
+                fragile=False,
+                slots=slots,
+                kind="order",
+                order=list(plan.order),
             )
         )
     return rows

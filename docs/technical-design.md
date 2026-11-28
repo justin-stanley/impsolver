@@ -124,6 +124,13 @@ draw from the JSON alone, and changes no number:
   `required` when present members are sorted by supplied probability), and per-member columns
   (`p`, `source`, `cls`) aligned with the chamber roster.
 
+`what_if` lists the recommended order under other settings, as sensitivity rows with a `kind`:
+`setting` rows change the House lane count (`house_lanes`) or switch trial Saturdays, and `order`
+rows swap two neighbours in the recommended order (`order` holds the swapped order,
+`base_rescheduled` its value and `best` the recommended order's value). They are computed with
+the sensitivities and never set `fragile`. The page's gate forms use only `gates`: the browser
+repeats `thresholds.required_pro` on the counted classes and does not simulate.
+
 ## Changes since the original design
 These change behavior relative to the original design.
 - `alignment_chamber_weight` (default `{house: 1, senate: 0}`) multiplies `alignment_weight` for each

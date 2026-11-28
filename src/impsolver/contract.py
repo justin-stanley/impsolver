@@ -53,6 +53,7 @@ class ScenarioMeta(BaseModel):
     cutoffs: tuple[float, float]
     attendance: str
     uncertainty_draws: int
+    uncertain_priors: bool = False  # a prior is a range or a Beta, so bounds differ from p
 
 
 class ReportMeta(BaseModel):
@@ -149,6 +150,7 @@ def meta(loaded: Loaded) -> ReportMeta:
             cutoffs=prep.scenario.cutoffs,
             attendance=prep.scenario.attendance,
             uncertainty_draws=prep.scenario.uncertainty_draws,
+            uncertain_priors=has_uncertainty(prep.scenario),
         )
         for cid, prep in loaded.preps.items()
     }

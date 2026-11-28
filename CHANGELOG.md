@@ -7,6 +7,14 @@ All notable changes are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- What-if controls on the planning page. Each gate panel in the Votes tab has a form that redoes
+  the gate's counted arithmetic in the browser: more members absent from a bloc, uncertain members
+  of a bloc counted as PRO, and other cutoffs (locked when a scenario supplies prior ranges). It
+  shows new values beside the unchanged ones and says the simulation is not re-run. The Floor time
+  tab gains an Other settings section: the recommended order re-scheduled with one more or one
+  fewer House lane, with trial Saturdays switched, with durations scaled, and with each pair of
+  neighbours swapped, each with its own lane calendar. Reports carry these as `what_if` rows, and
+  `ScenarioMeta.uncertain_priors` says whether a scenario has prior ranges. No result changes.
 - The planning page shows uncertainty more plainly. Each gate gets a histogram of the simulated
   PRO count over the draws that reach it, on the tally strip's scale, with the share on each side
   of the line as a frequency. Percentages are rounded to a whole percent when their standard error
