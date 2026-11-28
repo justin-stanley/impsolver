@@ -255,7 +255,7 @@ def tally_svg(g: GateDetail, sim: SimGate | None) -> str:
         parts.append(f'<text x="{x(t):.1f}" y="{ty}" text-anchor="{a}" class="muted">{t}</text>')
     label = f"Tally at {g.stage}: {tally_summary(g)}"
     return (
-        f'<div class="scrollx"><svg viewBox="0 0 760 {ty + 8:.0f}" width="100%" '
+        f'<div class="scrollx" tabindex="0"><svg viewBox="0 0 760 {ty + 8:.0f}" width="100%" '
         f'style="min-width:520px" role="img" aria-label="{e(label)}">{"".join(parts)}</svg></div>'
     )
 
@@ -309,7 +309,7 @@ def count_curve(g: GateDetail, sim: SimGate | None) -> str:
         )
     return (
         "<h4>How often the count gets there</h4>"
-        f'<div class="scrollx"><svg viewBox="0 0 760 {base + 22:.0f}" width="100%" '
+        f'<div class="scrollx" tabindex="0"><svg viewBox="0 0 760 {base + 22:.0f}" width="100%" '
         f'style="min-width:520px" role="img" aria-label="{e(label)}">{"".join(bars)}'
         f'<line x1="{left}" x2="{left + span}" y1="{base}" y2="{base}" stroke="var(--muted)"/>'
         f'<line x1="{xn:.1f}" x2="{xn:.1f}" y1="20" y2="{base}" '
@@ -442,7 +442,7 @@ def member_svg(g: GateDetail, case: CaseGates, cutoffs: tuple[float, float]) -> 
         else "No rank pivot: the threshold cannot be reached with the members present."
     )
     return (
-        f'<div class="scrollx"><svg viewBox="0 0 760 {base + 50:.0f}" width="100%" '
+        f'<div class="scrollx" tabindex="0"><svg viewBox="0 0 760 {base + 50:.0f}" width="100%" '
         f'style="min-width:520px" role="img" aria-label="{e(label)}">{"".join(parts)}</svg></div>'
     )
 
@@ -595,7 +595,8 @@ def gate_panel(
         f'data-gate="{e(g.stage)}"><h4>{e(g.stage)} · {e(gate_name(g.stage, g.label))}</h4>'
         f"<p class=rule>{e(g.rule.sentence)}</p>{tally_svg(g, sim)}{KEY}{facts}"
         f"{count_curve(g, sim)}"
-        f'<div class="vgrid"><div>{bloc_table(g)}</div><div>{threshold_steps(g)}</div></div>'
+        f'<div class="vgrid"><div tabindex="0">{bloc_table(g)}</div>'
+        f'<div tabindex="0">{threshold_steps(g)}</div></div>'
         f"{gate_whatif(cid, g, case, cutoffs, uncertain) if cid else ''}"
         f"<h4>{e(MEMBER_HEADING)}</h4><p class=note>{tag('supplied')} {e(MEMBER_NOTE)}"
         f"{DECISIVE_NOTE if sim is not None and sim.decisive_share else ''}</p>"

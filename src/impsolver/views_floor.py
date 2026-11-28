@@ -252,7 +252,8 @@ def lane_calendar(pf: Portfolio, plan: PlanOut, res: PortfolioResult, full: bool
         )
     label = f"Lane calendar. {calendar_summary(plan)}"
     return (
-        f'<div class="scrollx"><svg class="lanes" viewBox="0 0 {left + width + 10:.0f} '
+        f'<div class="scrollx" tabindex="0"><svg class="lanes" '
+        f'viewBox="0 0 {left + width + 10:.0f} '
         f'{height:.0f}" width="100%" style="min-width:640px" role="img" '
         f'aria-label="{e(label)}">{"".join(parts)}</svg></div>'
     )
