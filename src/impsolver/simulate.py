@@ -42,7 +42,7 @@ from .deterministic import default_path
 from .model import Alignment, Chamber, Member, Stage
 from .paths import Path, path_for
 from .prepare import Prepared
-from .results import CountSummary, SimArticle, SimGate, Simulation
+from .results import CountHist, CountSummary, SimArticle, SimGate, Simulation
 from .thresholds import has_quorum, membership_base, pro_wins, tie_mode
 from .uncertainty import has_uncertainty, sample_scenario
 
@@ -207,6 +207,9 @@ class RawSim:
     pro: npt.NDArray[np.int64]  # [g, draws]
     passed: npt.NDArray[np.bool_]  # [g, draws]
     present: npt.NDArray[np.int64]  # [g, draws] members in the chamber for the vote
+    # Per stage id, per roster member: draws in which that member's vote decided the gate.
+    decisive: dict[str, npt.NDArray[np.int64]] | None = None
+    random_attendance: bool = False
 
     @property
     def complete(self) -> npt.NDArray[np.bool_]:
@@ -222,11 +225,16 @@ def run_raw(
     rho: float,
     extra: float = 0.0,
     shared: dict[tuple[str, str], FloatArr] | None = None,
+    decisive: bool = False,
 ) -> RawSim:
     """Simulate ``draws`` passes through ``path``.
 
     ``shared`` maps (chamber, bloc) to a full-length array of party swings. Blocs found there use
     those swings instead of fresh ones, which correlates outcomes across scenarios.
+
+    ``decisive`` also counts, per gate and member, the draws in which the gate's result would
+    flip if that one member's vote flipped (the tally sits exactly on the line with the member
+    PRO, or one short with the member not PRO). It reads the same draws and changes no result.
     """
     stages = list(path.all_stages)
     models = chamber_models(prep, article, stages, extra)
@@ -236,6 +244,8 @@ def run_raw(
     pro = np.zeros((len(stages), draws), dtype=np.int64)
     passed = np.zeros((len(stages), draws), dtype=bool)
     present = np.zeros((len(stages), draws), dtype=np.int64)
+    masks = {ch: prep.present_mask(cm.chamber) for ch, cm in models.items()}
+    dec = {st.id: np.zeros(len(masks[st.chamber]), dtype=np.int64) for st in stages}
     done = 0
     while done < draws:
         m = min(CHUNK, draws - done)
@@ -268,18 +278,34 @@ def run_raw(
                 pro[k, done : done + m] = gate_pro[g]
                 present[k, done : done + m] = n_in
                 base = membership_base(st.rule, cm.seats, cm.vacancies)
-                wins = pro_wins(
-                    st.rule,
-                    st.pass_direction,
-                    gate_pro[g],
-                    n_in - gate_pro[g],
-                    np.zeros(m, dtype=np.int64),
-                    base,
-                    tie_mode(st, prep.scenario.senate_tie_break),
-                )
+                zero = np.zeros(m, dtype=np.int64)
+                tie = tie_mode(st, prep.scenario.senate_tie_break)
+                con = n_in - gate_pro[g]
+                wins = pro_wins(st.rule, st.pass_direction, gate_pro[g], con, zero, base, tie)
                 passed[k, done : done + m] = wins & quorum
+                if decisive:
+                    # One PRO vote fewer loses a won gate; one more wins a lost one.
+                    lose = ~pro_wins(
+                        st.rule, st.pass_direction, gate_pro[g] - 1, con + 1, zero, base, tie
+                    )
+                    gain = pro_wins(
+                        st.rule, st.pass_direction, gate_pro[g] + 1, con - 1, zero, base, tie
+                    )
+                    v = votes[g]
+                    other = ~v if absent is None else ~v & ~absent
+                    hits = (v & (wins & lose)[:, None]).sum(axis=0)
+                    hits += (other & (~wins & gain)[:, None]).sum(axis=0)
+                    dec[st.id][masks[ch]] += hits
         done += m
-    return RawSim(stages, len(path.stages), pro, passed, present)
+    return RawSim(
+        stages,
+        len(path.stages),
+        pro,
+        passed,
+        present,
+        dec if decisive else None,
+        any(cm.p_absent is not None for cm in models.values()),
+    )
 
 
 def summarize(x: npt.NDArray[np.int64]) -> CountSummary:
@@ -287,28 +313,56 @@ def summarize(x: npt.NDArray[np.int64]) -> CountSummary:
     return CountSummary(mean=float(x.mean()), p5=float(q[0]), p50=float(q[1]), p95=float(q[2]))
 
 
-def _gates(raw: RawSim) -> list[SimGate]:
+def histogram(x: npt.NDArray[np.int64]) -> CountHist:
+    """Draws per count, trimmed to the counts that occur."""
+    if x.size == 0:
+        return CountHist(start=0, counts=[])
+    lo = int(x.min())
+    return CountHist(start=lo, counts=[int(c) for c in np.bincount(x - lo)])
+
+
+def _gates(raw: RawSim, detail: bool = False) -> list[SimGate]:
     reached = np.ones(raw.pro.shape[1], dtype=bool)
+    draws = raw.pro.shape[1]
     gates: list[SimGate] = []
     for k, st in enumerate(raw.stages):
         r = float(reached.mean())
         pp = float(raw.passed[k][reached].mean()) if reached.any() else 0.0
-        gates.append(
-            SimGate(
-                stage=st.id, p_reached=r, p_pass_given_reached=pp, pro_count=summarize(raw.pro[k])
-            )
+        gate = SimGate(
+            stage=st.id, p_reached=r, p_pass_given_reached=pp, pro_count=summarize(raw.pro[k])
         )
+        if detail:
+            n = int(reached.sum())
+            gate.n_reached = n
+            gate.pass_se = float(np.sqrt(pp * (1 - pp) / n)) if n else None
+            gate.pro_count_reached = summarize(raw.pro[k][reached]) if n else None
+            gate.pro_hist = histogram(raw.pro[k][reached])
+            if raw.random_attendance:
+                gate.present_count = summarize(raw.present[k])
+            if raw.decisive is not None:
+                gate.decisive_share = [round(float(c) / draws, 5) for c in raw.decisive[st.id]]
+        gates.append(gate)
         reached = reached & raw.passed[k]
     return gates
 
 
 def simulate_article(
-    prep: Prepared, article: str, path: Path, draws: int, seed: int, rho: float
+    prep: Prepared,
+    article: str,
+    path: Path,
+    draws: int,
+    seed: int,
+    rho: float,
+    detail: bool = False,
 ) -> SimArticle:
-    return summarize_raw(run_raw(prep, article, path, draws, seed, rho), article, path, draws)
+    """One article's gate path. ``detail`` adds the per-gate fields the planning page draws."""
+    raw = run_raw(prep, article, path, draws, seed, rho, decisive=detail)
+    return summarize_raw(raw, article, path, draws, detail)
 
 
-def summarize_raw(raw: RawSim, article: str, path: Path, draws: int) -> SimArticle:
+def summarize_raw(
+    raw: RawSim, article: str, path: Path, draws: int, detail: bool = False
+) -> SimArticle:
     """Per-gate pass rates and P(complete) from one simulation run."""
     pc = float(raw.complete.mean())
     return SimArticle(
@@ -316,7 +370,7 @@ def summarize_raw(raw: RawSim, article: str, path: Path, draws: int) -> SimArtic
         path=path.name,
         p_complete=pc,
         mc_se=float(np.sqrt(pc * (1 - pc) / draws)),
-        gates=_gates(raw),
+        gates=_gates(raw, detail),
     )
 
 
@@ -449,6 +503,7 @@ def run_raw_articles(
     rho: float,
     extra: float = 0.0,
     shared: dict[tuple[str, str], FloatArr] | None = None,
+    decisive: bool = False,
 ) -> dict[str, RawSim]:
     """Run :func:`run_raw` for each article with common random numbers.
 
@@ -459,7 +514,7 @@ def run_raw_articles(
     correlated through the shared member draws, as they are when one chamber votes on several
     articles against the same official.
     """
-    return {a: run_raw(prep, a, path, draws, seed, rho, extra, shared) for a in articles}
+    return {a: run_raw(prep, a, path, draws, seed, rho, extra, shared, decisive) for a in articles}
 
 
 def any_complete(raws: dict[str, RawSim]) -> npt.NDArray[np.bool_]:

@@ -80,7 +80,7 @@ def test_page_has_tabs_ladder_and_one_panel_per_gate(res: PortfolioResult) -> No
     assert tab.count('class="gatebtn"') == 10 and tab.count('class="gatepanel') == 10
     # The binding gate is the one open at first, and it is labelled in words, not by colour.
     assert re.search(r'data-gate="S2" aria-pressed="true"[^>]*><b>S2<span class="tag">binding', tab)
-    assert "then passes: 39.7% (under 50%)" in tab
+    assert "then passes: 40% (under 50%)" in tab
     assert "Optional, after conviction" in tab
     assert "Two thirds of the members present. With 100 present, PRO needs 67." in tab
     # Each drawing carries a text alternative.

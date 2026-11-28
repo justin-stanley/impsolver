@@ -435,7 +435,8 @@ def left_out_table(res: PortfolioResult) -> str:
 def plan_views(pf: Portfolio, plan: PlanOut, res: PortfolioResult) -> str:
     """The lane calendar, its full-window version, the day budget and the date reasons."""
     return (
-        f"<p class=note>{e(calendar_summary(plan))} Bar labels count session days.</p>"
+        f"<p class=note>{e(calendar_summary(plan))} Bar labels count session days. Durations "
+        "are the supplied numbers; no range is drawn around them.</p>"
         f"{lane_calendar(pf, plan, res)}{CALENDAR_KEY}"
         '<details class="full"><summary>Show the whole window to the deadline</summary>'
         f"{lane_calendar(pf, plan, res, full=True)}</details>"

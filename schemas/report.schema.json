@@ -237,6 +237,28 @@
       "title": "ChamberRoster",
       "type": "object"
     },
+    "CountHist": {
+      "description": "How many draws gave each count: ``counts[i]`` draws had ``start + i``.",
+      "properties": {
+        "start": {
+          "title": "Start",
+          "type": "integer"
+        },
+        "counts": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "start",
+        "counts"
+      ],
+      "title": "CountHist",
+      "type": "object"
+    },
     "CountSummary": {
       "properties": {
         "mean": {
@@ -1391,6 +1413,78 @@
         },
         "pro_count": {
           "$ref": "#/$defs/CountSummary"
+        },
+        "n_reached": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Reached"
+        },
+        "pass_se": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pass Se"
+        },
+        "pro_count_reached": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CountSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pro_hist": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CountHist"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "present_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CountSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "decisive_share": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decisive Share"
         }
       },
       "required": [
